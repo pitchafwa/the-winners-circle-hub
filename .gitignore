@@ -1,0 +1,17 @@
+# Secrets — never committed
+.env
+
+# Python
+ingest/.venv/
+ingest/.cache/
+ingest/__pycache__/
+**/__pycache__/
+*.pyc
+
+# Node / frontend
+web/node_modules/
+web/dist/
+
+# OS
+.DS_Store
+Thumbs.db

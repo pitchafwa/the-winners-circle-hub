@@ -1,0 +1,12 @@
+[build]
+  base = "web"
+  command = "pnpm build"
+  publish = "dist"
+
+# React Router client-side routes (e.g. /team, /history, /admin/trades) need
+# every path to fall through to index.html — otherwise a direct link or
+# refresh on a non-root route 404s.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

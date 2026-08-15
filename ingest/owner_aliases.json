@@ -1,0 +1,22 @@
+{
+  "_readme": [
+    "Maps ESPN team_id to the real names league members actually use in text",
+    "messages when discussing trades and draft picks. Used by parse.py's team-key",
+    "matcher (load_manual_draft, and future manual_trades helpers) so 'Deejay',",
+    "'Ant', 'Tommy', etc. resolve to the right franchise, not just the ESPN team",
+    "name/abbrev/id. First alias listed is treated as the primary display nickname.",
+    "team_id 10 (Remember the Process) is Tommy's own team."
+  ],
+  "aliases": {
+    "1": ["Deejay", "Malik"],
+    "2": ["BMoney", "Brandon"],
+    "3": ["Derrick"],
+    "4": ["Travian", "Lew", "TrayLew"],
+    "5": ["Antonio"],
+    "6": ["Ant", "Anthone"],
+    "7": ["Dae", "Daevion"],
+    "8": ["Marquel", "Kelo"],
+    "9": ["Tyus"],
+    "10": ["Tommy"]
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "_readme": [
+    "Trades executed via LM tools (so ESPN has no TRADE_ACCEPT record) and",
+    "pick swaps tracked in the commissioner's notes. Merged into activity.json.",
+    "Each trade: {season, date: 'YYYY-MM-DD', week (scoring period it lands in),",
+    "  teams: [teamA_id, teamB_id],",
+    "  assets: [",
+    "    {player: 'Player Name', from: teamA_id, to: teamB_id}   -- players by name",
+    "    {pick: '2027 2nd', from: teamB_id, to: teamA_id}        -- picks as text",
+    "  ]}",
+    "Player names are matched against the NFL player list; unmatched names fail",
+    "the build loudly rather than guessing.",
+    "pick_ownership: current holder of every traded future pick, one entry per",
+    "pick: {season, round, original_team_id, owned_by_team_id, via: 'free text'}."
+  ],
+  "trades": [
+    {
+      "season": 2026,
+      "date": "2026-08-10",
+      "week": 0,
+      "teams": [
+        6,
+        8
+      ],
+      "assets": [
+        {
+          "pick": "2026 1st",
+          "from": 6,
+          "to": 8
+        },
+        {
+          "player": "Chris Godwin Jr.",
+          "from": 8,
+          "to": 6
+        }
+      ]
+    }
+  ],
+  "pick_ownership": [
+    {
+      "season": 2026,
+      "round": 1,
+      "original_team_id": 6,
+      "owned_by_team_id": 8,
+      "via": "traded 2026-08-10"
+    }
+  ]
+}

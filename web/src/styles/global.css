@@ -167,11 +167,25 @@ hr,
   padding-bottom: 1rem;
 }
 
+.masthead-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
 .wordmark {
   font-size: clamp(1.9rem, 4.5vw, 2.9rem);
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--paper);
+}
+
+.masthead-date {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #96A0BE;
 }
 
 .masthead-controls {

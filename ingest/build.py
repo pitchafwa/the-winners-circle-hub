@@ -374,10 +374,11 @@ def build_badges(seasons: list[int]) -> None:
         for s in league.full_schedule:
             if s.winner == "UNDECIDED" or s.away_id is None:
                 continue
-            # playoff weeks: winners-bracket games only — consolation scores
-            # are teams that aren't really playing (also excludes seasons
-            # where tier info is unavailable, rather than counting noise)
-            if s.matchup_period > league.reg_season_weeks and s.playoff_tier != "WINNERS_BRACKET":
+            # regular season only — playoff teams play strictly more real
+            # games than the field did all year, so letting a playoff week
+            # set the all-time single-week record would be an unfair extra
+            # shot at it purely for having stayed alive
+            if s.matchup_period > league.reg_season_weeks:
                 continue
             for score, tid in ((s.home_score, s.home_id), (s.away_score, s.away_id)):
                 if score <= 0:

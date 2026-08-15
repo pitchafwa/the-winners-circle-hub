@@ -257,6 +257,15 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
         # games don't earn (or suffer) awards
         if any(m.is_playoff for m in matchups):
             matchups = [m for m in matchups if m.playoff_tier == "WINNERS_BRACKET"]
+        # Regular-season-only past this point, with three exceptions: playoff
+        # teams play strictly fewer real opponents than the field did all
+        # year, so letting them keep racking up highest-score/blowout/etc.
+        # trophies in the playoffs would unfairly pad their trophy count vs.
+        # teams whose season ended in week reg_season_weeks. Worst benching,
+        # the bust, and the projection buster are single-decision/single-player
+        # mistakes rather than "did you have the best week" wins, so those
+        # keep accumulating every week, playoffs included.
+        reg_season_only = week <= league.reg_season_weeks
         team_weeks: list[TeamWeek] = []
         margins: list[tuple[float, TeamWeek, TeamWeek]] = []  # (margin, winner, loser)
         winners: list[TeamWeek] = []
@@ -280,22 +289,23 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
         if not team_weeks:
             continue
 
-        # Highest / lowest score
-        hi = max(team_weeks, key=lambda t: t.total)
-        lo = min(team_weeks, key=lambda t: t.total)
-        awards.append(Award(week, "highest_score", hi.team_id, hi.total,
-                            f"{tname[hi.team_id]} put up {_fmt(hi.total)}, the week's top score"))
-        awards.append(Award(week, "lowest_score", lo.team_id, lo.total,
-                            f"{tname[lo.team_id]} managed just {_fmt(lo.total)}"))
+        if reg_season_only:
+            # Highest / lowest score
+            hi = max(team_weeks, key=lambda t: t.total)
+            lo = min(team_weeks, key=lambda t: t.total)
+            awards.append(Award(week, "highest_score", hi.team_id, hi.total,
+                                f"{tname[hi.team_id]} put up {_fmt(hi.total)}, the week's top score"))
+            awards.append(Award(week, "lowest_score", lo.team_id, lo.total,
+                                f"{tname[lo.team_id]} managed just {_fmt(lo.total)}"))
 
-        # Best coach — highest rating, tiebreak fewer bench points lost
-        rated = [(tid, coach[tid]["weeks"][week]) for tid in coach
-                 if week in coach[tid]["weeks"] and coach[tid]["weeks"][week]["rating"] is not None]
-        if rated:
-            tid, cw = max(rated, key=lambda kv: (kv[1]["rating"], -kv[1]["bench_lost"]))
-            awards.append(Award(week, "best_coach", tid, round(cw["rating"] * 100, 1),
-                                f"{tname[tid]} started {_fmt(cw['actual'])} of a possible "
-                                f"{_fmt(cw['optimal'])} ({cw['rating']:.1%})"))
+            # Best coach — highest rating, tiebreak fewer bench points lost
+            rated = [(tid, coach[tid]["weeks"][week]) for tid in coach
+                     if week in coach[tid]["weeks"] and coach[tid]["weeks"][week]["rating"] is not None]
+            if rated:
+                tid, cw = max(rated, key=lambda kv: (kv[1]["rating"], -kv[1]["bench_lost"]))
+                awards.append(Award(week, "best_coach", tid, round(cw["rating"] * 100, 1),
+                                    f"{tname[tid]} started {_fmt(cw['actual'])} of a possible "
+                                    f"{_fmt(cw['optimal'])} ({cw['rating']:.1%})"))
 
         # Worst benching — largest benched score that beat an eligible starter
         best_bench: tuple[float, float, int, PlayerWeek, PlayerWeek] | None = None
@@ -316,34 +326,35 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
                                 f"{tname[tid]} started {s.name} for {_fmt(s.actual)} "
                                 f"and sat {b.name} for {_fmt(b.actual)}"))
 
-        # Blowout / nail-biter
-        if margins:
-            mg, w_, l_ = max(margins, key=lambda x: x[0])
-            awards.append(Award(week, "blowout", w_.team_id, mg,
-                                f"{tname[w_.team_id]} beat {tname[l_.team_id]} by {_fmt(mg)} "
-                                f"({_fmt(w_.total)}–{_fmt(l_.total)})"))
-            mg, w_, l_ = min(margins, key=lambda x: x[0])
-            detail = (f"{tname[w_.team_id]} and {tname[l_.team_id]} tied at {_fmt(w_.total)}"
-                      if mg == 0.0 and any(m.winner == "TIE" for m in matchups)
-                      else f"{tname[w_.team_id]} edged {tname[l_.team_id]} by {_fmt(mg)} "
-                           f"({_fmt(w_.total)}–{_fmt(l_.total)})")
-            awards.append(Award(week, "nail_biter", w_.team_id, mg, detail))
+        if reg_season_only:
+            # Blowout / nail-biter
+            if margins:
+                mg, w_, l_ = max(margins, key=lambda x: x[0])
+                awards.append(Award(week, "blowout", w_.team_id, mg,
+                                    f"{tname[w_.team_id]} beat {tname[l_.team_id]} by {_fmt(mg)} "
+                                    f"({_fmt(w_.total)}–{_fmt(l_.total)})"))
+                mg, w_, l_ = min(margins, key=lambda x: x[0])
+                detail = (f"{tname[w_.team_id]} and {tname[l_.team_id]} tied at {_fmt(w_.total)}"
+                          if mg == 0.0 and any(m.winner == "TIE" for m in matchups)
+                          else f"{tname[w_.team_id]} edged {tname[l_.team_id]} by {_fmt(mg)} "
+                               f"({_fmt(w_.total)}–{_fmt(l_.total)})")
+                awards.append(Award(week, "nail_biter", w_.team_id, mg, detail))
 
-        # Luck: unluckiest / luckiest vs the week's median
-        scores = [t.total for t in team_weeks]
-        median = statistics.median(scores)
-        if losers:
-            above = [t for t in losers if t.total > median]
-            pick = max(above, key=lambda t: t.total) if above else max(losers, key=lambda t: t.total)
-            qual = "lost despite beating the weekly median" if above else "was the week's highest-scoring loser"
-            awards.append(Award(week, "unluckiest", pick.team_id, pick.total,
-                                f"{tname[pick.team_id]} {qual} with {_fmt(pick.total)}"))
-        if winners:
-            below = [t for t in winners if t.total < median]
-            pick = min(below, key=lambda t: t.total) if below else min(winners, key=lambda t: t.total)
-            qual = "won while scoring below the weekly median" if below else "was the week's lowest-scoring winner"
-            awards.append(Award(week, "luckiest", pick.team_id, pick.total,
-                                f"{tname[pick.team_id]} {qual} with {_fmt(pick.total)}"))
+            # Luck: unluckiest / luckiest vs the week's median
+            scores = [t.total for t in team_weeks]
+            median = statistics.median(scores)
+            if losers:
+                above = [t for t in losers if t.total > median]
+                pick = max(above, key=lambda t: t.total) if above else max(losers, key=lambda t: t.total)
+                qual = "lost despite beating the weekly median" if above else "was the week's highest-scoring loser"
+                awards.append(Award(week, "unluckiest", pick.team_id, pick.total,
+                                    f"{tname[pick.team_id]} {qual} with {_fmt(pick.total)}"))
+            if winners:
+                below = [t for t in winners if t.total < median]
+                pick = min(below, key=lambda t: t.total) if below else min(winners, key=lambda t: t.total)
+                qual = "won while scoring below the weekly median" if below else "was the week's lowest-scoring winner"
+                awards.append(Award(week, "luckiest", pick.team_id, pick.total,
+                                    f"{tname[pick.team_id]} {qual} with {_fmt(pick.total)}"))
 
         # Projection buster / bust (starters only)
         projected = [(tw.team_id, p) for tw in team_weeks for p in tw.starters()
@@ -366,7 +377,7 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
 
         # Waiver hero — best starter added via waivers/FA in the last 14 days
         week_end = league.week_end_dates.get(week)
-        if week_end and league.adds:
+        if reg_season_only and week_end and league.adds:
             heroes = []
             for tw in team_weeks:
                 for p in tw.starters():

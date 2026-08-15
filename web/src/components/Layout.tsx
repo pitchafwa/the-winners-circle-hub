@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useApp } from "../state/AppContext";
 import { dateTime } from "../lib/format";
+import type { Meta } from "../types/data";
 
 const NAV = [
   { to: "/", label: "League", end: true },
@@ -10,6 +11,16 @@ const NAV = [
   { to: "/trophies", label: "Trophy Case" },
 ];
 
+/** WEEK N · LIVE / LATE EDITION once that week's games are all in, or
+ * OFFSEASON outside the season — computed from fields already in the
+ * data contract, no ingest change needed. */
+function mastheadDate(meta: Meta | null): string {
+  if (!meta || !meta.season_started) return "Offseason";
+  const week = meta.current_matchup_period;
+  const done = meta.completed_weeks.includes(week);
+  return `Week ${String(week).padStart(2, "0")} · ${done ? "Late Edition" : "Live"}`;
+}
+
 export default function Layout() {
   const { seasonsIndex, season, setSeason, meta, metaError, myTeamId, setMyTeamId } = useApp();
 
@@ -17,7 +28,10 @@ export default function Layout() {
     <div className="shell">
       <header className="masthead">
         <div className="masthead-top">
-          <h1 className="wordmark">{meta?.name ?? "The League Hub"}</h1>
+          <div className="masthead-name">
+            <h1 className="wordmark">{meta?.name ?? "The League Hub"}</h1>
+            <span className="masthead-date">{mastheadDate(meta)}</span>
+          </div>
           <div className="masthead-controls">
             {meta && (
               <label>

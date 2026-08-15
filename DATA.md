@@ -16,6 +16,17 @@ General rules:
   only `WINNERS_BRACKET` games feed stats/superlatives/records — consolation-ladder
   games involve teams that aren't really competing and are excluded everywhere
   except the matchups page (which still shows them, clearly tagged).
+- Weekly superlatives/trophies are **regular-season only**, with three named
+  exceptions (`worst_benching`, `bust`, `projection_buster`) that keep firing
+  in the playoffs too — playoff teams play strictly more real games than
+  everyone else, so letting every award type keep accumulating for them would
+  unfairly pad their trophy count relative to a team whose season ended in
+  week `reg_season_weeks`. The three exceptions are single-decision/single-
+  player mistakes, not "best week" wins, so that imbalance doesn't apply the
+  same way. Same rule for `record_high_week`/`record_low_week` badges — a
+  playoff week can't set the all-time single-week record. See
+  `metrics.compute_superlatives`'s `reg_season_only` flag and the matching
+  filter in `build.py`'s `build_badges`.
 
 ## `seasons.json`
 

@@ -573,22 +573,6 @@ export default function HistoryPage() {
 
       <section className="section">
         <div className="section-head">
-          <h2>Head-to-head</h2>
-          <span className="label">
-            {h2hSeasons.length > 0
-              ? `all-time, ${Math.min(...h2hSeasons)}–${Math.max(...h2hSeasons)} · row team's wins vs column team`
-              : "row team's wins vs column team"}
-          </span>
-        </div>
-        {h2hSeasons.length > 0 ? (
-          <H2HMatrix bundles={all.bundles} meta={meta} />
-        ) : all.loading ? null : (
-          <EmptyState>The grid fills in once games are played.</EmptyState>
-        )}
-      </section>
-
-      <section className="section">
-        <div className="section-head">
           <h2>Schedule swap</h2>
           <span className="label">{season} · the argument generator</span>
         </div>
@@ -620,10 +604,26 @@ export default function HistoryPage() {
       <section className="section">
         <div className="section-head">
           <h2>Record book</h2>
-          <span className="label">all seasons on file ({all.bundles.map((b) => b.season).sort().join(", ")})</span>
+          <span className="label">all seasons on file</span>
         </div>
         {all.error && <div className="error-state">{all.error}</div>}
         {all.bundles.length > 0 && <RecordBook bundles={all.bundles} />}
+      </section>
+
+      <section className="section">
+        <div className="section-head">
+          <h2>Head-to-head</h2>
+          <span className="label">
+            {h2hSeasons.length > 0
+              ? `all-time, ${Math.min(...h2hSeasons)}–${Math.max(...h2hSeasons)} · row team's wins vs column team`
+              : "row team's wins vs column team"}
+          </span>
+        </div>
+        {h2hSeasons.length > 0 ? (
+          <H2HMatrix bundles={all.bundles} meta={meta} />
+        ) : all.loading ? null : (
+          <EmptyState>The grid fills in once games are played.</EmptyState>
+        )}
       </section>
 
       <section className="section">

@@ -446,3 +446,119 @@ export interface Badges {
   /** Manual badges whose franchise no longer exists (2012-17 era). */
   unassigned: Badge[];
 }
+
+export type AcquiredVia = "draft" | "trade" | "waiver" | "fa" | "preexisting" | "unknown";
+export type DepartedVia = "trade" | "dropped" | null;
+
+export interface OwnershipStint {
+  player_id: number;
+  name: string;
+  position: string;
+  team_id: number;
+  acquired_via: AcquiredVia;
+  start_season: number;
+  start_week: number;
+  departed_via: DepartedVia;
+  end_season: number | null;
+  end_week: number | null;
+  weeks_rostered: number;
+  weeks_started: number;
+  weeks_benched: number;
+  points_started: number;
+  points_projected_started: number;
+  points_benched: number;
+  start_rate: number;
+}
+
+export interface OwnershipLeader {
+  team_id: number;
+  player_id: number;
+  name: string;
+  position: string;
+  points_started: number;
+  points_under_projection: number;
+  weeks_rostered: number;
+  weeks_started: number;
+  start_rate: number;
+  start_season: number;
+  start_week: number;
+  end_season: number | null;
+  end_week: number | null;
+}
+
+export interface Ownership {
+  generated_at: string;
+  stints: OwnershipStint[];
+  leaders: {
+    value: OwnershipLeader[];
+    busts: OwnershipLeader[];
+    stashes: OwnershipLeader[];
+  };
+}
+
+export interface TradeGradeAsset {
+  player_id?: number | null;
+  name?: string;
+  pick?: string;
+  from_team_id: number;
+  to_team_id: number;
+  value: number | null;
+}
+
+export interface TradeValueSide {
+  gained: number;
+  lost: number;
+  net: number;
+}
+
+export interface TradeGrade {
+  season: number;
+  date: number;
+  week: number;
+  team_ids: number[];
+  players: TradeGradeAsset[];
+  picks: TradeGradeAsset[];
+  value_by_team: Record<string, TradeValueSide>;
+  winner_team_id: number | null;
+  has_estimated_asset: boolean;
+}
+
+export interface TradeGrades {
+  generated_at: string;
+  trades: TradeGrade[];
+  valuation_available: boolean;
+  valuation_updated_at: string | null;
+}
+
+export interface PickFuturesEntry {
+  season: number;
+  round: number;
+  original_team_id: number;
+  current_owner_id: number;
+  status: PickResolutionStatus;
+  overall_pick: number | null;
+  player_id: number | null;
+  player_name: string | null;
+  via: string;
+}
+
+export interface PickFutures {
+  generated_at: string;
+  board: PickFuturesEntry[];
+}
+
+export type SpectrumLabel = "Contending" | "Balanced" | "Rebuilding";
+
+export interface SpectrumTeam {
+  team_id: number;
+  current_roster_value: number;
+  future_pick_capital: number;
+  ratio: number;
+  percentile: number;
+  label: SpectrumLabel;
+}
+
+export interface Spectrum {
+  generated_at: string;
+  teams: SpectrumTeam[];
+}

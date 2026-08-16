@@ -1,0 +1,25 @@
+{
+  "_readme": [
+    "Manual override of a future season's rookie-draft order.",
+    "Wins over the computed real-standings order in pick_tracking.resolve()",
+    "whenever present for that season, and doesn't need the prior season to",
+    "be final first \u2014 used when Tommy wants the pick futures board to reflect",
+    "an order that isn't established by real ESPN standings yet (or a",
+    "correction), without backdating every pick-swap trade to get there.",
+    "overrides: {\"<season>\": [team_id, ...]} \u2014 pick 1 first, one entry per team."
+  ],
+  "overrides": {
+    "2026": [
+      2,
+      7,
+      9,
+      8,
+      5,
+      3,
+      4,
+      1,
+      6,
+      10
+    ]
+  }
+}

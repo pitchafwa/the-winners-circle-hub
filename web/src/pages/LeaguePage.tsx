@@ -8,7 +8,8 @@ import ActivityFeed from "../components/ActivityFeed";
 import EmptyState from "../components/EmptyState";
 import OddsStrip from "../components/OddsStrip";
 import PositionHeatmap from "../components/PositionHeatmap";
-import type { Activity, Award, Positions, Power, Recaps, Sim, Standings, Superlatives } from "../types/data";
+import ContendRebuildTable from "../components/ContendRebuildTable";
+import type { Activity, Award, Positions, Power, Recaps, Sim, Spectrum, Standings, Superlatives } from "../types/data";
 
 /** Pick the latest week's single biggest story for the hero. */
 function marquee(awards: Award[], week: number): Award | null {
@@ -31,6 +32,7 @@ export default function LeaguePage() {
   const sim = useOptionalJson<Sim>(base ? `${base}/sim.json` : null);
   const recaps = useOptionalJson<Recaps>(base ? `${base}/recaps.json` : null);
   const positions = useOptionalJson<Positions>(base ? `${base}/positions.json` : null);
+  const spectrum = useJson<Spectrum>("spectrum.json");
 
   if (!meta) return null;
 
@@ -82,6 +84,16 @@ export default function LeaguePage() {
             <EmptyState>Standings appear once week 1 is in the books.</EmptyState>
           ))}
       </section>
+
+      {spectrum.data && spectrum.data.teams.length > 0 && (
+        <section className="section" aria-labelledby="spectrum-h">
+          <div className="section-head">
+            <h2 id="spectrum-h">Contend / Rebuild</h2>
+            <span className="label">current roster value vs. future pick capital</span>
+          </div>
+          <ContendRebuildTable spectrum={spectrum.data} />
+        </section>
+      )}
 
       <div className="two-col">
         <section className="section" aria-labelledby="power-h">

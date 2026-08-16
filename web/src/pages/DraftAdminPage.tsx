@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "../state/AppContext";
 import PasswordGate from "../components/PasswordGate";
 import TeamPicker from "../components/TeamPicker";
+import { clearJsonCache } from "../lib/data";
 import { parseDraft, submitDraft } from "../lib/draftApi";
 import type { ParsedDraftPick } from "../types/draftAdmin";
 
@@ -108,6 +109,7 @@ export default function DraftAdminPage() {
       }
       setRebuildLog(res.rebuild_output ?? "");
       setPicksWritten(res.picks_written ?? 0);
+      clearJsonCache();
       setStage("done");
     } catch (e) {
       setError((e as Error).message);

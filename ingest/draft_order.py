@@ -17,9 +17,28 @@ computed it correctly when it built the bracket.
 """
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 
+import config
 from parse import LeagueData
+
+MANUAL_OVERRIDE_PATH = config.ROOT / "ingest" / "manual_draft_order.json"
+
+
+def manual_override(year: int) -> list[int] | None:
+    """A hand-set full pick order for one draft year, if one's been saved —
+    always wins over the computed real-standings order in
+    pick_tracking.resolve() when present, and unlike the computed order it
+    doesn't need the prior season to be final first. For when Tommy doesn't
+    want to backdate real pick-swap trades just to get the pick futures
+    board's projected slots right."""
+    if not MANUAL_OVERRIDE_PATH.exists():
+        return None
+    with open(MANUAL_OVERRIDE_PATH, encoding="utf-8") as f:
+        overrides = json.load(f).get("overrides", {})
+    order = overrides.get(str(year))
+    return order if order else None
 
 
 def _playoff_team_ids(league: LeagueData) -> set[int]:

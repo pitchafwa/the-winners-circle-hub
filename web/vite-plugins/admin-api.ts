@@ -11,8 +11,10 @@ const PYTHON = path.join(INGEST_DIR, ".venv", "Scripts", "python.exe");
 // URL /api/<tool>/<subcommand> -> `python <tool>_tool.py <subcommand>`.
 // Whitelisted explicitly — never derive a script path from unchecked user input.
 const TOOLS: Record<string, { script: string; subcommands: string[] }> = {
-  trade: { script: "trade_tool.py", subcommands: ["resolve", "submit"] },
+  trade: { script: "trade_tool.py", subcommands: ["resolve", "submit", "list", "delete", "reassign_pick"] },
   draft: { script: "draft_tool.py", subcommands: ["parse", "submit"] },
+  draftorder: { script: "draft_order_tool.py", subcommands: ["get", "set", "clear"] },
+  data: { script: "data_tool.py", subcommands: ["export", "import"] },
 };
 
 function readBody(req: IncomingMessage): Promise<string> {
@@ -50,7 +52,7 @@ export default function adminApiPlugin(): Plugin {
     name: "admin-api",
     configureServer(server: ViteDevServer) {
       server.middlewares.use(async (req, res, next) => {
-        const match = req.url?.match(/^\/api\/([a-z]+)\/([a-z]+)$/);
+        const match = req.url?.match(/^\/api\/([a-z]+)\/([a-z_]+)$/);
         if (!match) return next();
         if (req.method !== "POST") {
           res.statusCode = 405;

@@ -86,3 +86,35 @@ export interface SubmitResponse {
   ok: boolean;
   rebuild_output: string;
 }
+
+export interface TradeListEntry {
+  id: string;
+  season: number;
+  date: string;
+  week: number;
+  team_names: string[];
+  assets: string[];
+}
+
+export interface ListTradesResponse {
+  trades: TradeListEntry[];
+}
+
+export interface DeleteTradeResponse {
+  ok: boolean;
+  rebuild_output: string;
+  reverted_picks: string[];
+}
+
+export interface ReassignPickPayload {
+  season: number;
+  round: number;
+  original_team_id: number;
+  new_owner_id: number;
+  note?: string;
+}
+
+export interface ReassignPickResponse {
+  ok: boolean;
+  rebuild_output: string;
+}

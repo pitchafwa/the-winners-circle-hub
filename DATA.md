@@ -231,14 +231,39 @@ entirely. There are two separate grades, shown separately:
 
 `picks[]`: `{overall, round, round_pick, team_id, player_id, keeper, bid,
 name, position, value (current 1QB dynasty value, 0–9999), expected_value
-(smoothed same-position baseline — a moving average over ACTUAL draft order,
-not a resort, so it can't fall into the bug above), value_diff (value −
-expected_value; this is what efficiency_grades sums), points/expected/diff
-(informational only: real season fantasy production and its own best-of-
-position resort — kept for context, NOT used for grading; null preseason)}`.
+(a fixed external pick-value curve looked up by round/round_pick — see
+`ingest/pick_values.json` — NOT derived from this class's own players),
+value_diff (value − expected_value; this is what efficiency_grades sums),
+points/expected/diff (informational only: real season fantasy production and
+its own best-of-position resort — kept for context, NOT used for grading;
+null preseason)}`.
 Players outside the valuation source's ranked universe (essentially all D/ST
 and K, and deep dart-throw picks) get `value: 0` — an honest read: the market
 judges these to carry no real dynasty asset value, not unknown data.
+`expected_value` is `null` for any pick beyond what `pick_values.json` covers
+(currently rounds 1-4) rather than a guessed number, and `value_diff` is
+`null` whenever either input is — never a fabricated difference.
+
+**Why `expected_value` isn't derived from this league's own draft class
+(2026-08 revision)**: it used to be a smoothed average of nearby SAME-
+POSITION picks' actual current values within that one class (fixing an even
+earlier bug where a full value-resort let a team's own later good pick steal
+expected value from its own earlier pick). That approach had its own real
+flaw: it made "expected value" drift with how strong or weak that one year's
+class happened to be, so two different seasons' report cards graded 1.01
+against two different baselines — not comparable to each other even at the
+same pick number. `pick_values.json` fixes that with real KeepTradeCut
+rookie-pick dynasty trade values (1QB format) instead — genuinely
+**year-specific** where KTC's real futures market actually supports it
+(`parse.pick_values_for_season`), since KTC does publish a class-strength
+signal for picks that haven't happened yet (a 2027 1st is priced higher
+than a 2026 1st right now, matching this league's own read that 2026's
+class is weak). A season without a matching year on file — every draft this
+league has ever run, since manual draft data only goes back to 2024 and the
+earliest year on file is 2026 — clamps to the nearest year available rather
+than extrapolating or refusing to grade. Tommy's call: exact year-matching
+isn't expected for the past, just wanted where it's real and available for
+drafts going forward.
 
 `valuation_available` (bool) and `valuation_updated_at`: if the valuation
 fetch fails and no prior cache exists, `haul_grades`/`efficiency_grades` are
@@ -249,3 +274,78 @@ unmatched-name warnings from the manual draft file.
 
 Standings rows also carry `consistency` (stdev of weekly scores, lower =
 steadier; null under 2 games).
+
+## `ownership.json` (top level, cross-season)
+
+Roster-ownership timeline: continuous per-player-per-team tenure "stints,"
+built by `ingest/ownership.py` by joining per-week lineups
+(`matchups/week-N.json`), activity events, manual trades, and manual drafts.
+A stint ends the moment a player stops appearing in that team's weekly
+lineup (a real departure — never a bye; byes still leave the player in the
+lineup with `played: false`).
+
+`stints[]`: `{player_id, name, position, team_id, acquired_via
+("draft"|"trade"|"waiver"|"fa"|"preexisting"|"unknown"), start_season,
+start_week, departed_via ("trade"|"dropped"|null), end_season, end_week
+(both null = still on this roster today), weeks_rostered, weeks_started,
+weeks_benched, points_started, points_projected_started, points_benched,
+start_rate (weeks_started / weeks_rostered)}`. `acquired_via: "preexisting"`
+means the stint's first data week is also the first season this league has
+any lineup data for at all (2024 in practice — 2012–2023 is standings-only,
+see the History section above) — there's no earlier record to attribute the
+acquisition to. `"unknown"` means a real acquisition that predates
+`manual_trades.json`'s coverage or otherwise couldn't be matched to a
+draft/trade/waiver event; both are honest "don't know," never guessed.
+
+`leaders`: three per-team top-5 lists derived from `stints[]` — `value`
+(highest `points_started`, "who's delivered the most value"), `busts`
+(highest `points_projected_started − points_started`, min. 4 weeks
+rostered, "biggest headache"), `stashes` (lowest `start_rate`, min. 10
+weeks rostered, "longest-held bench project"). Each entry:
+`{team_id, player_id, name, position, points_started,
+points_under_projection, weeks_rostered, weeks_started, start_rate,
+start_season, start_week, end_season, end_week}`.
+
+## `trades.json` (top level, cross-season)
+
+Every trade in `ingest/manual_trades.json`, graded on the same dynasty
+valuation table (`ingest/valuation.py`) that backs `draft.json` — no second
+baseline. `trades[]`: `{season, date, week, team_ids[], players[]
+{player_id, name, from_team_id, to_team_id, value}, picks[] {pick,
+from_team_id, to_team_id, value}, value_by_team{"<team_id>": {gained, lost,
+net}}, winner_team_id, has_estimated_asset}`.
+
+Player `value` resolves directly against the dynasty table. A traded pick
+can't be resolved to its exact draft slot from the trade record alone (that
+needs the original-owner + resolved-slot bookkeeping `pick_tracking.py`
+does at read time, not captured per historical trade), so pick `value` is
+that draft year's **round average** from `pick_values.json` and the trade
+gets `has_estimated_asset: true` — surfaced in the UI, never hidden as if
+it were a hard number. `winner_team_id` is `null` when valuation wasn't
+available for this build (explicit missing-data state, matching
+`draft.json`'s `valuation_available` convention) — see `valuation_available`
+/ `valuation_updated_at` at the top level.
+
+## `pick_futures.json` (top level, cross-season)
+
+Every team's full slate of picks for the next 3 rookie drafts, starting
+with the current (imminent, not-yet-drafted) season — not just picks that
+have been traded, unlike `activity.json`'s per-season `pick_ownership`.
+`board[]`: `{season, round, original_team_id, current_owner_id, status
+("unresolved"|"projected"|"resolved"), overall_pick, player_id,
+player_name, via}` — same resolution states as `activity.json`'s
+`pick_ownership` (`ingest/pick_tracking.py:resolve`); untraded picks
+default `current_owner_id` to `original_team_id`.
+
+## `spectrum.json` (top level, cross-season)
+
+Contend/rebuild signal per team. No player-age data exists anywhere in
+this league's cache (checked the raw ESPN player JSON directly — not
+exposed), so instead of roster age this compares two real numbers: current
+roster dynasty value (open `ownership.json` stints) against held future
+pick capital (`pick_futures.json`, valued the same round-average way as
+`trades.json`'s pick assets). `teams[]`: `{team_id, current_roster_value,
+future_pick_capital, ratio (pick_capital / (roster_value + pick_capital)),
+percentile (league-wide rank of ratio, 0–100), label
+("Contending"|"Balanced"|"Rebuilding")}` — percentile ≤33 Contending, ≥67
+Rebuilding, else Balanced.

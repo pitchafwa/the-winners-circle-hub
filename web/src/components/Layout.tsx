@@ -1,14 +1,31 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useApp } from "../state/AppContext";
 import { dateTime } from "../lib/format";
+import NavDropdown from "./NavDropdown";
 import type { Meta } from "../types/data";
 
 const NAV = [
   { to: "/", label: "League", end: true },
   { to: "/team", label: "My Team" },
   { to: "/matchups", label: "Matchups" },
-  { to: "/history", label: "History" },
+];
+
+const HISTORY_ITEMS = [
+  { to: "/history", label: "Standings", end: true },
+  { to: "/history/records", label: "Record Book" },
+  { to: "/history/h2h", label: "Head-to-Head" },
+  { to: "/history/careers", label: "Career Stats" },
+];
+
+const DRAFT_ITEMS = [
+  { to: "/draft", label: "Draft Grades", end: true },
+  { to: "/draft/futures", label: "Pick Futures" },
+];
+
+const NAV_AFTER_DRAFT = [
+  { to: "/franchises", label: "Franchises" },
   { to: "/trophies", label: "Trophy Case" },
+  { to: "/trades", label: "Trades" },
 ];
 
 /** WEEK N · LIVE / LATE EDITION once that week's games are all in, or
@@ -79,6 +96,17 @@ export default function Layout() {
               {n.label}
             </NavLink>
           ))}
+          <NavDropdown label="History" items={HISTORY_ITEMS} />
+          <NavDropdown label="Draft" items={DRAFT_ITEMS} />
+          {NAV_AFTER_DRAFT.map((n) => (
+            <NavLink
+              key={n.to}
+              to={n.to}
+              className={({ isActive }) => (isActive ? "navlink active" : "navlink")}
+            >
+              {n.label}
+            </NavLink>
+          ))}
         </nav>
       </header>
 
@@ -102,6 +130,12 @@ export default function Layout() {
         <NavLink to="/admin/trades" className="muted" style={{ fontSize: "0.7rem" }}>trades</NavLink>
         {" · "}
         <NavLink to="/admin/drafts" className="muted" style={{ fontSize: "0.7rem" }}>drafts</NavLink>
+        {" · "}
+        <NavLink to="/admin/picks" className="muted" style={{ fontSize: "0.7rem" }}>picks</NavLink>
+        {" · "}
+        <NavLink to="/admin/draft-order" className="muted" style={{ fontSize: "0.7rem" }}>draft order</NavLink>
+        {" · "}
+        <NavLink to="/admin/data" className="muted" style={{ fontSize: "0.7rem" }}>backup &amp; restore</NavLink>
         {" · "}
         <NavLink to="/admin/weekly-summary" className="muted" style={{ fontSize: "0.7rem" }}>weekly summary</NavLink>
       </footer>

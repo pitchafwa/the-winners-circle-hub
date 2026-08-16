@@ -224,6 +224,48 @@ hr,
   color: var(--accent-2);
 }
 
+.nav-dropdown {
+  position: relative;
+}
+
+.nav-dropdown > button {
+  font-family: var(--font-body);
+}
+
+.nav-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0;
+  z-index: 20;
+  background: var(--ink);
+  border: 1px solid rgba(250, 243, 225, 0.18);
+  border-top: 2px solid var(--accent-2);
+  min-width: 12rem;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-dropdown-item {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #96A0BE;
+  white-space: nowrap;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+}
+
+.nav-dropdown-item:hover {
+  color: var(--paper);
+  background: rgba(250, 243, 225, 0.06);
+  text-decoration: none;
+}
+
+.nav-dropdown-item.active {
+  color: var(--accent-2);
+}
+
 .footer {
   margin-top: 4rem;
   padding-top: 1rem;

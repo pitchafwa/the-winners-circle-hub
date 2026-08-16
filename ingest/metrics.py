@@ -499,31 +499,30 @@ def _letter_grade(rank: int, n: int) -> str:
     return letters[min(rank * len(letters) // max(n, 1), len(letters) - 1)]
 
 
-def _windowed_expected(values: list[float], group_size: int) -> list[float]:
-    """Smoothed baseline over VALUES IN DRAFT ORDER (never resorted by value).
-
-    This is the fix for the original bug: matching the k-th drafted player
-    against the k-th-best OUTCOME (a full resort) creates a zero-sum
-    permutation where one team's own later, better pick steals the expected
-    value out from under its own earlier pick — punishing exactly the GMs
-    who dominated a position. A moving average over the ACTUAL draft-order
-    sequence stays slot-sensitive (early picks are still expected to be
-    worth more) without that self-cannibalizing swap, because a window only
-    shares expectation with a few *neighboring* slots rather than doing an
-    exact 1:1 trade with a specific, unrelated pick elsewhere in the group.
+def _pick_expected_value(pick_values: dict, round_: int, round_pick: int) -> float | None:
+    """Standardized value-curve lookup (see ingest/pick_values.json) — a
+    pick's expected value is a fixed external number (KeepTradeCut's real
+    rookie-pick dynasty market, 1QB format), not derived from what this
+    specific class's players turned out to be worth. That's the deliberate
+    fix for comparing draft classes across different years: the old
+    within-class approach made 1.01's "expected value" whatever this year's
+    class happened to produce, so a strong class and a weak class weren't
+    comparable to each other at all, even at the same pick number.
+    None (never a fabricated number) when the pick falls outside what's on
+    file — beyond round 4, or round_pick > 10 for a lookup context that only
+    ever has a 10-team round anyway.
     """
-    n = len(values)
-    w = max(1, round(group_size / 6))
-    return [
-        round(statistics.mean(values[max(0, i - w):min(n, i + w + 1)]), 1)
-        for i in range(n)
-    ]
+    row = pick_values.get(str(round_))
+    if not row or round_pick < 1 or round_pick > len(row):
+        return None
+    return row[round_pick - 1]
 
 
 def compute_draft(league: LeagueData, picks: list[dict],
                   names: dict[int, str] | None = None,
                   dynasty_values: dict[str, int] | None = None,
-                  valuation_updated_at: str | None = None) -> dict | None:
+                  valuation_updated_at: str | None = None,
+                  pick_values: dict | None = None) -> dict | None:
     """Draft report card, graded on external dynasty market value — a
     baseline independent of this league's own season, so it can't fall into
     the self-referential trap above. Two separate grades, per league request:
@@ -535,9 +534,17 @@ def compute_draft(league: LeagueData, picks: list[dict],
       so a draft from years ago doesn't get retroactively punished as its
       players' careers wind down — every class decays, so relative share
       within the class stays meaningful no matter how much time has passed.
-    - EFFICIENCY: each pick graded against a smoothed same-position baseline
-      (see _windowed_expected) — did this specific selection beat what a
-      typical player taken around that slot was worth.
+    - EFFICIENCY: each pick graded against a fixed, standardized pick-value
+      curve (see ingest/pick_values.json / _pick_expected_value) — did this
+      specific selection beat what that DRAFT SLOT itself is worth as an
+      asset, using a real external market (KeepTradeCut rookie picks) that's
+      the same regardless of which season's draft is being graded. This
+      replaced an earlier within-class approach (comparing a pick to nearby
+      same-position picks in that same draft) specifically because it made
+      "expected value" drift with how strong or weak that one class
+      happened to be — 1.01 in a stacked class and 1.01 in a weak class
+      graded on different baselines, so different seasons' report cards
+      weren't comparable to each other at all, even pick-for-pick.
 
     Also carries each pick's actual fantasy production (points/expected/diff)
     as informational context — real, but not what determines the grade.
@@ -553,6 +560,7 @@ def compute_draft(league: LeagueData, picks: list[dict],
     names = {**player_names(league), **(names or {})}
     dynasty_values = dynasty_values or {}
     valuation_available = bool(dynasty_values)
+    pick_values = pick_values or {}
 
     positions: dict[int, str] = {}
     totals: dict[int, float] = defaultdict(float)
@@ -585,17 +593,17 @@ def compute_draft(league: LeagueData, picks: list[dict],
     for pos, plist in by_pos.items():
         plist.sort(key=lambda x: x["overall"])
 
-        values = [dynasty_values.get(_normalize_name(names.get(p["player_id"]) or p.get("player_name_raw") or ""), 0)
-                  for p in plist]
-        expected_values = _windowed_expected(values, len(plist)) if valuation_available else [0] * len(plist)
-
         # informational only — real fantasy production, best-of-position
         # resort, kept for context but NOT used for grading (this is the
-        # exact resort-matching shape that caused the original bug)
+        # exact resort-matching shape that caused the original within-class
+        # value bug, which is also why grading no longer resorts by value)
         fantasy_pts = [round(totals.get(p["player_id"], 0.0), 1) for p in plist] if league.weeks else None
         fantasy_expected = sorted(fantasy_pts, reverse=True) if fantasy_pts is not None else None
 
         for i, p in enumerate(plist):
+            value = (dynasty_values.get(_normalize_name(names.get(p["player_id"]) or p.get("player_name_raw") or ""), 0)
+                     if valuation_available else None)
+            expected_value = _pick_expected_value(pick_values, p["round"], p["round_pick"])
             rows.append({
                 **p,
                 "name": names.get(p["player_id"]) or p.get("player_name_raw") or f"Player {p['player_id']}",
@@ -603,9 +611,10 @@ def compute_draft(league: LeagueData, picks: list[dict],
                 "points": fantasy_pts[i] if fantasy_pts is not None else None,
                 "expected": fantasy_expected[i] if fantasy_expected is not None else None,
                 "diff": round(fantasy_pts[i] - fantasy_expected[i], 1) if fantasy_pts is not None else None,
-                "value": values[i] if valuation_available else None,
-                "expected_value": expected_values[i] if valuation_available else None,
-                "value_diff": round(values[i] - expected_values[i], 1) if valuation_available else None,
+                "value": value,
+                "expected_value": expected_value,
+                "value_diff": round(value - expected_value, 1)
+                              if value is not None and expected_value is not None else None,
             })
     rows.extend(unmatched_rows)
     rows.sort(key=lambda x: x["overall"])

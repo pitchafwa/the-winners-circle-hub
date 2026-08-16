@@ -5,7 +5,7 @@
     "circumstances outside ESPN's standings).",
     "",
     "2012-2017 used to be hand-entered here too, since we believed ESPN had",
-    "no data at all for those seasons. That was wrong — ESPN's leagueHistory",
+    "no data at all for those seasons. That was wrong \u2014 ESPN's leagueHistory",
     "endpoint serves them fine with valid espn_s2/SWID cookies (discovered",
     "2026-08-15); build_badges() now computes them automatically from real",
     "data like every other season, and every one of the removed hand-entered",
@@ -16,7 +16,7 @@
     "team_id is the ESPN franchise slot id (see meta.json teams). If the franchise",
     "no longer exists, use team_id: null and set team_name_then.",
     "",
-    "suppress[]: {season, type, team_id} — removes a specific auto-computed",
+    "suppress[]: {season, type, team_id} \u2014 removes a specific auto-computed",
     "badge before the badges[] additions above are applied, so a correction",
     "reads as 'replace the wrong badge', not 'also show the wrong one'.",
     "",
@@ -27,10 +27,14 @@
       "season": 2022,
       "type": "champion",
       "team_id": 8,
-      "detail": "Co-champion with Remember the Process, 2022 — the season's outcome was decided by extenuating real-world circumstances (the Damar Hamlin incident), and both finalists were formally credited as champions."
+      "detail": "Co-champion with Remember the Process, 2022 \u2014 the season's outcome was decided by extenuating real-world circumstances (the Damar Hamlin incident), and both finalists were formally credited as champions."
     }
   ],
   "suppress": [
-    {"season": 2022, "type": "runner_up", "team_id": 8}
+    {
+      "season": 2022,
+      "type": "runner_up",
+      "team_id": 8
+    }
   ]
 }

@@ -33,6 +33,609 @@
           "from": 8,
           "to": 6
         }
+      ],
+      "id": "265d53ce"
+    },
+    {
+      "season": 2025,
+      "date": "2026-08-08",
+      "week": 0,
+      "teams": [
+        4,
+        9
+      ],
+      "assets": [
+        {
+          "pick": "2026 1st",
+          "from": 9,
+          "to": 4
+        },
+        {
+          "pick": "2027 2nd",
+          "from": 9,
+          "to": 4
+        },
+        {
+          "player": "Harold Fannin Jr.",
+          "from": 9,
+          "to": 4
+        },
+        {
+          "player": "Josh Jacobs",
+          "from": 4,
+          "to": 9
+        },
+        {
+          "player": "Hunter Henry",
+          "from": 4,
+          "to": 9
+        }
+      ],
+      "id": "b010b55f"
+    },
+    {
+      "season": 2025,
+      "date": "2025-11-26",
+      "week": 13,
+      "teams": [
+        4,
+        7
+      ],
+      "assets": [
+        {
+          "player": "Joe Burrow",
+          "from": 7,
+          "to": 4
+        },
+        {
+          "player": "Josh Jacobs",
+          "from": 7,
+          "to": 4
+        },
+        {
+          "player": "Woody Marks",
+          "from": 4,
+          "to": 7
+        },
+        {
+          "player": "J.K. Dobbins",
+          "from": 4,
+          "to": 7
+        },
+        {
+          "pick": "2026 1st",
+          "from": 4,
+          "to": 7
+        }
+      ],
+      "id": "10e8b07e"
+    },
+    {
+      "season": 2025,
+      "date": "2025-11-25",
+      "week": 13,
+      "teams": [
+        5,
+        7
+      ],
+      "assets": [
+        {
+          "pick": "2026 1st",
+          "from": 7,
+          "to": 5
+        },
+        {
+          "pick": "2027 1st",
+          "from": 7,
+          "to": 5
+        },
+        {
+          "player": "Justin Jefferson",
+          "from": 5,
+          "to": 7
+        },
+        {
+          "player": "Michael Wilson",
+          "from": 5,
+          "to": 7
+        }
+      ],
+      "id": "479dcd37"
+    },
+    {
+      "season": 2025,
+      "date": "2025-11-25",
+      "week": 13,
+      "teams": [
+        1,
+        2
+      ],
+      "assets": [
+        {
+          "player": "Javonte Williams",
+          "from": 2,
+          "to": 1
+        },
+        {
+          "player": "D'Andre Swift",
+          "from": 1,
+          "to": 2
+        },
+        {
+          "pick": "2026 1st",
+          "from": 1,
+          "to": 2
+        }
+      ],
+      "id": "4952d38b"
+    },
+    {
+      "season": 2025,
+      "date": "2025-11-25",
+      "week": 13,
+      "teams": [
+        8,
+        10
+      ],
+      "assets": [
+        {
+          "player": "A.J. Brown",
+          "from": 10,
+          "to": 8
+        },
+        {
+          "player": "Quinshon Judkins",
+          "from": 8,
+          "to": 10
+        }
+      ],
+      "id": "de332d5c"
+    },
+    {
+      "season": 2025,
+      "date": "2025-11-25",
+      "week": 13,
+      "teams": [
+        3,
+        8
+      ],
+      "assets": [
+        {
+          "player": "Tee Higgins",
+          "from": 8,
+          "to": 3
+        },
+        {
+          "player": "James Conner",
+          "from": 8,
+          "to": 3
+        },
+        {
+          "player": "Cam Skattebo",
+          "from": 3,
+          "to": 8
+        }
+      ],
+      "id": "a31c600b"
+    },
+    {
+      "id": "dece7c8b",
+      "season": 2026,
+      "date": "2026-08-08",
+      "week": 0,
+      "teams": [
+        7,
+        10
+      ],
+      "assets": [
+        {
+          "player": "Tyler Shough",
+          "from": 10,
+          "to": 7
+        },
+        {
+          "player": "Tony Pollard",
+          "from": 10,
+          "to": 7
+        },
+        {
+          "pick": "2027 2nd",
+          "from": 7,
+          "to": 10
+        },
+        {
+          "player": "Michael Wilson",
+          "from": 7,
+          "to": 10
+        }
+      ]
+    },
+    {
+      "id": "4bcb83e5",
+      "season": 2026,
+      "date": "2026-08-08",
+      "week": 0,
+      "teams": [
+        4,
+        9
+      ],
+      "assets": [
+        {
+          "pick": "2026 1st",
+          "from": 9,
+          "to": 4
+        },
+        {
+          "pick": "2027 2nd",
+          "from": 9,
+          "to": 4
+        },
+        {
+          "player": "Harold Fannin Jr.",
+          "from": 9,
+          "to": 4
+        },
+        {
+          "player": "Josh Jacobs",
+          "from": 4,
+          "to": 9
+        },
+        {
+          "player": "Hunter Henry",
+          "from": 4,
+          "to": 9
+        }
+      ]
+    },
+    {
+      "id": "36278149",
+      "season": 2025,
+      "date": "2025-11-25",
+      "week": 13,
+      "teams": [
+        2,
+        7,
+        10
+      ],
+      "assets": [
+        {
+          "player": "DeVonta Smith",
+          "from": 10,
+          "to": 7
+        },
+        {
+          "player": "Terry McLaurin",
+          "from": 10,
+          "to": 7
+        },
+        {
+          "player": "Bucky Irving",
+          "from": 7,
+          "to": 10
+        },
+        {
+          "pick": "2026 2nd",
+          "from": 2,
+          "to": 10
+        },
+        {
+          "pick": "2026 2nd",
+          "from": 10,
+          "to": 7
+        }
+      ]
+    },
+    {
+      "id": "15953667",
+      "season": 2025,
+      "date": "2025-08-15",
+      "week": 0,
+      "teams": [
+        5,
+        10
+      ],
+      "assets": [
+        {
+          "pick": "2025 1st",
+          "from": 10,
+          "to": 5
+        },
+        {
+          "pick": "2026 1st",
+          "from": 5,
+          "to": 10
+        },
+        {
+          "player": "DeVonta Smith",
+          "from": 5,
+          "to": 10
+        },
+        {
+          "player": "Kyle Pitts Sr.",
+          "from": 5,
+          "to": 10
+        }
+      ]
+    },
+    {
+      "id": "c4e10c33",
+      "season": 2025,
+      "date": "2025-08-15",
+      "week": 0,
+      "teams": [
+        2,
+        8
+      ],
+      "assets": [
+        {
+          "player": "Tyreek Hill",
+          "from": 8,
+          "to": 2
+        },
+        {
+          "pick": "2025 2nd",
+          "from": 8,
+          "to": 2
+        },
+        {
+          "pick": "2026 1st",
+          "from": 8,
+          "to": 2
+        },
+        {
+          "pick": "2025 1st",
+          "from": 2,
+          "to": 8
+        }
+      ]
+    },
+    {
+      "id": "2e13aeeb",
+      "season": 2025,
+      "date": "2025-08-16",
+      "week": 0,
+      "teams": [
+        3,
+        8
+      ],
+      "assets": [
+        {
+          "player": "Drake Maye",
+          "from": 8,
+          "to": 3
+        },
+        {
+          "player": "Travis Kelce",
+          "from": 8,
+          "to": 3
+        },
+        {
+          "pick": "2025 2nd",
+          "from": 8,
+          "to": 3
+        },
+        {
+          "pick": "2025 2nd",
+          "from": 3,
+          "to": 8
+        }
+      ]
+    },
+    {
+      "id": "1779b96d",
+      "season": 2025,
+      "date": "2025-08-16",
+      "week": 0,
+      "teams": [
+        2,
+        8
+      ],
+      "assets": [
+        {
+          "pick": "2025 2nd",
+          "from": 8,
+          "to": 2
+        },
+        {
+          "player": "Javonte Williams",
+          "from": 8,
+          "to": 2
+        },
+        {
+          "pick": "2025 2nd",
+          "from": 2,
+          "to": 8
+        }
+      ]
+    },
+    {
+      "id": "5a816bbd",
+      "season": 2025,
+      "date": "2025-08-16",
+      "week": 0,
+      "teams": [
+        1,
+        4
+      ],
+      "assets": [
+        {
+          "pick": "2025 2nd",
+          "from": 1,
+          "to": 4
+        },
+        {
+          "pick": "2026 2nd",
+          "from": 4,
+          "to": 1
+        }
+      ]
+    },
+    {
+      "id": "0a189c85",
+      "season": 2025,
+      "date": "2025-08-16",
+      "week": 0,
+      "teams": [
+        5,
+        9,
+        10
+      ],
+      "assets": [
+        {
+          "player": "Cade Otton",
+          "from": 10,
+          "to": 5
+        },
+        {
+          "pick": "2026 4th",
+          "from": 10,
+          "to": 5
+        },
+        {
+          "pick": "2025 3rd",
+          "from": 5,
+          "to": 10
+        },
+        {
+          "pick": "2025 3rd",
+          "from": 9,
+          "to": 10
+        }
+      ]
+    },
+    {
+      "id": "660d1989",
+      "season": 2025,
+      "date": "2025-08-16",
+      "week": 0,
+      "teams": [
+        3,
+        10
+      ],
+      "assets": [
+        {
+          "pick": "2025 3rd",
+          "from": 10,
+          "to": 3
+        },
+        {
+          "pick": "2026 3rd",
+          "from": 3,
+          "to": 10
+        }
+      ]
+    },
+    {
+      "id": "5df02783",
+      "season": 2025,
+      "date": "2025-10-01",
+      "week": 5,
+      "teams": [
+        2,
+        4
+      ],
+      "assets": [
+        {
+          "player": "Rhamondre Stevenson",
+          "from": 4,
+          "to": 2
+        },
+        {
+          "player": "Jacory Croskey-Merritt",
+          "from": 4,
+          "to": 2
+        },
+        {
+          "pick": "2026 2nd",
+          "from": 4,
+          "to": 2
+        },
+        {
+          "pick": "2026 1st",
+          "from": 2,
+          "to": 4
+        }
+      ]
+    },
+    {
+      "id": "b83da3a7",
+      "season": 2025,
+      "date": "2025-10-03",
+      "week": 5,
+      "teams": [
+        4,
+        8,
+        10
+      ],
+      "assets": [
+        {
+          "pick": "2026 1st",
+          "from": 10,
+          "to": 8
+        },
+        {
+          "pick": "2026 2nd",
+          "from": 4,
+          "to": 8
+        },
+        {
+          "player": "Rashee Rice",
+          "from": 10,
+          "to": 8
+        },
+        {
+          "player": "Kyler Murray",
+          "from": 10,
+          "to": 8
+        },
+        {
+          "player": "Drake London",
+          "from": 8,
+          "to": 10
+        },
+        {
+          "player": "Jayden Daniels",
+          "from": 8,
+          "to": 10
+        },
+        {
+          "pick": "2027 2nd",
+          "from": 8,
+          "to": 10
+        }
+      ]
+    },
+    {
+      "id": "d1ad15cd",
+      "season": 2025,
+      "date": "2025-10-21",
+      "week": 8,
+      "teams": [
+        5,
+        8,
+        9
+      ],
+      "assets": [
+        {
+          "player": "Quinshon Judkins",
+          "from": 5,
+          "to": 8
+        },
+        {
+          "player": "Chris Godwin Jr.",
+          "from": 5,
+          "to": 8
+        },
+        {
+          "player": "TreVeyon Henderson",
+          "from": 8,
+          "to": 5
+        },
+        {
+          "pick": "2026 1st",
+          "from": 9,
+          "to": 8
+        }
       ]
     }
   ],
@@ -43,6 +646,245 @@
       "original_team_id": 6,
       "owned_by_team_id": 8,
       "via": "traded 2026-08-10"
+    },
+    {
+      "season": 2027,
+      "round": 2,
+      "original_team_id": 7,
+      "owned_by_team_id": 10,
+      "via": "traded 2026-08-08",
+      "trade_id": "dece7c8b"
+    },
+    {
+      "season": 2026,
+      "round": 1,
+      "original_team_id": 9,
+      "owned_by_team_id": 4,
+      "via": "traded 2026-08-08",
+      "trade_id": "4bcb83e5"
+    },
+    {
+      "season": 2027,
+      "round": 2,
+      "original_team_id": 9,
+      "owned_by_team_id": 4,
+      "via": "traded 2026-08-08",
+      "trade_id": "4bcb83e5"
+    },
+    {
+      "season": 2026,
+      "round": 1,
+      "original_team_id": 4,
+      "owned_by_team_id": 7,
+      "via": "traded 2025-11-26"
+    },
+    {
+      "season": 2026,
+      "round": 1,
+      "original_team_id": 7,
+      "owned_by_team_id": 5,
+      "via": "traded 2025-11-25"
+    },
+    {
+      "season": 2027,
+      "round": 1,
+      "original_team_id": 7,
+      "owned_by_team_id": 5,
+      "via": "traded 2025-11-25"
+    },
+    {
+      "season": 2026,
+      "round": 1,
+      "original_team_id": 1,
+      "owned_by_team_id": 2,
+      "via": "traded 2025-11-25"
+    },
+    {
+      "season": 2026,
+      "round": 2,
+      "original_team_id": 2,
+      "owned_by_team_id": 10,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2025,
+      "round": 1,
+      "original_team_id": 10,
+      "owned_by_team_id": 5,
+      "via": "traded 2025-08-15",
+      "trade_id": "15953667"
+    },
+    {
+      "season": 2025,
+      "round": 2,
+      "original_team_id": 8,
+      "owned_by_team_id": 2,
+      "via": "traded 2025-08-15",
+      "trade_id": "c4e10c33"
+    },
+    {
+      "season": 2026,
+      "round": 1,
+      "original_team_id": 8,
+      "owned_by_team_id": 4,
+      "via": "traded 2025-10-01",
+      "trade_id": "5df02783"
+    },
+    {
+      "season": 2025,
+      "round": 1,
+      "original_team_id": 2,
+      "owned_by_team_id": 8,
+      "via": "traded 2025-08-15",
+      "trade_id": "c4e10c33"
+    },
+    {
+      "season": 2025,
+      "round": 2,
+      "original_team_id": 9,
+      "owned_by_team_id": 3,
+      "via": "traded 2025-08-16",
+      "trade_id": "2e13aeeb"
+    },
+    {
+      "season": 2025,
+      "round": 2,
+      "original_team_id": 3,
+      "owned_by_team_id": 2,
+      "via": "traded 2025-08-16",
+      "trade_id": "1779b96d"
+    },
+    {
+      "season": 2025,
+      "round": 2,
+      "original_team_id": 2,
+      "owned_by_team_id": 8,
+      "via": "traded 2025-08-16",
+      "trade_id": "1779b96d"
+    },
+    {
+      "season": 2025,
+      "round": 2,
+      "original_team_id": 1,
+      "owned_by_team_id": 4,
+      "via": "traded 2025-08-16",
+      "trade_id": "5a816bbd"
+    },
+    {
+      "season": 2026,
+      "round": 2,
+      "original_team_id": 4,
+      "owned_by_team_id": 1,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2026,
+      "round": 4,
+      "original_team_id": 10,
+      "owned_by_team_id": 2,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2025,
+      "round": 3,
+      "original_team_id": 5,
+      "owned_by_team_id": 3,
+      "via": "traded 2025-08-16",
+      "trade_id": "660d1989"
+    },
+    {
+      "season": 2025,
+      "round": 3,
+      "original_team_id": 9,
+      "owned_by_team_id": 10,
+      "via": "traded 2025-08-16",
+      "trade_id": "0a189c85"
+    },
+    {
+      "season": 2026,
+      "round": 3,
+      "original_team_id": 3,
+      "owned_by_team_id": 10,
+      "via": "traded 2025-08-16",
+      "trade_id": "660d1989"
+    },
+    {
+      "season": 2027,
+      "round": 2,
+      "original_team_id": 8,
+      "owned_by_team_id": 10,
+      "via": "traded 2025-10-03",
+      "trade_id": "b83da3a7"
+    },
+    {
+      "season": 2026,
+      "round": 2,
+      "original_team_id": 8,
+      "owned_by_team_id": 3,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2026,
+      "round": 2,
+      "original_team_id": 10,
+      "owned_by_team_id": 5,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2026,
+      "round": 3,
+      "original_team_id": 2,
+      "owned_by_team_id": 1,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2026,
+      "round": 3,
+      "original_team_id": 5,
+      "owned_by_team_id": 8,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2027,
+      "round": 1,
+      "original_team_id": 9,
+      "owned_by_team_id": 10,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2026,
+      "round": 3,
+      "original_team_id": 10,
+      "owned_by_team_id": 2,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2026,
+      "round": 3,
+      "original_team_id": 4,
+      "owned_by_team_id": 2,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2027,
+      "round": 3,
+      "original_team_id": 5,
+      "owned_by_team_id": 10,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2027,
+      "round": 2,
+      "original_team_id": 2,
+      "owned_by_team_id": 10,
+      "via": "manually reassigned"
+    },
+    {
+      "season": 2027,
+      "round": 3,
+      "original_team_id": 9,
+      "owned_by_team_id": 10,
+      "via": "manually reassigned"
     }
   ]
 }

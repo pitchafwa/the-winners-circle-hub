@@ -8,15 +8,42 @@
     "team_id 10 (Remember the Process) is Tommy's own team."
   ],
   "aliases": {
-    "1": ["Deejay", "Malik"],
-    "2": ["BMoney", "Brandon"],
-    "3": ["Derrick"],
-    "4": ["Travian", "Lew", "TrayLew"],
-    "5": ["Antonio"],
-    "6": ["Ant", "Anthone"],
-    "7": ["Dae", "Daevion"],
-    "8": ["Marquel", "Kelo"],
-    "9": ["Tyus"],
-    "10": ["Tommy"]
+    "1": [
+      "Deejay",
+      "Malik"
+    ],
+    "2": [
+      "BMoney",
+      "Brandon"
+    ],
+    "3": [
+      "Derrick"
+    ],
+    "4": [
+      "Travian",
+      "Lew",
+      "TrayLew"
+    ],
+    "5": [
+      "Antonio"
+    ],
+    "6": [
+      "Ant",
+      "Anthone"
+    ],
+    "7": [
+      "Dae",
+      "Daevion"
+    ],
+    "8": [
+      "Marquel",
+      "Kelo"
+    ],
+    "9": [
+      "Tyus"
+    ],
+    "10": [
+      "Tommy"
+    ]
   }
 }

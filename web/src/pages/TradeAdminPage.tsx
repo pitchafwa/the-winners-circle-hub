@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import { useApp } from "../state/AppContext";
 import PasswordGate from "../components/PasswordGate";
 import TeamPicker from "../components/TeamPicker";
+import { clearJsonCache } from "../lib/data";
 import { extractTradeMovements } from "../lib/claude";
-import { resolveTradeMovements, submitTrade } from "../lib/tradeApi";
+import { deleteTrade, listTrades, resolveTradeMovements, submitTrade } from "../lib/tradeApi";
 import type {
   RawMovement,
   ResolvedMovement,
   ResolvedPickAsset,
   ResolvedPlayerAsset,
   SubmitAsset,
+  TradeListEntry,
 } from "../types/trade";
 
 const API_KEY_STORAGE = "league-hub:v1:anthropic-api-key";
@@ -38,6 +40,40 @@ export default function TradeAdminPage() {
   const [overrides, setOverrides] = useState<Record<number, { originalTeamId?: number }>>({});
   const [resolving, setResolving] = useState(false);
   const [rebuildLog, setRebuildLog] = useState("");
+
+  const [existingTrades, setExistingTrades] = useState<TradeListEntry[] | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const refreshList = () => {
+    setListError(null);
+    listTrades()
+      .then((res) => setExistingTrades(res.trades))
+      .catch((e: Error) => setListError(e.message));
+  };
+
+  useEffect(() => {
+    refreshList();
+  }, []);
+
+  const doDelete = async (t: TradeListEntry) => {
+    const summary = `${t.team_names.join(" ↔ ")} (${t.date})`;
+    if (!window.confirm(`Delete this trade?\n\n${summary}\n\nThis can't be undone here — you'd have to re-enter it.`)) return;
+    setDeletingId(t.id);
+    setListError(null);
+    try {
+      const res = await deleteTrade(t.id);
+      clearJsonCache();
+      refreshList();
+      if (res.reverted_picks.length > 0) {
+        window.alert(`Trade deleted. Note: ${res.reverted_picks.join("; ")} — re-enter any later trades of that pick if needed.`);
+      }
+    } catch (e) {
+      setListError((e as Error).message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     if (season !== null) setTradeSeason(season);
@@ -143,6 +179,8 @@ export default function TradeAdminPage() {
     try {
       const res = await submitTrade({ season: tradeSeason, date, week, assets });
       setRebuildLog(res.rebuild_output);
+      clearJsonCache();
+      refreshList();
       setStage("done");
     } catch (e) {
       setError((e as Error).message);
@@ -161,6 +199,41 @@ export default function TradeAdminPage() {
 
   return (
     <PasswordGate>
+      <section className="section" style={{ marginTop: 0 }}>
+        <div className="section-head">
+          <h2>Existing trades</h2>
+          <span className="label">delete a misentered one — there's no inline editor, re-submit after deleting</span>
+        </div>
+        {listError && <div className="error-state" style={{ marginBottom: "1rem" }}>{listError}</div>}
+        {existingTrades === null ? (
+          <p className="muted" style={{ fontStyle: "italic" }}>Loading...</p>
+        ) : existingTrades.length === 0 ? (
+          <p className="muted" style={{ fontStyle: "italic" }}>No trades on file yet.</p>
+        ) : (
+          <ul className="feed">
+            {existingTrades.map((t) => (
+              <li key={t.id} className="feed-row" style={{ alignItems: "flex-start" }}>
+                <span className="muted num feed-date">{t.date}</span>
+                <span style={{ flex: 1 }}>
+                  <strong>{t.team_names.join(" ↔ ")}</strong>{" "}
+                  <span className="muted">({t.season}, week {t.week})</span>
+                  <br />
+                  <span className="muted" style={{ fontSize: "0.82rem" }}>{t.assets.join(" · ")}</span>
+                </span>
+                <button
+                  className="label"
+                  style={{ color: "var(--negative)", cursor: deletingId ? "not-allowed" : "pointer" }}
+                  disabled={deletingId !== null}
+                  onClick={() => doDelete(t)}
+                >
+                  {deletingId === t.id ? "deleting..." : "delete"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="section">
         <div className="section-head">
           <h2>Submit a trade</h2>

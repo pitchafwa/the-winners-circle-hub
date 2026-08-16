@@ -67,3 +67,12 @@ export function useOptionalJson<T>(path: string | null): Loaded<T> {
 export function loadJson<T>(path: string, optional = false): Promise<T | null> {
   return fetchJson(path, optional) as Promise<T | null>;
 }
+
+/** Drop every cached response so the next fetch of any path hits the
+ * network again. The admin tools (trade/draft submit and delete) rebuild
+ * JSON files on disk in place — without this, any page already visited in
+ * this browser tab keeps serving what it fetched before the rebuild for
+ * the rest of the session, since `cache` above never expires on its own. */
+export function clearJsonCache(): void {
+  cache.clear();
+}

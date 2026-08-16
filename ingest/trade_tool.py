@@ -8,6 +8,16 @@ so the browser never needs its own copy of the name-matching / ledger logic.
     submit   — a user-confirmed trade -> appended to manual_trades.json,
                with the pick-ownership ledger updated, then rebuilds the site
                from cache so it's live within seconds.
+    list     — every trade on file, with team names resolved, for the
+               password-gated "manage trades" admin view.
+    delete   — remove one trade by id (see `list`), roll back any pick-
+               ownership entries it created, then rebuild.
+    reassign_pick — directly set (or clear) who currently holds a future
+               draft pick, bypassing the trade flow entirely. For when
+               backdating a real trade just to fix the pick futures board
+               isn't worth the effort — this writes straight to the same
+               pick_ownership ledger a trade would, with no player/other-
+               asset side effects.
 
 Local-only by design: there is no live backend for the deployed site, so this
 only runs against `pnpm dev` on the machine that has the repo checked out.
@@ -17,6 +27,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import uuid
 from datetime import datetime, timezone
 
 import config
@@ -35,7 +46,13 @@ def _load_manual_trades() -> dict:
     if not MANUAL_TRADES_PATH.exists():
         return {"trades": [], "pick_ownership": []}
     with open(MANUAL_TRADES_PATH, encoding="utf-8") as f:
-        return json.load(f)
+        manual = json.load(f)
+    # migrate: every trade needs a stable id so it can be deleted later.
+    # Trades entered before this existed don't have one — assign on first
+    # load rather than requiring a one-off migration script.
+    for t in manual.get("trades", []):
+        t.setdefault("id", uuid.uuid4().hex[:8])
+    return manual
 
 
 def _save_manual_trades(data: dict) -> None:
@@ -43,6 +60,15 @@ def _save_manual_trades(data: dict) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     tmp.replace(MANUAL_TRADES_PATH)
+
+
+def _load_and_persist_ids() -> dict:
+    """list/delete need every trade's id to already be saved to disk before
+    they can be referenced — plain _load_manual_trades() only assigns ids
+    in memory."""
+    manual = _load_manual_trades()
+    _save_manual_trades(manual)
+    return manual
 
 
 def _current_names(season: int) -> dict[int, str]:
@@ -120,6 +146,7 @@ def cmd_submit(payload: dict) -> dict:
     names = _current_names(season)
 
     manual = _load_manual_trades()
+    trade_id = uuid.uuid4().hex[:8]
     stored_assets = []
     for a in payload["assets"]:
         if a["type"] == "player":
@@ -136,11 +163,12 @@ def cmd_submit(payload: dict) -> dict:
             })
             pick_tracking.upsert_pick_ownership(
                 manual["pick_ownership"], a["year"], a["round"], a["original_team_id"],
-                a["to"], via=f"traded {payload.get('date', '')}".strip(),
+                a["to"], via=f"traded {payload.get('date', '')}".strip(), trade_id=trade_id,
             )
 
     involved_teams = sorted({a["from"] for a in payload["assets"]} | {a["to"] for a in payload["assets"]})
     manual["trades"].append({
+        "id": trade_id,
         "season": season,
         "date": payload["date"],
         "week": int(payload.get("week") or 0),
@@ -148,15 +176,99 @@ def cmd_submit(payload: dict) -> dict:
         "assets": stored_assets,
     })
     _save_manual_trades(manual)
-
-    rebuild = subprocess.run(
-        [sys.executable, str(config.ROOT / "ingest" / "build.py"), "--offline", "--season", str(season)],
-        cwd=str(config.ROOT / "ingest"), capture_output=True, text=True,
-    )
+    rebuild = _rebuild(season)
     return {
         "ok": rebuild.returncode == 0,
         "rebuild_output": rebuild.stdout + rebuild.stderr,
     }
+
+
+def cmd_list(_payload: dict) -> dict:
+    manual = _load_and_persist_ids()
+    season = config.SEASON
+    try:
+        league = parse.load_league(season)
+        team_name = {tid: t.name for tid, t in league.teams.items()}
+    except FileNotFoundError:
+        team_name = {}
+
+    def label(tid: int) -> str:
+        return team_name.get(tid, f"Team {tid}")
+
+    trades = []
+    for t in sorted(manual.get("trades", []), key=lambda x: x.get("date", ""), reverse=True):
+        assets = [
+            (f"{a['player']} → {label(a['to'])}" if "player" in a else f"{a['pick']} → {label(a['to'])}")
+            for a in t.get("assets", [])
+        ]
+        trades.append({
+            "id": t["id"], "season": t["season"], "date": t["date"], "week": t.get("week", 0),
+            "team_names": [label(tid) for tid in t.get("teams", [])],
+            "assets": assets,
+        })
+    return {"trades": trades}
+
+
+def cmd_delete(payload: dict) -> dict:
+    trade_id = payload["id"]
+    manual = _load_and_persist_ids()
+    trade = next((t for t in manual["trades"] if t["id"] == trade_id), None)
+    if trade is None:
+        raise ValueError(f"no trade on file with id '{trade_id}'")
+
+    manual["trades"] = [t for t in manual["trades"] if t["id"] != trade_id]
+    # roll back any pick-ownership entries this trade set — but only if
+    # nothing later re-touched the same pick (the ledger holds only the
+    # CURRENT holder, no history, so if a later trade already overwrote
+    # this one's effect there's nothing to undo).
+    reverted = [
+        p for p in manual["pick_ownership"] if p.get("trade_id") == trade_id
+    ]
+    manual["pick_ownership"] = [p for p in manual["pick_ownership"] if p.get("trade_id") != trade_id]
+    _save_manual_trades(manual)
+
+    rebuild = _rebuild(int(trade["season"]))
+    return {
+        "ok": rebuild.returncode == 0,
+        "rebuild_output": rebuild.stdout + rebuild.stderr,
+        "reverted_picks": [
+            f"{p['season']} round {p['round']} (was traded, now back to original owner)" for p in reverted
+        ],
+    }
+
+
+def cmd_reassign_pick(payload: dict) -> dict:
+    year = int(payload["season"])
+    round_ = int(payload["round"])
+    original_team_id = int(payload["original_team_id"])
+    new_owner_id = int(payload["new_owner_id"])
+    note = (payload.get("note") or "manually reassigned").strip()
+
+    manual = _load_manual_trades()
+    if new_owner_id == original_team_id:
+        # back to the original owner — remove the ledger entry entirely
+        # rather than writing an owner==original entry, so it reads
+        # identically to "never traded" everywhere else (current_holder()
+        # already defaults to original_team_id when no entry exists).
+        manual["pick_ownership"] = [
+            p for p in manual["pick_ownership"]
+            if not (p["season"] == year and p["round"] == round_ and p["original_team_id"] == original_team_id)
+        ]
+    else:
+        pick_tracking.upsert_pick_ownership(
+            manual["pick_ownership"], year, round_, original_team_id, new_owner_id, via=note,
+        )
+    _save_manual_trades(manual)
+
+    rebuild = _rebuild(config.SEASON)
+    return {"ok": rebuild.returncode == 0, "rebuild_output": rebuild.stdout + rebuild.stderr}
+
+
+def _rebuild(season: int) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(config.ROOT / "ingest" / "build.py"), "--offline", "--season", str(season)],
+        cwd=str(config.ROOT / "ingest"), capture_output=True, text=True,
+    )
 
 
 def _ordinal_suffix(n: int) -> str:
@@ -165,17 +277,23 @@ def _ordinal_suffix(n: int) -> str:
     return {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
 
 
+COMMANDS = {
+    "resolve": cmd_resolve,
+    "submit": cmd_submit,
+    "list": cmd_list,
+    "delete": cmd_delete,
+    "reassign_pick": cmd_reassign_pick,
+}
+
+
 def main() -> None:
-    if len(sys.argv) < 2 or sys.argv[1] not in ("resolve", "submit"):
-        print(json.dumps({"error": "usage: trade_tool.py resolve|submit  (JSON on stdin)"}))
+    if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
+        print(json.dumps({"error": f"usage: trade_tool.py {'|'.join(COMMANDS)}  (JSON on stdin)"}))
         sys.exit(1)
 
-    payload = json.loads(sys.stdin.read())
+    payload = json.loads(sys.stdin.read() or "{}")
     try:
-        if sys.argv[1] == "resolve":
-            result = cmd_resolve(payload)
-        else:
-            result = cmd_submit(payload)
+        result = COMMANDS[sys.argv[1]](payload)
     except Exception as e:  # noqa: BLE001 — always return JSON, even on failure
         print(json.dumps({"error": str(e)}))
         sys.exit(1)

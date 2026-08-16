@@ -12,12 +12,20 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from datetime import datetime, timezone
 
 import config
 import metrics
+import ownership
 import parse
 import pick_tracking
+import spectrum
+import trade_grades
+
+# Rookie draft rounds this league has ever run — matches ingest/pick_values.json
+DRAFT_ROUNDS = [1, 2, 3, 4]
+PICK_FUTURES_HORIZON_YEARS = 3
 
 
 def _write(path, payload):
@@ -25,7 +33,19 @@ def _write(path, payload):
     tmp = path.with_suffix(".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, separators=(",", ":"))
-    tmp.replace(path)
+    # OneDrive sync (and, for files under active dev, the Vite file watcher
+    # holding a read handle) intermittently locks the target just long
+    # enough to fail an atomic rename on Windows — genuinely transient, so
+    # retry with backoff rather than aborting the whole build over it.
+    max_attempts = 20
+    for attempt in range(max_attempts):
+        try:
+            tmp.replace(path)
+            break
+        except PermissionError:
+            if attempt == max_attempts - 1:
+                raise
+            time.sleep(0.5)
     print(f"  wrote {path.relative_to(config.ROOT)}")
 
 
@@ -299,7 +319,8 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     picks, draft_problems = parse.load_manual_draft(season, league.teams, names)
     for prob in draft_problems:
         print(f"  manual draft {season}: {prob}", file=sys.stderr)
-    draft = metrics.compute_draft(league, picks, names, dynasty_values, valuation_updated_at)
+    draft = metrics.compute_draft(league, picks, names, dynasty_values, valuation_updated_at,
+                                  parse.pick_values_for_season(season))
     if draft:
         _write(out_dir / "draft.json", {
             "generated_at": generated_at, **draft, "problems": draft_problems})
@@ -486,6 +507,21 @@ def cached_seasons() -> list[int]:
     )
 
 
+def _season_summary(season: int) -> dict:
+    """Read a season's seasons.json summary straight back off its own
+    meta.json — used so seasons.json can always list every cached season,
+    not just whichever ones this particular build run happened to rebuild."""
+    with open(config.DATA_DIR / str(season) / "meta.json", encoding="utf-8") as f:
+        meta = json.load(f)
+    return {
+        "season": season,
+        "name": meta["name"],
+        "completed_weeks": len(meta["completed_weeks"]),
+        "season_over": meta["season_over"],
+        "season_started": meta["season_started"],
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--offline", action="store_true", help="rebuild from cache, no network")
@@ -523,10 +559,9 @@ def main():
     if not dynasty_values:
         print("  no valuation data available — draft grades will be skipped", file=sys.stderr)
 
-    summaries = []
     for season in seasons:
         print(f"Building {season}...")
-        summaries.append(build_season(season, dynasty_values, valuation_updated_at))
+        build_season(season, dynasty_values, valuation_updated_at)
 
     # cross-season aggregates always span every season on record, even when
     # --season restricted the per-season build loop above (e.g. the trade/
@@ -534,11 +569,53 @@ def main():
     # a one-season build would silently wipe every other season's badges
     build_badges(all_seasons)
 
+    print("Building roster ownership timeline...")
+    ownership_data = ownership.build_ownership(all_seasons)
+    _write(config.DATA_DIR / "ownership.json", {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        **ownership_data,
+    })
+
+    print("Building trade grades...")
+    _write(config.DATA_DIR / "trades.json", {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        **trade_grades.grade_trades(dynasty_values, valuation_updated_at),
+    })
+
+    print("Building pick futures board...")
+    latest_teams = list(parse.load_league(max(all_seasons)).teams)
+    all_pick_ownership = metrics.pick_ownership(0)  # unfiltered: every ledger entry on file
+    pick_board = pick_tracking.all_picks_board(
+        config.SEASON, latest_teams, DRAFT_ROUNDS, all_pick_ownership,
+        horizon_years=PICK_FUTURES_HORIZON_YEARS)
+    _write(config.DATA_DIR / "pick_futures.json", {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "board": pick_board,
+    })
+
+    print("Building contend/rebuild spectrum...")
+    _write(config.DATA_DIR / "spectrum.json", {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "teams": spectrum.contend_rebuild_spectrum(
+            latest_teams, ownership_data["stints"], pick_board, dynasty_values),
+    })
+
+    # Always cover every cached season here, never just `seasons` (which is
+    # only the current run's scope — a single season when --season was
+    # passed, as every admin tool's rebuild subprocess does). A season this
+    # run didn't touch still has a real meta.json on disk from whenever it
+    # WAS last built, so read the summary back from there rather than
+    # relying on this run's in-memory `summaries` — otherwise every
+    # single-season admin rebuild (trade/draft/pick/draft-order submits)
+    # silently collapsed this file down to just that one season, breaking
+    # the season picker and every cross-season page (History, Draft, etc.)
+    # that fans out over seasons.json's own list.
+    all_summaries = [_season_summary(s) for s in sorted(all_seasons, reverse=True)]
     _write(config.DATA_DIR / "seasons.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "default_season": config.SEASON if any(s["season"] == config.SEASON for s in summaries)
-        else max(s["season"] for s in summaries),
-        "seasons": summaries,
+        "default_season": config.SEASON if any(s["season"] == config.SEASON for s in all_summaries)
+        else max(s["season"] for s in all_summaries),
+        "seasons": all_summaries,
     })
     print("Build complete.")
 

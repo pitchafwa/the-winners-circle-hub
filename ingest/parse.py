@@ -217,6 +217,31 @@ def owner_aliases() -> dict[int, list[str]]:
     return {int(k): v for k, v in raw.items()}
 
 
+def pick_values_for_season(season: int) -> dict[str, list[float]]:
+    """Standardized draft-pick value curve for one draft season — round (as
+    a string key) -> list of 12 values, index 0 = pick 1. See
+    ingest/pick_values.json for the full story on why this is a fixed
+    external snapshot (KeepTradeCut's real rookie-pick trade market) rather
+    than anything derived from this league's own data.
+
+    Genuinely year-specific where KTC's real futures market supports it;
+    falls back to the nearest year on file otherwise (clamped, not
+    extrapolated) — every draft this league actually has predates the
+    earliest year on file, so in practice this always clamps low today, but
+    the clamp works both directions as more years get added over time."""
+    path = config.ROOT / "ingest" / "pick_values.json"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        by_year = json.load(f).get("values", {})
+    if not by_year:
+        return {}
+    years = sorted(int(y) for y in by_year)
+    clamped = min(max(season, years[0]), years[-1])
+    nearest = min(years, key=lambda y: abs(y - clamped))
+    return by_year[str(nearest)]
+
+
 def global_player_names() -> dict[int, str]:
     """id -> name from the cached NFL-wide player list."""
     path = config.CACHE_DIR / "players.json"

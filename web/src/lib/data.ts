@@ -5,7 +5,14 @@ import { useEffect, useState } from "react";
  * malformed required file renders an error state, never a silent undefined.
  */
 
-const cache = new Map<string, unknown>();
+const cache = new Map<string, { value: unknown; at: number }>();
+
+// A long-lived tab (this is a personal dashboard people leave open) should
+// still notice server-side changes eventually, even without an explicit
+// clearJsonCache() call (only the local admin tools trigger those, after
+// their own submit) — e.g. re-running the ingest by hand outside the admin
+// UI. 60s caps how stale a view can get without needing a manual reload.
+const CACHE_TTL_MS = 60_000;
 
 export interface Loaded<T> {
   data: T | null;
@@ -15,20 +22,21 @@ export interface Loaded<T> {
 
 async function fetchJson(path: string, optional: boolean): Promise<unknown> {
   const key = `${path}|${optional}`;
-  if (cache.has(key)) return cache.get(key);
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
   const res = await fetch(`/data/${path}`);
   // Dev server and Netlify SPA fallbacks answer missing files with index.html
   // and a 200 — a non-JSON content-type means the file does not exist.
   const isJson = (res.headers.get("content-type") ?? "").includes("json");
   if (!res.ok || !isJson) {
     if (optional && (res.status === 404 || !isJson)) {
-      cache.set(key, null);
+      cache.set(key, { value: null, at: Date.now() });
       return null;
     }
     throw new Error(`data/${path}: ${res.ok ? "not found (SPA fallback)" : `HTTP ${res.status}`}`);
   }
   const json = (await res.json()) as unknown;
-  cache.set(key, json);
+  cache.set(key, { value: json, at: Date.now() });
   return json;
 }
 

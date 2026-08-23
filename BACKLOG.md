@@ -20,6 +20,20 @@ table, matchups) through to `/franchise/:teamId` — the Franchise pages
 exist and are reachable via the Franchises index, just not cross-linked
 from every mention of a team yet.
 
+## Parked (2026-08-16) — built, pulled from nav pending a simpler design
+
+- **Data backup/restore** (`/admin/data`). Built and worked (bundles
+  `manual_trades.json`, `manual_draft_order.json`, `manual_badges.json`,
+  `owner_aliases.json`, `manual_draft/*.csv` into one downloadable JSON,
+  restores from one) but Tommy found the UX too complex as shipped.
+  Code is still in the repo (`ingest/data_tool.py`,
+  `web/src/pages/DataAdminPage.tsx`, `web/src/lib/dataAdminApi.ts`,
+  `web/src/types/dataAdmin.ts`) and registered in `admin-api.ts`, just
+  unrouted/unlinked — not deleted, so it can be picked back up rather than
+  rebuilt from scratch. Needs a simpler take before it's worth re-exposing
+  (fewer choices, or fold export into something that already exists rather
+  than a whole new page — worth discussing with Tommy before rebuilding).
+
 ## Declined
 
 - Draft class survival rate

@@ -135,8 +135,6 @@ export default function Layout() {
         {" · "}
         <NavLink to="/admin/draft-order" className="muted" style={{ fontSize: "0.7rem" }}>draft order</NavLink>
         {" · "}
-        <NavLink to="/admin/data" className="muted" style={{ fontSize: "0.7rem" }}>backup &amp; restore</NavLink>
-        {" · "}
         <NavLink to="/admin/weekly-summary" className="muted" style={{ fontSize: "0.7rem" }}>weekly summary</NavLink>
       </footer>
     </div>

@@ -19,6 +19,7 @@ import DraftAdminPage from "./pages/DraftAdminPage";
 import PickAdminPage from "./pages/PickAdminPage";
 import DraftOrderAdminPage from "./pages/DraftOrderAdminPage";
 import WeeklySummaryAdminPage from "./pages/WeeklySummaryAdminPage";
+import DataAdminPage from "./pages/DataAdminPage";
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="admin/picks" element={<PickAdminPage />} />
           <Route path="admin/draft-order" element={<DraftOrderAdminPage />} />
           <Route path="admin/weekly-summary" element={<WeeklySummaryAdminPage />} />
+          <Route path="admin/data" element={<DataAdminPage />} />
         </Route>
       </Routes>
     </AppProvider>

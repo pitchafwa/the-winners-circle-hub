@@ -9,7 +9,10 @@ import ActivityFeed from "../components/ActivityFeed";
 import EmptyState from "../components/EmptyState";
 import PositionHeatmap from "../components/PositionHeatmap";
 import ContendRebuildTable from "../components/ContendRebuildTable";
-import type { Activity, Award, Positions, Recaps, Sim, Spectrum, Standings, Superlatives } from "../types/data";
+import { BumpChart, SwapMatrix } from "../components/HistoryCharts";
+import type {
+  Activity, Award, Positions, Recaps, Schedule, ScheduleSwap, Sim, Spectrum, Standings, Superlatives,
+} from "../types/data";
 
 /** Pick the latest week's single biggest story for the hero. */
 function marquee(awards: Award[], week: number): Award | null {
@@ -32,6 +35,8 @@ export default function LeaguePage() {
   const recaps = useOptionalJson<Recaps>(base ? `${base}/recaps.json` : null);
   const positions = useOptionalJson<Positions>(base ? `${base}/positions.json` : null);
   const spectrum = useJson<Spectrum>("spectrum.json");
+  const schedule = useOptionalJson<Schedule>(base ? `${base}/schedule.json` : null);
+  const scheduleSwap = useOptionalJson<ScheduleSwap>(base ? `${base}/schedule_swap.json` : null);
 
   if (!meta) return null;
 
@@ -119,6 +124,30 @@ export default function LeaguePage() {
                 : "Not yet simulated — odds arrive with the first data refresh."}
             </EmptyState>
           )
+        )}
+      </section>
+
+      <section className="section" aria-labelledby="arc-h">
+        <div className="section-head">
+          <h2 id="arc-h">Season timeline</h2>
+          <span className="label">{meta.season} standings by week — your team in green</span>
+        </div>
+        {schedule.data ? (
+          <BumpChart schedule={schedule.data} meta={meta} />
+        ) : (
+          !schedule.loading && <EmptyState>No schedule data.</EmptyState>
+        )}
+      </section>
+
+      <section className="section" aria-labelledby="swap-h">
+        <div className="section-head">
+          <h2 id="swap-h">Schedule swap</h2>
+          <span className="label">the argument generator</span>
+        </div>
+        {scheduleSwap.data ? (
+          <SwapMatrix swap={scheduleSwap.data} meta={meta} />
+        ) : (
+          !scheduleSwap.loading && <EmptyState>Needs at least one completed week.</EmptyState>
         )}
       </section>
 

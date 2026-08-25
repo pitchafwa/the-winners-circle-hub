@@ -88,6 +88,23 @@ def _departed_via(week, team_id, player_id, trade_moves, activity_by_pair) -> st
     return "dropped"
 
 
+def _meaningful_teams(league: "parse.LeagueData", week: int) -> set[int]:
+    """Teams playing a game that actually counts this week — regular season,
+    or a playoff game still advancing toward the championship. Consolation-
+    bracket teams are excluded entirely (not just their points): most
+    managers stop setting real lineups once they're out of contention, so
+    those weeks shouldn't touch a player's ownership stint at all — same
+    treatment as a week the team has no matchup data for."""
+    teams: set[int] = set()
+    for m in league.weeks.get(week, []):
+        if m.playoff_tier not in ("NONE", "WINNERS_BRACKET"):
+            continue
+        teams.add(m.home.team_id)
+        if m.away is not None:
+            teams.add(m.away.team_id)
+    return teams
+
+
 def build_ownership(seasons: list[int]) -> dict:
     seasons = sorted(seasons)
     all_trades = _load_manual_trades()
@@ -104,7 +121,9 @@ def build_ownership(seasons: list[int]) -> dict:
         seen_data_season = True
 
         for week in league.completed_weeks():
-            active_teams = {tid for tid in league.teams if league.team_week(tid, week) is not None}
+            active_teams = _meaningful_teams(league, week) & {
+                tid for tid in league.teams if league.team_week(tid, week) is not None
+            }
             rosters: dict[int, dict[int, "parse.PlayerWeek"]] = {
                 tid: {p.player_id: p for p in league.team_week(tid, week).lineup}
                 for tid in active_teams
@@ -130,15 +149,27 @@ def build_ownership(seasons: list[int]) -> dict:
                             "start_season": season, "start_week": week,
                             "departed_via": None, "end_season": None, "end_week": None,
                             "weeks_rostered": 0, "weeks_started": 0, "weeks_benched": 0,
+                            "weeks_projected": 0,
                             "points_started": 0.0, "points_projected_started": 0.0, "points_benched": 0.0,
+                            "points_started_projected_weeks": 0.0,
                         }
                         open_stints[pid] = st
                     st["weeks_rostered"] += 1
                     if pw.started:
                         st["weeks_started"] += 1
                         st["points_started"] = round(st["points_started"] + pw.actual, 2)
-                        st["points_projected_started"] = round(
-                            st["points_projected_started"] + (pw.projected or 0.0), 2)
+                        # None means ESPN had no projection at all for this
+                        # week (every 2017 week, some live-in-progress
+                        # weeks) — leaving it out of both sums keeps
+                        # points_projected_started an honest "projected
+                        # total for the weeks a projection actually
+                        # existed," not silently padded with zeros that
+                        # would inflate every over/under-projection stat.
+                        if pw.projected is not None:
+                            st["weeks_projected"] += 1
+                            st["points_projected_started"] = round(st["points_projected_started"] + pw.projected, 2)
+                            st["points_started_projected_weeks"] = round(
+                                st["points_started_projected_weeks"] + pw.actual, 2)
                     else:
                         st["weeks_benched"] += 1
                         st["points_benched"] = round(st["points_benched"] + pw.actual, 2)
@@ -152,7 +183,7 @@ def build_ownership(seasons: list[int]) -> dict:
     leaders = {
         "value": _top_per_team(stints, key=lambda s: s["points_started"]),
         "busts": _top_per_team(
-            stints, key=lambda s: s["points_projected_started"] - s["points_started"],
+            stints, key=lambda s: s["points_projected_started"] - s["points_started_projected_weeks"],
             min_weeks=MIN_BUST_WEEKS),
         "stashes": _top_per_team(stints, key=lambda s: -s["start_rate"], min_weeks=MIN_STASH_WEEKS),
     }
@@ -173,7 +204,9 @@ def _top_per_team(stints: list[dict], key, min_weeks: int = 0) -> list[dict]:
                 "team_id": team_id, "player_id": s["player_id"], "name": s["name"],
                 "position": s["position"],
                 "points_started": s["points_started"],
-                "points_under_projection": round(s["points_projected_started"] - s["points_started"], 2),
+                "points_under_projection": round(
+                    s["points_projected_started"] - s["points_started_projected_weeks"], 2)
+                    if s["weeks_projected"] else None,
                 "weeks_rostered": s["weeks_rostered"], "weeks_started": s["weeks_started"],
                 "start_rate": s["start_rate"],
                 "start_season": s["start_season"], "start_week": s["start_week"],

@@ -48,7 +48,8 @@ def _label(pct: float) -> str:
 def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board: list[dict],
                              dynasty_values: dict[str, int], redraft_values: dict[str, int],
                              roster_players: dict[int, list[tuple[int, frozenset[int]]]],
-                             starting_slots: list[int], season: int) -> list[dict]:
+                             starting_slots: list[int], season: int,
+                             pick_curves: dict[str, dict[str, list[float]]] | None = None) -> list[dict]:
     dynasty_roster_value: dict[int, float] = {tid: 0.0 for tid in team_ids}
     for s in stints:
         if s["end_season"] is not None:
@@ -68,7 +69,7 @@ def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board
     for p in pick_board:
         year = p["season"]
         if year not in values_cache:
-            values_cache[year] = pick_values_for_season(year)
+            values_cache[year] = pick_values_for_season(year, pick_curves)
         row = values_cache[year].get(str(p["round"]))
         est = (sum(row) / len(row)) if row else 0.0
         pick_capital[p["current_owner_id"]] = pick_capital.get(p["current_owner_id"], 0.0) + est

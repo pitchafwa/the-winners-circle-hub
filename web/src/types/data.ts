@@ -158,9 +158,9 @@ export interface MatchupSide {
   home_bonus: number;
   adjustment: number;
   is_home: boolean;
-  optimal_points: number;
+  optimal_points: number | null;
   coach_rating: number | null;
-  bench_points_lost: number;
+  bench_points_lost: number | null;
   optimal_lineup: OptimalSlot[];
   lineup: LineupPlayer[];
 }
@@ -207,9 +207,9 @@ export interface TeamWeekRow {
   opponent_points: number | null;
   result: "W" | "L" | "T";
   is_playoff: boolean;
-  optimal_points: number;
+  optimal_points: number | null;
   coach_rating: number | null;
-  bench_points_lost: number;
+  bench_points_lost: number | null;
   all_play: AllPlayWeek | null;
 }
 
@@ -514,9 +514,18 @@ export interface OwnershipStint {
   weeks_rostered: number;
   weeks_started: number;
   weeks_benched: number;
+  /** Of weeks_started, how many actually had a real ESPN projection —
+   * 2017 has none at all, so this is the honest denominator for any
+   * over/under-projection stat (weeks_started would silently understate
+   * the projection as 0 for weeks it never existed). */
+  weeks_projected: number;
   points_started: number;
   points_projected_started: number;
   points_benched: number;
+  /** Sum of actual points for just the weeks_projected weeks — the
+   * matching numerator for points_projected_started, so the two can be
+   * diffed without a season with no projections skewing the result. */
+  points_started_projected_weeks: number;
   start_rate: number;
 }
 
@@ -526,7 +535,7 @@ export interface OwnershipLeader {
   name: string;
   position: string;
   points_started: number;
-  points_under_projection: number;
+  points_under_projection: number | null;
   weeks_rostered: number;
   weeks_started: number;
   start_rate: number;

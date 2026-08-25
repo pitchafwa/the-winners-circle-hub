@@ -15,6 +15,13 @@ interface AppState {
   loading: boolean;
   teamsById: Map<number, TeamRef>;
   teamName: (id: number | null | undefined) => string;
+  /** Franchise identity (team_id) survives renames — this always resolves to
+   * the CURRENT roster info, regardless of which season is selected. Use
+   * this (not teamsById/teamName) anywhere multiple seasons are shown
+   * together, so an old game or stat line is labeled with the name people
+   * know the franchise by today, not whatever it was called back then. */
+  currentTeamsById: Map<number, TeamRef>;
+  currentTeamName: (id: number | null | undefined) => string;
   myTeamId: number | null;
   setMyTeamId: (id: number | null) => void;
 }
@@ -42,6 +49,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [seasonsIndex, seasonChoice]);
 
   const metaLoad = useJson<Meta>(season !== null ? `${season}/meta.json` : null);
+  const currentSeason = seasonsIndex?.default_season ?? null;
+  const currentMetaLoad = useJson<Meta>(currentSeason !== null ? `${currentSeason}/meta.json` : null);
 
   const setSeason = (s: number) => {
     localStorage.setItem(SEASON_KEY, String(s));
@@ -60,6 +69,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return m;
   }, [metaLoad.data]);
 
+  const currentTeamsById = useMemo(() => {
+    const m = new Map<number, TeamRef>();
+    currentMetaLoad.data?.teams.forEach((t) => m.set(t.id, t));
+    return m;
+  }, [currentMetaLoad.data]);
+
   const value: AppState = {
     seasonsIndex,
     season,
@@ -69,6 +84,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     loading: seasonsLoad.loading || metaLoad.loading,
     teamsById,
     teamName: (id) => (id === null || id === undefined ? "—" : teamsById.get(id)?.name ?? `Team ${id}`),
+    currentTeamsById,
+    currentTeamName: (id) =>
+      id === null || id === undefined ? "—" : currentTeamsById.get(id)?.name ?? `Team ${id}`,
     myTeamId,
     setMyTeamId,
   };

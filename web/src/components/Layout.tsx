@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useApp } from "../state/AppContext";
+import { useJson } from "../lib/data";
 import { dateTime } from "../lib/format";
 import NavDropdown from "./NavDropdown";
-import type { Meta } from "../types/data";
+import type { Meta, Spectrum, TradeGrades } from "../types/data";
 
 const NAV = [
   { to: "/", label: "League", end: true },
@@ -10,22 +11,26 @@ const NAV = [
   { to: "/matchups", label: "Matchups" },
 ];
 
+// Season Arc (the week-by-week bump chart + schedule swap) moved onto the
+// League page itself — it's single-season-scoped like everything on that
+// page, unlike the rest of this dropdown, which is genuinely multi-season.
 const HISTORY_ITEMS = [
-  { to: "/history", label: "Standings", end: true },
-  { to: "/history/records", label: "Record Book" },
+  { to: "/history", label: "Record Book", end: true },
   { to: "/history/h2h", label: "Head-to-Head" },
   { to: "/history/careers", label: "Career Stats" },
 ];
 
-const DRAFT_ITEMS = [
+// Draft Grades/Pick Futures/Trades are all "how teams are building/moving
+// assets" — one dropdown instead of splitting Trades out as its own
+// top-level item next to two thematically-identical siblings.
+const FRONT_OFFICE_ITEMS = [
   { to: "/draft", label: "Draft Grades", end: true },
   { to: "/draft/futures", label: "Pick Futures" },
+  { to: "/trades", label: "Trades" },
 ];
 
-const NAV_AFTER_DRAFT = [
-  { to: "/franchises", label: "Franchises" },
-  { to: "/trophies", label: "Trophy Case" },
-  { to: "/trades", label: "Trades" },
+const NAV_TAIL = [
+  { to: "/trophies", label: "Superlatives" },
 ];
 
 /** WEEK N · LIVE / LATE EDITION once that week's games are all in, or
@@ -40,6 +45,22 @@ function mastheadDate(meta: Meta | null): string {
 
 export default function Layout() {
   const { seasonsIndex, season, setSeason, meta, metaError, myTeamId, setMyTeamId } = useApp();
+  const franchiseItems = (meta?.teams ?? []).map((t) => ({
+    to: `/franchise/${t.id}`,
+    label: t.nickname ?? t.name,
+  }));
+
+  // KTC backs draft grades, trade grades, and the contend/rebuild spectrum —
+  // fetched independently from ESPN on its own 12h cache. Showing the OLDER
+  // of the two KTC timestamps (dynasty from trades.json, redraft from
+  // spectrum.json) next to the ESPN one is a cheap way to notice if that
+  // fetch ever starts silently failing: it'll stop advancing while the ESPN
+  // timestamp keeps moving normally.
+  const trades = useJson<TradeGrades>("trades.json");
+  const spectrum = useJson<Spectrum>("spectrum.json");
+  const ktcUpdatedAt = [trades.data?.valuation_updated_at, spectrum.data?.redraft_valuation_updated_at]
+    .filter((d): d is string => d !== null && d !== undefined)
+    .sort()[0] ?? null;
 
   return (
     <div className="shell">
@@ -97,8 +118,9 @@ export default function Layout() {
             </NavLink>
           ))}
           <NavDropdown label="History" items={HISTORY_ITEMS} />
-          <NavDropdown label="Draft" items={DRAFT_ITEMS} />
-          {NAV_AFTER_DRAFT.map((n) => (
+          <NavDropdown label="Front Office" items={FRONT_OFFICE_ITEMS} />
+          {franchiseItems.length > 0 && <NavDropdown label="Franchises" items={franchiseItems} />}
+          {NAV_TAIL.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
@@ -124,6 +146,7 @@ export default function Layout() {
         {meta && (
           <span>
             Data pulled from ESPN {dateTime(meta.fetched_at)} · built {dateTime(meta.generated_at)}
+            {ktcUpdatedAt && <> · market values (KTC) as of {dateTime(ktcUpdatedAt)}</>}
           </span>
         )}
         {" · "}

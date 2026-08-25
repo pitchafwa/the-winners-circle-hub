@@ -6,7 +6,8 @@ import { useAllSeasons } from "../lib/useAllSeasons";
 import { pts, shortDate, signed } from "../lib/format";
 import BadgeShelf from "../components/BadgeShelf";
 import EmptyState from "../components/EmptyState";
-import type { Badges, Draft, DraftPick, OwnershipLeader, Ownership, TradeGrades } from "../types/data";
+import { CareerLeaderboards } from "../components/HistoryCharts";
+import type { Badges, Draft, DraftPick, Ownership, TradeGrades } from "../types/data";
 
 function useTeamDraftPicks(teamId: number): { picks: (DraftPick & { season: number })[]; loading: boolean } {
   const { seasonsIndex } = useApp();
@@ -37,39 +38,10 @@ function useTeamDraftPicks(teamId: number): { picks: (DraftPick & { season: numb
   return state;
 }
 
-function LeaderList({ title, rows, valueLabel, valueOf }: {
-  title: string;
-  rows: OwnershipLeader[];
-  valueLabel: string;
-  valueOf: (r: OwnershipLeader) => string;
-}) {
-  return (
-    <div>
-      <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>{title}</h3>
-      {rows.length === 0 ? (
-        <p className="muted" style={{ fontStyle: "italic", fontSize: "0.85rem" }}>Nothing on file yet.</p>
-      ) : (
-        <ul className="feed">
-          {rows.map((r) => (
-            <li key={r.player_id} className="feed-row">
-              <span className="num feed-date muted">{r.start_season}–{r.end_season ?? "now"}</span>
-              <span>
-                <strong>{r.name}</strong> <span className="muted">{r.position}</span>{" "}
-                <span className="num">{valueOf(r)}</span>
-                <span className="muted"> {valueLabel}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 export default function FranchisePage() {
   const { teamId } = useParams<{ teamId: string }>();
   const tid = Number(teamId);
-  const { teamsById, teamName } = useApp();
+  const { teamsById, teamName, currentTeamName } = useApp();
   const badges = useJson<Badges>("badges.json");
   const trades = useJson<TradeGrades>("trades.json");
   const ownership = useJson<Ownership>("ownership.json");
@@ -92,10 +64,6 @@ export default function FranchisePage() {
   }, [all.bundles, tid]);
 
   const myTrades = (trades.data?.trades ?? []).filter((tr) => tr.team_ids.includes(tid));
-
-  const value = (ownership.data?.leaders.value ?? []).filter((r) => r.team_id === tid);
-  const busts = (ownership.data?.leaders.busts ?? []).filter((r) => r.team_id === tid);
-  const stashes = (ownership.data?.leaders.stashes ?? []).filter((r) => r.team_id === tid);
 
   if (!info) return null;
 
@@ -128,14 +96,7 @@ export default function FranchisePage() {
           <h2>Roster legends</h2>
           <span className="label">from the roster-ownership timeline</span>
         </div>
-        <div className="record-book">
-          <LeaderList title="Most value delivered" rows={value} valueLabel="pts started"
-            valueOf={(r) => pts(r.points_started, 0)} />
-          <LeaderList title="Biggest headaches" rows={busts} valueLabel="under projection"
-            valueOf={(r) => signed(r.points_under_projection, 0)} />
-          <LeaderList title="Favorite stashes" rows={stashes} valueLabel="weeks, rarely started"
-            valueOf={(r) => `${r.weeks_rostered}wk / ${(r.start_rate * 100).toFixed(0)}% started`} />
-        </div>
+        <CareerLeaderboards ownership={ownership.data} teamId={tid} teamName={currentTeamName} />
       </section>
 
       <section className="section">

@@ -193,7 +193,7 @@ export default function MatchupsPage() {
 
   return (
     <>
-      {sim.data && sim.data.this_week_matchups.length > 0 && (
+      {sim.data && sim.data.this_week_matchups?.length > 0 && (
         <section className="section" aria-labelledby="weekly-h">
           <div className="section-head">
             <h2 id="weekly-h">This Week's Games</h2>
@@ -207,7 +207,7 @@ export default function MatchupsPage() {
         </section>
       )}
 
-      <section className="section" style={sim.data?.this_week_matchups.length ? { marginTop: "2.5rem" } : undefined}>
+      <section className="section" style={sim.data?.this_week_matchups?.length ? { marginTop: "2.5rem" } : undefined}>
         <div className="section-head">
           <h2>Matchups</h2>
           {weeks.length > 0 && (

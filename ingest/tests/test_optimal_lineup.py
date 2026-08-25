@@ -101,12 +101,26 @@ class TestEdgeCases:
         assert optimal == 0.0
         assert all(p is None for _, p in assignment)
 
-    def test_negative_scorers_lose_to_empty_slot(self):
-        # An empty slot (0 pts) is legal, so the optimal lineup benches a
-        # negative-scoring D/ST rather than starting it.
+    def test_negative_scorers_forced_when_no_real_alternative(self):
+        # A manager can't actually leave a required slot empty. With 2 real
+        # D/ST candidates for 1 slot, one of them has to start — the empty
+        # slot (0 pts) is only a stand-in for "not enough real candidates,"
+        # never a way to dodge a bad-but-real outcome. Picks the least bad.
         slots = [DST]
         roster = [player("Bad DST", -4.0, {DST, BENCH_SLOT}, "D/ST"),
                   player("Worse DST", -9.0, {DST, BENCH_SLOT}, "D/ST")]
         optimal, assignment = optimal_lineup(roster, slots)
-        assert assignment[0][1] is None
-        assert optimal == 0.0
+        assert assignment[0][1] is not None
+        assert assignment[0][1].name == "Bad DST"
+        assert optimal == -4.0
+
+    def test_negative_scorer_benched_when_short_on_candidates(self):
+        # Only 1 real candidate for 2 slots — the second slot genuinely has
+        # no one to fill it (0 pts, legitimately empty), but the one real
+        # candidate that exists still has to be used for the other.
+        slots = [DST, DST]
+        roster = [player("Bad DST", -4.0, {DST, BENCH_SLOT}, "D/ST")]
+        optimal, assignment = optimal_lineup(roster, slots)
+        filled = [p for _, p in assignment if p is not None]
+        assert len(filled) == 1
+        assert optimal == -4.0

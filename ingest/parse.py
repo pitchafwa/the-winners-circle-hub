@@ -27,6 +27,12 @@ NON_STARTING = {BENCH_SLOT, IR_SLOT}
 
 POSITION_NAMES = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "D/ST"}
 
+# 2017's archive (leagueHistory + mRoster) never assigns a real lineupSlotId
+# (every entry comes back 0) — substitute each player's own primary
+# position as a starting slot, since we know they started (only starters
+# are present in that response at all) but not which exact slot.
+LEGACY_POSITION_SLOT = {1: 0, 2: 2, 3: 4, 4: 6, 5: 17, 16: 16}
+
 
 @dataclass
 class PlayerWeek:
@@ -217,23 +223,47 @@ def owner_aliases() -> dict[int, list[str]]:
     return {int(k): v for k, v in raw.items()}
 
 
-def pick_values_for_season(season: int) -> dict[str, list[float]]:
-    """Standardized draft-pick value curve for one draft season — round (as
-    a string key) -> list of 12 values, index 0 = pick 1. See
-    ingest/pick_values.json for the full story on why this is a fixed
-    external snapshot (KeepTradeCut's real rookie-pick trade market) rather
-    than anything derived from this league's own data.
-
-    Genuinely year-specific where KTC's real futures market supports it;
-    falls back to the nearest year on file otherwise (clamped, not
-    extrapolated) — every draft this league actually has predates the
-    earliest year on file, so in practice this always clamps low today, but
-    the clamp works both directions as more years get added over time."""
+def _static_pick_values() -> dict[str, dict[str, list[float]]]:
     path = config.ROOT / "ingest" / "pick_values.json"
     if not path.exists():
         return {}
     with open(path, encoding="utf-8") as f:
-        by_year = json.load(f).get("values", {})
+        return json.load(f).get("values", {})
+
+
+def pick_values_for_season(season: int, live_curves: dict[str, dict[str, list[float]]] | None = None,
+                           ) -> dict[str, list[float]]:
+    """Draft-pick value curve for one draft season — round (as a string
+    key) -> list of 10 values, index 0 = pick 1.
+
+    Prefers `live_curves` (KeepTradeCut's real current futures market for
+    picks, re-derived every build by `valuation.pick_curve_by_year()` —
+    same fetch that already backs player values, so this costs nothing
+    extra) for whichever year is nearest `season` among the years KTC
+    actually published this fetch. Falls back to the static snapshot in
+    `ingest/pick_values.json` for anything outside that live-covered range
+    (every draft this league has actually run, and any round beyond what
+    KTC lists) — see that file for why a fixed reference exists at all.
+    Clamped to the nearest year on file, never extrapolated, on whichever
+    source ends up used."""
+    live_curves = live_curves or {}
+    static = _static_pick_values()
+    if live_curves:
+        years = sorted(int(y) for y in live_curves)
+        clamped = min(max(season, years[0]), years[-1])
+        nearest = min(years, key=lambda y: abs(y - clamped))
+        live = live_curves[str(nearest)]
+        if not static:
+            return live
+        # Round-by-round: live where KTC has it, static fallback otherwise
+        # (KTC's fetch currently covers rounds 1-4, same as the static file,
+        # but this stays correct if either side's coverage changes later).
+        static_row = _static_pick_values_for_season(static, season)
+        return {**static_row, **live}
+    return _static_pick_values_for_season(static, season)
+
+
+def _static_pick_values_for_season(by_year: dict, season: int) -> dict[str, list[float]]:
     if not by_year:
         return {}
     years = sorted(int(y) for y in by_year)
@@ -561,11 +591,25 @@ def _parse_player(entry: dict, week: int) -> PlayerWeek | None:
         elif stat.get("statSourceId") == 1:
             projected = round(stat.get("appliedTotal", 0.0), 2)
 
+    slot_id = entry.get("lineupSlotId", BENCH_SLOT)
+    if not played and "appliedStatTotal" in ppe and slot_id not in NON_STARTING:
+        # Legacy per-season archive (2017, via leagueHistory + mRoster): no
+        # per-week statSourceId/scoringPeriodId breakdown survives in
+        # player.stats — but this entry's own appliedStatTotal IS that
+        # week's real score (verified by reconciling against ESPN's
+        # official team total). Every entry present here is a real starter
+        # (the legacy response never includes bench), so it's safe to treat
+        # any of these as "played" — there's no real-vs-projected
+        # distinction to preserve, only a real result.
+        actual = round(ppe.get("appliedStatTotal", 0.0), 2)
+        played = True
+        slot_id = LEGACY_POSITION_SLOT.get(player.get("defaultPositionId", 0), slot_id)
+
     return PlayerWeek(
         player_id=player["id"],
         name=player.get("fullName", f"Player {player['id']}"),
         position=POSITION_NAMES.get(player.get("defaultPositionId", 0), "?"),
-        slot_id=entry.get("lineupSlotId", BENCH_SLOT),
+        slot_id=slot_id,
         eligible_slots=frozenset(player.get("eligibleSlots", [])),
         actual=actual,
         played=played,
@@ -575,7 +619,8 @@ def _parse_player(entry: dict, week: int) -> PlayerWeek | None:
 
 
 def _parse_side(side: dict, week: int, is_home: bool, home_bonus: float) -> TeamWeek:
-    entries = side.get("rosterForCurrentScoringPeriod", {}).get("entries", [])
+    roster = side.get("rosterForCurrentScoringPeriod") or side.get("rosterForMatchupPeriod") or {}
+    entries = roster.get("entries", [])
     lineup = [p for e in entries if (p := _parse_player(e, week)) is not None]
     return TeamWeek(
         team_id=side["teamId"],

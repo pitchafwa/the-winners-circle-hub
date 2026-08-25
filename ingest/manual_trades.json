@@ -32,15 +32,18 @@
         {
           "pick": "2026 1st",
           "from": 6,
-          "to": 8
+          "to": 8,
+          "value": 5318.2
         },
         {
           "player": "Chris Godwin Jr.",
           "from": 8,
-          "to": 6
+          "to": 6,
+          "value": 3686
         }
       ],
-      "id": "265d53ce"
+      "id": "265d53ce",
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "season": 2025,
@@ -54,30 +57,36 @@
         {
           "pick": "2026 1st",
           "from": 9,
-          "to": 4
+          "to": 4,
+          "value": 5318.2
         },
         {
           "pick": "2027 2nd",
           "from": 9,
-          "to": 4
+          "to": 4,
+          "value": 3761.2
         },
         {
           "player": "Harold Fannin Jr.",
           "from": 9,
-          "to": 4
+          "to": 4,
+          "value": 5385
         },
         {
           "player": "Josh Jacobs",
           "from": 4,
-          "to": 9
+          "to": 9,
+          "value": 4923
         },
         {
           "player": "Hunter Henry",
           "from": 4,
-          "to": 9
+          "to": 9,
+          "value": 2774
         }
       ],
-      "id": "b010b55f"
+      "id": "b010b55f",
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "season": 2025,
@@ -91,30 +100,36 @@
         {
           "player": "Joe Burrow",
           "from": 7,
-          "to": 4
+          "to": 4,
+          "value": 5751
         },
         {
           "player": "Josh Jacobs",
           "from": 7,
-          "to": 4
+          "to": 4,
+          "value": 4923
         },
         {
           "player": "Woody Marks",
           "from": 4,
-          "to": 7
+          "to": 7,
+          "value": 3438
         },
         {
           "player": "J.K. Dobbins",
           "from": 4,
-          "to": 7
+          "to": 7,
+          "value": 3652
         },
         {
           "pick": "2026 1st",
           "from": 4,
-          "to": 7
+          "to": 7,
+          "value": 5318.2
         }
       ],
-      "id": "10e8b07e"
+      "id": "10e8b07e",
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "season": 2025,
@@ -128,25 +143,30 @@
         {
           "pick": "2026 1st",
           "from": 7,
-          "to": 5
+          "to": 5,
+          "value": 5318.2
         },
         {
           "pick": "2027 1st",
           "from": 7,
-          "to": 5
+          "to": 5,
+          "value": 5318.2
         },
         {
           "player": "Justin Jefferson",
           "from": 5,
-          "to": 7
+          "to": 7,
+          "value": 7588
         },
         {
           "player": "Michael Wilson",
           "from": 5,
-          "to": 7
+          "to": 7,
+          "value": 4561
         }
       ],
-      "id": "479dcd37"
+      "id": "479dcd37",
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "season": 2025,
@@ -160,20 +180,24 @@
         {
           "player": "Javonte Williams",
           "from": 2,
-          "to": 1
+          "to": 1,
+          "value": 5446
         },
         {
           "player": "D'Andre Swift",
           "from": 1,
-          "to": 2
+          "to": 2,
+          "value": 4820
         },
         {
           "pick": "2026 1st",
           "from": 1,
-          "to": 2
+          "to": 2,
+          "value": 5318.2
         }
       ],
-      "id": "4952d38b"
+      "id": "4952d38b",
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "season": 2025,
@@ -187,15 +211,18 @@
         {
           "player": "A.J. Brown",
           "from": 10,
-          "to": 8
+          "to": 8,
+          "value": 5910
         },
         {
           "player": "Quinshon Judkins",
           "from": 8,
-          "to": 10
+          "to": 10,
+          "value": 6034
         }
       ],
-      "id": "de332d5c"
+      "id": "de332d5c",
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "season": 2025,
@@ -209,20 +236,24 @@
         {
           "player": "Tee Higgins",
           "from": 8,
-          "to": 3
+          "to": 3,
+          "value": 5773
         },
         {
           "player": "James Conner",
           "from": 8,
-          "to": 3
+          "to": 3,
+          "value": 1900
         },
         {
           "player": "Cam Skattebo",
           "from": 3,
-          "to": 8
+          "to": 8,
+          "value": 5472
         }
       ],
-      "id": "a31c600b"
+      "id": "a31c600b",
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "dece7c8b",
@@ -237,24 +268,29 @@
         {
           "player": "Tyler Shough",
           "from": 10,
-          "to": 7
+          "to": 7,
+          "value": 4142
         },
         {
           "player": "Tony Pollard",
           "from": 10,
-          "to": 7
+          "to": 7,
+          "value": 3476
         },
         {
           "pick": "2027 2nd",
           "from": 7,
-          "to": 10
+          "to": 10,
+          "value": 3761.2
         },
         {
           "player": "Michael Wilson",
           "from": 7,
-          "to": 10
+          "to": 10,
+          "value": 4561
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "4bcb83e5",
@@ -269,29 +305,35 @@
         {
           "pick": "2026 1st",
           "from": 9,
-          "to": 4
+          "to": 4,
+          "value": 5318.2
         },
         {
           "pick": "2027 2nd",
           "from": 9,
-          "to": 4
+          "to": 4,
+          "value": 3761.2
         },
         {
           "player": "Harold Fannin Jr.",
           "from": 9,
-          "to": 4
+          "to": 4,
+          "value": 5385
         },
         {
           "player": "Josh Jacobs",
           "from": 4,
-          "to": 9
+          "to": 9,
+          "value": 4923
         },
         {
           "player": "Hunter Henry",
           "from": 4,
-          "to": 9
+          "to": 9,
+          "value": 2774
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "36278149",
@@ -307,29 +349,35 @@
         {
           "player": "DeVonta Smith",
           "from": 10,
-          "to": 7
+          "to": 7,
+          "value": 6200
         },
         {
           "player": "Terry McLaurin",
           "from": 10,
-          "to": 7
+          "to": 7,
+          "value": 4401
         },
         {
           "player": "Bucky Irving",
           "from": 7,
-          "to": 10
+          "to": 10,
+          "value": 5311
         },
         {
           "pick": "2026 2nd",
           "from": 2,
-          "to": 10
+          "to": 10,
+          "value": 3761.2
         },
         {
           "pick": "2026 2nd",
           "from": 10,
-          "to": 7
+          "to": 7,
+          "value": 3761.2
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "15953667",
@@ -344,24 +392,29 @@
         {
           "pick": "2025 1st",
           "from": 10,
-          "to": 5
+          "to": 5,
+          "value": 5318.2
         },
         {
           "pick": "2026 1st",
           "from": 5,
-          "to": 10
+          "to": 10,
+          "value": 5318.2
         },
         {
           "player": "DeVonta Smith",
           "from": 5,
-          "to": 10
+          "to": 10,
+          "value": 6200
         },
         {
           "player": "Kyle Pitts Sr.",
           "from": 5,
-          "to": 10
+          "to": 10,
+          "value": 5036
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "c4e10c33",
@@ -376,24 +429,29 @@
         {
           "player": "Tyreek Hill",
           "from": 8,
-          "to": 2
+          "to": 2,
+          "value": 1412
         },
         {
           "pick": "2025 2nd",
           "from": 8,
-          "to": 2
+          "to": 2,
+          "value": 3761.2
         },
         {
           "pick": "2026 1st",
           "from": 8,
-          "to": 2
+          "to": 2,
+          "value": 5318.2
         },
         {
           "pick": "2025 1st",
           "from": 2,
-          "to": 8
+          "to": 8,
+          "value": 5318.2
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "2e13aeeb",
@@ -408,24 +466,29 @@
         {
           "player": "Drake Maye",
           "from": 8,
-          "to": 3
+          "to": 3,
+          "value": 6487
         },
         {
           "player": "Travis Kelce",
           "from": 8,
-          "to": 3
+          "to": 3,
+          "value": 2984
         },
         {
           "pick": "2025 2nd",
           "from": 8,
-          "to": 3
+          "to": 3,
+          "value": 3761.2
         },
         {
           "pick": "2025 2nd",
           "from": 3,
-          "to": 8
+          "to": 8,
+          "value": 3761.2
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "1779b96d",
@@ -440,19 +503,23 @@
         {
           "pick": "2025 2nd",
           "from": 8,
-          "to": 2
+          "to": 2,
+          "value": 3761.2
         },
         {
           "player": "Javonte Williams",
           "from": 8,
-          "to": 2
+          "to": 2,
+          "value": 5446
         },
         {
           "pick": "2025 2nd",
           "from": 2,
-          "to": 8
+          "to": 8,
+          "value": 3761.2
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "5a816bbd",
@@ -467,14 +534,17 @@
         {
           "pick": "2025 2nd",
           "from": 1,
-          "to": 4
+          "to": 4,
+          "value": 3761.2
         },
         {
           "pick": "2026 2nd",
           "from": 4,
-          "to": 1
+          "to": 1,
+          "value": 3761.2
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "0a189c85",
@@ -490,24 +560,29 @@
         {
           "player": "Cade Otton",
           "from": 10,
-          "to": 5
+          "to": 5,
+          "value": 2612
         },
         {
           "pick": "2026 4th",
           "from": 10,
-          "to": 5
+          "to": 5,
+          "value": 1887.7
         },
         {
           "pick": "2025 3rd",
           "from": 5,
-          "to": 10
+          "to": 10,
+          "value": 2686.0
         },
         {
           "pick": "2025 3rd",
           "from": 9,
-          "to": 10
+          "to": 10,
+          "value": 2686.0
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "660d1989",
@@ -522,14 +597,17 @@
         {
           "pick": "2025 3rd",
           "from": 10,
-          "to": 3
+          "to": 3,
+          "value": 2686.0
         },
         {
           "pick": "2026 3rd",
           "from": 3,
-          "to": 10
+          "to": 10,
+          "value": 2686.0
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "5df02783",
@@ -544,24 +622,29 @@
         {
           "player": "Rhamondre Stevenson",
           "from": 4,
-          "to": 2
+          "to": 2,
+          "value": 3892
         },
         {
           "player": "Jacory Croskey-Merritt",
           "from": 4,
-          "to": 2
+          "to": 2,
+          "value": 3917
         },
         {
           "pick": "2026 2nd",
           "from": 4,
-          "to": 2
+          "to": 2,
+          "value": 3761.2
         },
         {
           "pick": "2026 1st",
           "from": 2,
-          "to": 4
+          "to": 4,
+          "value": 5318.2
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "b83da3a7",
@@ -577,39 +660,47 @@
         {
           "pick": "2026 1st",
           "from": 10,
-          "to": 8
+          "to": 8,
+          "value": 5318.2
         },
         {
           "pick": "2026 2nd",
           "from": 4,
-          "to": 8
+          "to": 8,
+          "value": 3761.2
         },
         {
           "player": "Rashee Rice",
           "from": 10,
-          "to": 8
+          "to": 8,
+          "value": 5637
         },
         {
           "player": "Kyler Murray",
           "from": 10,
-          "to": 8
+          "to": 8,
+          "value": 3746
         },
         {
           "player": "Drake London",
           "from": 8,
-          "to": 10
+          "to": 10,
+          "value": 7215
         },
         {
           "player": "Jayden Daniels",
           "from": 8,
-          "to": 10
+          "to": 10,
+          "value": 5978
         },
         {
           "pick": "2027 2nd",
           "from": 8,
-          "to": 10
+          "to": 10,
+          "value": 3761.2
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "d1ad15cd",
@@ -625,24 +716,29 @@
         {
           "player": "Quinshon Judkins",
           "from": 5,
-          "to": 8
+          "to": 8,
+          "value": 6034
         },
         {
           "player": "Chris Godwin Jr.",
           "from": 5,
-          "to": 8
+          "to": 8,
+          "value": 3686
         },
         {
           "player": "TreVeyon Henderson",
           "from": 8,
-          "to": 5
+          "to": 5,
+          "value": 5792
         },
         {
           "pick": "2026 1st",
           "from": 9,
-          "to": 8
+          "to": 8,
+          "value": 5318.2
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "222fc4ef",
@@ -657,39 +753,47 @@
         {
           "player": "Justin Jefferson",
           "from": 7,
-          "to": 10
+          "to": 10,
+          "value": 7588
         },
         {
           "player": "Rico Dowdle",
           "from": 7,
-          "to": 10
+          "to": 10,
+          "value": 3857
         },
         {
           "pick": "2026 1st",
           "from": 7,
-          "to": 10
+          "to": 10,
+          "value": 5318.2
         },
         {
           "player": "Emeka Egbuka",
           "from": 10,
-          "to": 7
+          "to": 7,
+          "value": 6562
         },
         {
           "player": "Bucky Irving",
           "from": 10,
-          "to": 7
+          "to": 7,
+          "value": 5311
         },
         {
           "pick": "2026 1st",
           "from": 10,
-          "to": 7
+          "to": 7,
+          "value": 5318.2
         },
         {
           "pick": "2026 2nd",
           "from": 10,
-          "to": 7
+          "to": 7,
+          "value": 3761.2
         }
-      ]
+      ],
+      "valuation_snapshot_at": "2026-08-24T18:47:30.287934+00:00"
     },
     {
       "id": "2bb907f2",

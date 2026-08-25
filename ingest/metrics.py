@@ -81,15 +81,24 @@ def optimal_lineup(candidates: list[PlayerWeek], starting_slots: list[int]) -> t
     eligible. Eligibility comes from ESPN's eligibleSlots, not position.
 
     Returns (optimal_points, [(slot_id, player_or_None), ...]). A slot is
-    returned with None (contributing 0) when no rostered player can fill it —
-    or when leaving it empty beats every eligible player (negative scorers).
+    returned with None (contributing 0) only when there genuinely aren't
+    enough rostered candidates to fill every slot — never as a stand-in for
+    "everyone eligible underperformed." A manager can't actually leave a
+    required slot empty; if every real option for it was bad, the true
+    optimal is still the least-bad real one, not a fictitious zero. This
+    matters most for seasons with no visible bench (e.g. 2017's archive,
+    candidates == that week's starters) — there, allowing unlimited empty
+    slots let the model "bench" a real negative scorer with nowhere to
+    actually put anyone else, inflating both optimal_points and coach_rating.
     """
     n, m = len(candidates), len(starting_slots)
     if m == 0:
         return 0.0, []
 
-    # m dummy rows at cost 0 = the always-legal option of an empty slot
-    cost = np.full((n + m, m), _FORBIDDEN)
+    # Only as many dummy (cost-0, empty-slot) rows as the real shortfall —
+    # zero whenever there are already at least as many candidates as slots.
+    dummy_count = max(0, m - n)
+    cost = np.full((n + dummy_count, m), _FORBIDDEN)
     cost[n:, :] = 0.0
     for i, p in enumerate(candidates):
         for j, slot in enumerate(starting_slots):
@@ -289,9 +298,22 @@ def division_race(league: LeagueData) -> dict[int, dict]:
 def team_week_coach(tw: TeamWeek, starting_slots: list[int]) -> dict:
     """Coach quality is judged on lineup production only — the home-field
     bonus and commissioner adjustments in the official total aren't coaching."""
+    actual = tw.lineup_points
+    if not tw.bench():
+        # No visible bench this week (2017's archive only ever returns
+        # starters) — there's no real alternative lineup to compare against,
+        # so optimal==actual isn't "the coach was perfect," it's "we can't
+        # tell." Report it as genuinely unknown rather than a fake 100%.
+        return {
+            "actual": actual,
+            "official_total": tw.total,
+            "optimal": None,
+            "rating": None,
+            "bench_lost": None,
+            "optimal_assignment": [],
+        }
     candidates = [p for p in tw.lineup if p.slot_id != IR_SLOT]
     optimal, assignment = optimal_lineup(candidates, starting_slots)
-    actual = tw.lineup_points
     rating = round(actual / optimal, 4) if optimal > 0 else None
     return {
         "actual": actual,
@@ -321,12 +343,24 @@ def compute_coach(league: LeagueData) -> dict[int, dict]:
         if not weeks:
             continue
         total_actual = round(sum(w["actual"] for w in weeks.values()), 2)
-        total_optimal = round(sum(w["optimal"] for w in weeks.values()), 2)
+        # Only weeks with a real optimal/bench comparison count toward the
+        # season rating — mixing in a bench-blind week's actual against
+        # nothing would understate/inflate the ratio for no real reason.
+        known = [w for w in weeks.values() if w["optimal"] is not None]
+        if known:
+            known_actual = round(sum(w["actual"] for w in known), 2)
+            total_optimal = round(sum(w["optimal"] for w in known), 2)
+            rating = round(known_actual / total_optimal, 4) if total_optimal else None
+            bench_lost = round(sum(w["bench_lost"] for w in known), 2)
+        else:
+            total_optimal = None
+            rating = None
+            bench_lost = None
         data["season"] = {
             "actual": total_actual,
             "optimal": total_optimal,
-            "rating": round(total_actual / total_optimal, 4) if total_optimal else None,
-            "bench_lost": round(sum(w["bench_lost"] for w in weeks.values()), 2),
+            "rating": rating,
+            "bench_lost": bench_lost,
         }
     return out
 

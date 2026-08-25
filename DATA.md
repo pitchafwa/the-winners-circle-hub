@@ -10,7 +10,16 @@ General rules:
 - Timestamps: `generated_at`/`fetched_at` are ISO-8601 UTC; transaction dates are ms epochs.
 - Scores: `total` = official score (includes home bonus + commissioner adjustment);
   `lineup_points` = what the starters produced; `optimal_points` = best legal lineup
-  (IR excluded, bench eligible, empty slot allowed). Coach rating = lineup/optimal.
+  (IR excluded, bench eligible; an empty slot is only ever legal when there
+  genuinely aren't enough real candidates to fill it — never a way to dodge
+  a bad-but-real outcome when a full bench exists). Coach rating =
+  lineup/optimal. All three of `optimal_points`/`coach_rating`/
+  `bench_points_lost` are `null` for a week with no visible bench at all
+  (2017's archive — see the History note under `badges.json` below) — there's
+  no real alternative lineup to compare against, so reporting `optimal ==
+  actual` would read as "perfect coaching" when it actually means "can't
+  tell." Same null-when-unknown rule applies to the season-level versions of
+  these three fields.
 - League rule: nothing past `ingest/config.py`'s `FINAL_COUNTED_WEEK` (17 — the
   week-17 game is this league's championship) counts anywhere. In playoff weeks,
   only `WINNERS_BRACKET` games feed stats/superlatives/records — consolation-ladder
@@ -189,8 +198,13 @@ Types: champion, runner_up, reg_season_title, points_title, superlative_champion
 best_coach_season, record_high_week (all-time single-week record holder),
 last_place, record_low_week, bench_king. Rank-based badges are only awarded for
 finished seasons. History depth: ESPN serves 2024+ without auth; 2012–2023
-need `espn_s2`/`SWID` cookies in `.env` (unlocked, standings/records only —
-no per-week box scores at that depth).
+need `espn_s2`/`SWID` cookies in `.env` for standings/records at all. Real
+per-player box scores go back further than that (2018+ full quality —
+same shape as 2024+; 2017 real but starters-only, no bench, no exact
+lineup slot; confirmed 2026-08-25 via direct API reconciliation) — 2012–2016
+stay standings-only forever, ESPN's own archive for those years is missing
+a meaningful, inconsistent fraction of player entries per week with no
+reliable way to detect or fill the gaps.
 
 `ingest/manual_badges.json` also corrects auto-computed badges for real-world
 facts the app's own data can't capture — e.g. 2022 was a co-championship
@@ -199,6 +213,12 @@ standings, encoded via that file's `suppress[]` (removes the wrong
 auto-computed badge) + `badges[]` (adds the correct one). See its `_readme`.
 
 ## `{season}/sim.json` (absent when season is over or schedule unknown)
+
+Actively deleted (`build.py`), not just skipped, the moment `season_over`
+flips true — a season that finishes mid-build cycle would otherwise keep
+whatever `sim.json` it had from its last live run forever, silently stale
+(fixed 2026-08-25; every completed season's `sim.json` was a leftover from
+whenever it was last "current" until then).
 
 Monte Carlo playoff odds. `n_sims`, `remaining_matchups`, `model` (plain-English
 method statement), `roster_strength_active` (bool — whether redraft valuation
@@ -386,12 +406,19 @@ rookie-pick dynasty trade values (1QB format) instead — genuinely
 (`parse.pick_values_for_season`), since KTC does publish a class-strength
 signal for picks that haven't happened yet (a 2027 1st is priced higher
 than a 2026 1st right now, matching this league's own read that 2026's
-class is weak). A season without a matching year on file — every draft this
-league has ever run, since manual draft data only goes back to 2024 and the
-earliest year on file is 2026 — clamps to the nearest year available rather
-than extrapolating or refusing to grade. Tommy's call: exact year-matching
-isn't expected for the past, just wanted where it's real and available for
-drafts going forward.
+class is weak). A season without a matching year on file clamps to the
+nearest year available rather than extrapolating or refusing to grade.
+
+**Live as of 2026-08-25**: `pick_values.json` is no longer the only source —
+`valuation.pick_curve_by_year()` derives a real, current curve from the SAME
+dynasty-rankings fetch that already backs player values (KTC lists future
+picks right alongside players, `position: "RDP"`, three tiers per round —
+"2027 Early 1st" / "Mid" / "Late" — interpolated into a full 10-pick curve),
+so no extra request is needed and the curve moves with the real market on
+the same 12h cache as everything else KTC-priced. `pick_values.json` is now
+purely the fallback for years/rounds outside whatever KTC's fetch actually
+covered that run (currently the next 3 draft years × rounds 1-4) — same
+nearest-year clamp as before, just on whichever source ends up used.
 
 `valuation_available` (bool) and `valuation_updated_at`: if the valuation
 fetch fails and no prior cache exists, `haul_grades`/`efficiency_grades` are
@@ -416,20 +443,41 @@ lineup with `played: false`).
 ("draft"|"trade"|"waiver"|"fa"|"preexisting"|"unknown"), start_season,
 start_week, departed_via ("trade"|"dropped"|null), end_season, end_week
 (both null = still on this roster today), weeks_rostered, weeks_started,
-weeks_benched, points_started, points_projected_started, points_benched,
+weeks_benched, weeks_projected, points_started, points_projected_started,
+points_started_projected_weeks, points_benched,
 start_rate (weeks_started / weeks_rostered)}`. `acquired_via: "preexisting"`
 means the stint's first data week is also the first season this league has
-any lineup data for at all (2024 in practice — 2012–2023 is standings-only,
-see the History section above) — there's no earlier record to attribute the
-acquisition to. `"unknown"` means a real acquisition that predates
-`manual_trades.json`'s coverage or otherwise couldn't be matched to a
-draft/trade/waiver event; both are honest "don't know," never guessed.
+any lineup data for at all (2017 in practice — 2012–2016 is standings-only,
+see the History note under `badges.json` above) — there's no earlier record
+to attribute the acquisition to. `"unknown"` means a real acquisition that
+predates `manual_trades.json`'s coverage or otherwise couldn't be matched to
+a draft/trade/waiver event; both are honest "don't know," never guessed.
+Only weeks in a real, meaningful game (regular season, or a `WINNERS_BRACKET`
+playoff game — same rule as everywhere else) touch a stint at all; a
+consolation-bracket week is skipped entirely, same as a week the team has
+no matchup data for — most managers don't set a real lineup once they're
+out of championship contention, so those weeks shouldn't pad anyone's
+tenure or point totals.
+
+`weeks_projected`/`points_started_projected_weeks` exist because 2017 has
+no ESPN projection data at all — `points_projected_started` only ever sums
+weeks that had a real projection to sum (never silently padded with 0 for
+a week where no projection existed, which would fabricate a huge fake
+overperformance for anyone with real 2017 usage). `points_started_projected_weeks`
+is the matching actual-points subset for those same weeks, so the two can
+be diffed apples-to-apples; `weeks_projected` is that subset's denominator
+for a fair per-game version of the same comparison. `points_started` (the
+"most points" leaderboard) and `weeks_started` (the "most weeks started"
+leaderboard) are unaffected — those stay honest full totals across every
+real started week regardless of projection availability.
 
 `leaders`: three per-team top-5 lists derived from `stints[]` — `value`
 (highest `points_started`, "who's delivered the most value"), `busts`
-(highest `points_projected_started − points_started`, min. 4 weeks
-rostered, "biggest headache"), `stashes` (lowest `start_rate`, min. 10
-weeks rostered, "longest-held bench project"). Each entry:
+(highest `points_projected_started − points_started_projected_weeks`,
+min. 4 weeks rostered, "biggest headache"), `stashes` (lowest `start_rate`,
+min. 10 weeks rostered, "longest-held bench project"). `points_under_projection`
+below is `null` (not a fabricated number) for a stint with no
+`weeks_projected` at all. Each entry:
 `{team_id, player_id, name, position, points_started,
 points_under_projection, weeks_rostered, weeks_started, start_rate,
 start_season, start_week, end_season, end_week}`.
@@ -454,17 +502,22 @@ has_estimated_asset, uses_current_value_fallback}`.
 is submitted: `trade_tool.py cmd_submit` snapshots the current dynasty
 value straight onto `manual_trades.json`'s asset record
 (`value_source: "snapshot"`), and that number is read back forever after,
-never re-priced against a later build's market. Trades entered before this
-existed have no stored snapshot; those fall back to whatever today's
-dynasty value is (`value_source: "current_fallback"`) and the whole trade
-gets `uses_current_value_fallback: true` so the UI can be honest that side
-isn't a true point-in-time read. A traded pick can't be resolved to its
-exact draft slot from the trade record alone (that needs the
-original-owner + resolved-slot bookkeeping `pick_tracking.py` does at read
-time, not captured per historical trade), so pick `value` is always that
-draft year's **round average** from `pick_values.json` (frozen at
-submission time same as players) and the trade gets
-`has_estimated_asset: true`.
+never re-priced against a later build's market. `value_source:
+"current_fallback"` (re-priced live every build, honestly flagged via
+`uses_current_value_fallback: true`) only happens for a trade with no
+stored snapshot at all — as of 2026-08-25, every trade on file has one
+(the 22 trades / 88 assets that predated this mechanism were backfilled
+once, at that date's market price, then frozen exactly like every other
+trade going forward) — this path is now effectively dead unless a future
+trade is somehow entered without going through `cmd_submit`. A traded pick
+can't be resolved to its exact draft slot from the trade record alone (that
+needs the original-owner + resolved-slot bookkeeping `pick_tracking.py`
+does at read time, not captured per historical trade), so pick `value` is
+always that draft year's **round average** — live where KTC's fetch covers
+it, `pick_values.json` fallback otherwise, see the `draft.json` section
+above — frozen at submission time same as players, and the trade gets
+`has_estimated_asset: true` regardless of source (it's always an estimate,
+never a resolved slot).
 
 **`production_since_trade`** (players only, `null` when not applicable) —
 `{points_started, points_projected_started, weeks_started, still_held}`,

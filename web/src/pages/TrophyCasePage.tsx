@@ -91,7 +91,7 @@ export default function TrophyCasePage() {
         </div>
         {superlatives.error && <div className="error-state">{superlatives.error}</div>}
         {!meta.season_started && (
-          <EmptyState>The trophy case opens with week 1. Every week hands out {keys.length || 11} awards.</EmptyState>
+          <EmptyState>Superlatives open with week 1. Every week hands out {keys.length || 11} awards.</EmptyState>
         )}
         {tally && meta.season_started && superlatives.data && (
           <div className="table-wrap">

@@ -1,28 +1,23 @@
 name: Refresh league data
 
-# Deliberately manual-only for now (workflow_dispatch). The intended cron
-# schedule is written below but commented out — uncomment it only when
-# told to go live. A *live* `schedule:` trigger starts firing the moment
-# this file lands on the default branch, so leaving it commented is the
-# actual mechanism for "disabled until I say so," not just a suggestion.
+# Live as of 2026-08-25 (Tommy's go-ahead). GitHub Actions cron is UTC-only
+# and doesn't observe DST, so these times drift by an hour across the
+# EST/EDT boundary; nudge by an hour after the fact if a run lands
+# off-window.
 #
-# Intended schedule (approximate — GitHub Actions cron is UTC-only and
-# doesn't observe DST, so these times drift by an hour across the EST/EDT
-# boundary; nudge by an hour after the fact if a run lands off-window):
+# Schedule:
 #   - every 15 min, Sun 1pm-midnight ET      (game day, high refresh rate)
 #   - hourly, Mon-Tue                        (Monday/Thursday-adjacent news)
 #   - every 6 hours, Wed-Sat                 (quiet stretch)
-#
-# on:
-#   schedule:
-#     - cron: "*/15 18-23 * * 0"   # Sun 1pm-7:59pm ET
-#     - cron: "*/15 0-4 * * 1"     # Sun 8pm-11:59pm ET (rolls into Mon UTC)
-#     - cron: "0 5-23 * * 1"       # Mon, hourly
-#     - cron: "0 * * * 2"          # Tue, hourly
-#     - cron: "0 */6 * * 3-6"      # Wed-Sat, every 6 hours
 
 on:
   workflow_dispatch: {}
+  schedule:
+    - cron: "*/15 18-23 * * 0"   # Sun 1pm-7:59pm ET
+    - cron: "*/15 0-4 * * 1"     # Sun 8pm-11:59pm ET (rolls into Mon UTC)
+    - cron: "0 5-23 * * 1"       # Mon, hourly
+    - cron: "0 * * * 2"          # Tue, hourly
+    - cron: "0 */6 * * 3-6"      # Wed-Sat, every 6 hours
 
 permissions:
   contents: write

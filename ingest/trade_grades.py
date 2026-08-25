@@ -91,7 +91,8 @@ def _matching_stint(index: dict[tuple[int, int, int], list[dict]],
 
 
 def grade_trades(dynasty_values: dict[str, int] | None, valuation_updated_at: str | None,
-                 stints: list[dict] | None = None) -> dict:
+                 stints: list[dict] | None = None,
+                 pick_curves: dict[str, dict[str, list[float]]] | None = None) -> dict:
     dynasty_values = dynasty_values or {}
     valuation_available = bool(dynasty_values)
     stint_index = _stints_by_team_player(stints or [])
@@ -122,7 +123,7 @@ def grade_trades(dynasty_values: dict[str, int] | None, valuation_updated_at: st
         season = t["season"]
         week = t.get("week", 0)
         by_name = {parse._normalize_name(n): pid for pid, n in names_for(season).items()}
-        pick_values = parse.pick_values_for_season(season)
+        pick_values = parse.pick_values_for_season(season, pick_curves)
         date_ms = int(datetime.fromisoformat(t["date"]).timestamp() * 1000) if t.get("date") else 0
 
         value_by_team: dict[int, dict[str, float]] = {int(tid): {"gained": 0.0, "lost": 0.0}

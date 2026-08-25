@@ -136,6 +136,62 @@ def values_by_name(offline: bool = False) -> tuple[dict[str, int], str | None]:
     return values, fetched_at
 
 
+_PICK_ENTRY_RE = re.compile(r"^(\d{4}) (Early|Mid|Late) (\d+)(?:st|nd|rd|th)$")
+_TIER_ANCHOR_SLOT = {"Early": 2, "Mid": 5, "Late": 8}  # pick # within a 10-team round
+
+
+def _interpolate_round(anchor_values: dict[int, float]) -> list[float]:
+    """3 known points (pick 2/5/8, from KTC's Early/Mid/Late tiers) -> a
+    full 10-pick curve. Piecewise-linear between the anchors; the two end
+    segments extend that same slope out to picks 1 and 9-10, clamped at 0 —
+    KTC doesn't publish a value for every single slot, and this league
+    already treats a hand-curated version of exactly this shape
+    (`pick_values.json`) as the standard, so a small local interpolation is
+    consistent with how the static fallback curve was built in the first
+    place, just re-derived from a live source instead of typed in by hand."""
+    anchors = sorted(anchor_values.items())
+    values = []
+    for slot in range(1, 11):
+        if slot <= anchors[0][0]:
+            (x0, y0), (x1, y1) = anchors[0], anchors[1]
+        elif slot >= anchors[-1][0]:
+            (x0, y0), (x1, y1) = anchors[-2], anchors[-1]
+        else:
+            (x0, y0), (x1, y1) = next(
+                (a, b) for a, b in zip(anchors, anchors[1:]) if a[0] <= slot <= b[0])
+        t = (slot - x0) / (x1 - x0)
+        values.append(max(round(y0 + t * (y1 - y0)), 0))
+    return values
+
+
+def pick_curve_by_year(offline: bool = False) -> tuple[dict[str, dict[str, list[float]]], str | None]:
+    """Live rookie-pick value curve, derived from the SAME dynasty-rankings
+    fetch `values_by_name()` already makes — KeepTradeCut lists future picks
+    (position "RDP") right alongside players, three tiers per round ("2027
+    Early 1st" / "Mid" / "Late"), so no extra request is needed. Returns
+    {year: {round: [10 values, pick 1 first]}}, only for years/rounds KTC
+    actually published this fetch (currently the next 3 draft years x
+    rounds 1-4) — callers fall back to the static `pick_values.json` curve
+    for anything outside that range, same "nearest year on file" clamp
+    `parse.pick_values_for_season` already does for the static-only case."""
+    players, fetched_at = _get_players(DYNASTY, offline)
+    raw: dict[str, dict[str, dict[int, float]]] = {}
+    for p in players:
+        if p.get("position") != "RDP":
+            continue
+        m = _PICK_ENTRY_RE.match(p["playerName"])
+        if not m:
+            continue
+        year, tier, round_ = m.group(1), m.group(2), m.group(3)
+        slot = _TIER_ANCHOR_SLOT[tier]
+        raw.setdefault(year, {}).setdefault(round_, {})[slot] = p["oneQBValues"]["value"]
+    curves = {
+        year: {round_: _interpolate_round(anchors) for round_, anchors in rounds.items() if len(anchors) >= 2}
+        for year, rounds in raw.items()
+    }
+    return curves, fetched_at
+
+
 def redraft_values_by_name(offline: bool = False) -> tuple[dict[str, int], str | None]:
     """normalized_name -> 1QB REDRAFT (this-season) value (0-9999), from
     keeptradecut.com/fantasy-rankings — a separate page from dynasty-rankings,

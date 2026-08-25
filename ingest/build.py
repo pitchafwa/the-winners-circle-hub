@@ -27,6 +27,19 @@ import trade_grades
 DRAFT_ROUNDS = [1, 2, 3, 4]
 PICK_FUTURES_HORIZON_YEARS = 3
 
+# ESPN's box-score API still returns per-player lineup + points data for
+# these seasons even though the box-score web page stops displaying it —
+# confirmed by reconciling summed starter points against ESPN's own recorded
+# team totals. 2024+ already gets this data through fetch_season() as each
+# year's "current" season. 2018 is full quality (same shape as 2019+, real
+# bench). 2017 is real but reduced: starters only, no bench, no exact lineup
+# slot (parse.py falls back to the player's default position). 2012-2016
+# were tested and rejected — ESPN's archive for those years is missing a
+# meaningful, inconsistent fraction of player entries per week (worse the
+# further back), so summed lineups don't reconcile against the real team
+# score and there's no reliable way to detect/fill the gaps.
+HISTORICAL_BOXSCORE_YEARS = range(2017, 2024)
+
 
 def _write(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -55,7 +68,8 @@ def _record_str(w, l, t):
 
 def build_season(season: int, dynasty_values: dict[str, int] | None = None,
                  valuation_updated_at: str | None = None,
-                 redraft_values: dict[str, int] | None = None) -> dict:
+                 redraft_values: dict[str, int] | None = None,
+                 pick_curves: dict[str, dict[str, list[float]]] | None = None) -> dict:
     """Write every data file for one season. Returns summary for seasons.json."""
     league = parse.load_league(season)
     out_dir = config.DATA_DIR / str(season)
@@ -329,7 +343,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     for prob in draft_problems:
         print(f"  manual draft {season}: {prob}", file=sys.stderr)
     draft = metrics.compute_draft(league, picks, names, dynasty_values, valuation_updated_at,
-                                  parse.pick_values_for_season(season))
+                                  parse.pick_values_for_season(season, pick_curves))
     if draft:
         _write(out_dir / "draft.json", {
             "generated_at": generated_at, **draft, "problems": draft_problems})
@@ -347,6 +361,13 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         sim = simulate.run(league, history, redraft_values)
         if sim:
             _write(out_dir / "sim.json", {"generated_at": generated_at, **sim})
+    else:
+        # A finished season has no "playoff odds" left to show — and a
+        # sim.json from back when this season was still live would just
+        # sit there forever, stale, once season_over flips true (this
+        # block only ever regenerates it, never revisits an old one). Same
+        # "stale file must not outlive its data source" rule as draft.json.
+        (out_dir / "sim.json").unlink(missing_ok=True)
 
     # ---- schedule.json (full season, for H2H matrix + bump chart) ---------
     _write(out_dir / "schedule.json", {
@@ -587,6 +608,24 @@ def main():
             except Exception as e:  # noqa: BLE001
                 print(f"  history {year} unavailable: {e}", file=sys.stderr)
 
+        # per-player box scores + transactions for the seasons ESPN's box-score
+        # API still has full lineup/points data for, even though the box-score
+        # web page stops displaying it — everything from 2024 on already comes
+        # through fetch_season() above as the "current" season of its year.
+        for year in HISTORICAL_BOXSCORE_YEARS:
+            try:
+                n = fetch.fetch_history_boxscores(year)
+                if n:
+                    print(f"  fetched {n} box-score week(s) for {year}")
+            except Exception as e:  # noqa: BLE001
+                print(f"  box scores {year} unavailable: {e}", file=sys.stderr)
+            try:
+                n = fetch.fetch_history_transactions(year)
+                if n:
+                    print(f"  fetched {n} transaction week(s) for {year}")
+            except Exception as e:  # noqa: BLE001
+                print(f"  transactions {year} unavailable: {e}", file=sys.stderr)
+
     all_seasons = cached_seasons()
     seasons = [args.season] if args.season else all_seasons
     if not seasons:
@@ -604,9 +643,17 @@ def main():
     if not redraft_values:
         print("  no redraft valuation data available — contend/rebuild spectrum will read 0 for the contending side", file=sys.stderr)
 
+    # Same dynasty-rankings fetch as values_by_name() above (cached, no
+    # extra request) — KTC lists future picks alongside players, so the
+    # pick-value curve stays as live as the player values do instead of
+    # only ever moving when someone hand-edits pick_values.json.
+    pick_curves, pick_curves_updated_at = valuation.pick_curve_by_year(offline=args.offline)
+    if not pick_curves:
+        print("  no live pick-value curve available — falling back to the static pick_values.json curve", file=sys.stderr)
+
     for season in seasons:
         print(f"Building {season}...")
-        build_season(season, dynasty_values, valuation_updated_at, redraft_values)
+        build_season(season, dynasty_values, valuation_updated_at, redraft_values, pick_curves)
 
     # cross-season aggregates always span every season on record, even when
     # --season restricted the per-season build loop above (e.g. the trade/
@@ -624,7 +671,7 @@ def main():
     print("Building trade grades...")
     _write(config.DATA_DIR / "trades.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        **trade_grades.grade_trades(dynasty_values, valuation_updated_at, ownership_data["stints"]),
+        **trade_grades.grade_trades(dynasty_values, valuation_updated_at, ownership_data["stints"], pick_curves),
     })
 
     print("Building pick futures board...")
@@ -646,7 +693,7 @@ def main():
         "teams": spectrum.contend_rebuild_spectrum(
             latest_teams, ownership_data["stints"], pick_board, dynasty_values, redraft_values,
             parse.current_roster_players(latest_league.season), latest_league.starting_slots,
-            latest_league.season),
+            latest_league.season, pick_curves),
     })
 
     print("Building all-time head-to-head...")

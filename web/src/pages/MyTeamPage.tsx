@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
 import { MISSING, pct, pts, signed } from "../lib/format";
@@ -61,7 +62,7 @@ export default function MyTeamPage() {
 
   const scoring = my?.weekly.map((w) => ({ week: w.week, points: w.points, avg: avgByWeek.get(w.week) ?? null })) ?? [];
   let running = 0;
-  const bench = my?.weekly.map((w) => ({ week: w.week, cumulative: Math.round((running += w.bench_points_lost) * 10) / 10 })) ?? [];
+  const bench = my?.weekly.map((w) => ({ week: w.week, cumulative: Math.round((running += w.bench_points_lost ?? 0) * 10) / 10 })) ?? [];
   const coachTrend = my?.weekly.map((w) => ({ week: w.week, rating: w.coach_rating })) ?? [];
 
   const best = my && my.weekly.length ? my.weekly.reduce((a, b) => (b.points > a.points ? b : a)) : null;
@@ -86,6 +87,9 @@ export default function MyTeamPage() {
           <p className="label">{meta.season} · {info?.nickname ?? info?.owner ?? "unclaimed"}</p>
           <h2 className="team-title">{info?.name ?? `Team ${myTeamId}`}</h2>
           {badges.error ? <div className="error-state">{badges.error}</div> : <BadgeShelf badges={myBadges} />}
+          <Link to={`/franchise/${myTeamId}`} className="muted" style={{ fontSize: "0.8rem" }}>
+            View full franchise history →
+          </Link>
         </div>
       </section>
 
@@ -235,7 +239,7 @@ export default function MyTeamPage() {
               !sim.loading && (
                 <EmptyState>
                   {meta.season_over
-                    ? "Season's over — see the Trophy Case for how it ended."
+                    ? "Season's over — see Superlatives for how it ended."
                     : '"What has to happen" arrives with the playoff-odds simulation once the season is underway.'}
                 </EmptyState>
               )

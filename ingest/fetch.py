@@ -192,6 +192,106 @@ def fetch_history_raw(year: int):
     return data
 
 
+def _history_url(year: int, views: str) -> str:
+    if year < 2018:
+        return (f"https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/"
+                f"leagueHistory/{config.LEAGUE_ID}?seasonId={year}&{views}")
+    return (f"https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/"
+            f"seasons/{year}/segments/0/leagues/{config.LEAGUE_ID}?{views}")
+
+
+def _history_get(year: int, params: dict, headers: dict | None = None) -> dict:
+    import requests
+
+    view = params.pop("view")
+    view = [view] if isinstance(view, str) else view
+    views = "&".join(f"view={v}" for v in view)
+    if params:
+        views += "&" + "&".join(f"{k}={v}" for k, v in params.items())
+    cookies = None
+    if config.ESPN_S2 and config.SWID:
+        cookies = {"espn_s2": config.ESPN_S2, "SWID": config.SWID}
+    r = requests.get(_history_url(year, views), cookies=cookies, headers=headers or {})
+    if r.status_code != 200:
+        raise RuntimeError(f"history {year}: HTTP {r.status_code}")
+    data = r.json()
+    if isinstance(data, list):
+        data = data[0] if data else {}
+    return data
+
+
+def _history_matchup_periods(year: int) -> dict[int, int]:
+    """week -> matchup period, read from this season's cached settings
+    (immutable, already fetched by fetch_history_raw). Falls back to an
+    identity mapping if the settings cache isn't there yet."""
+    cached = read_cache("league", season=year)
+    if not cached:
+        return {}
+    periods = cached["data"]["settings"]["scheduleSettings"].get("matchupPeriods", {})
+    out = {}
+    for mp, weeks in periods.items():
+        for w in weeks:
+            out[w] = int(mp)
+    return out
+
+
+def fetch_history_boxscores(year: int, max_week: int = config.FINAL_COUNTED_WEEK):
+    """Per-player box scores for a past season, one week at a time.
+
+    Mirrors fetch_week_raw's view/filter shape but against the historical
+    league endpoint, so parse.py's existing boxscores-week*.json glob picks
+    these up with no changes. Immutable and cached forever like
+    fetch_history_raw — only fetches weeks not already on disk.
+
+    2018+ hangs off the same endpoint/response shape as the current season
+    (real bench, real lineup slots) — nothing special needed. 2017 only
+    responds on the older leagueHistory endpoint, and only if `mRoster` is
+    requested alongside the usual views; even then it comes back shaped
+    differently (`rosterForMatchupPeriod`, starters only, no lineup-slot
+    detail) — parse.py's `_parse_side`/`_parse_player` know how to read
+    that shape as a fallback, so it's still cached as-is here.
+    """
+    views = ["mMatchupScore", "mBoxscore"]
+    if year < 2018:
+        views.append("mRoster")  # only view that surfaces any player data pre-2018
+    week_to_mp = _history_matchup_periods(year)
+    fetched = 0
+    for week in range(1, max_week + 1):
+        if read_cache("boxscores", week, season=year):
+            continue  # immutable — never re-fetch
+        matchup_period = week_to_mp.get(week, week)
+        filters = {"schedule": {"filterMatchupPeriodIds": {"value": [matchup_period]}}}
+        headers = {"x-fantasy-filter": json.dumps(filters)}
+        data = _history_get(
+            year,
+            {"view": list(views), "scoringPeriodId": week},
+            headers=headers,
+        )
+        if not data.get("schedule"):
+            break  # past the last real week of this season
+        write_cache("boxscores", data, week=week, final=True, season=year)
+        fetched += 1
+    return fetched
+
+
+def fetch_history_transactions(year: int, max_week: int = config.FINAL_COUNTED_WEEK):
+    """Transaction history (adds/drops/waivers/trades) for a past season, one
+    week at a time — same immutable-cache pattern as fetch_history_boxscores.
+    Needed for ownership.py's acquired_via/departed_via provenance."""
+    fetched = 0
+    for week in range(0, max_week + 1):
+        if read_cache("transactions", week, season=year):
+            continue
+        filters = {"transactions": {"filterType": {"value": TRANSACTION_TYPE_FILTER}}}
+        headers = {"x-fantasy-filter": json.dumps(filters)}
+        data = _history_get(year, {"view": "mTransactions2", "scoringPeriodId": week}, headers=headers)
+        if "transactions" not in data:
+            data = {"transactions": []}
+        write_cache("transactions", data, week=week, final=True, season=year)
+        fetched += 1
+    return fetched
+
+
 def fetch_player_names(league: League):
     """Global NFL player-id -> name map (kona player list). One request;
     stored at the cache root since names aren't season-specific. This is the

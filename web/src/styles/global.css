@@ -230,6 +230,10 @@ hr,
 
 .nav-dropdown > button {
   font-family: var(--font-body);
+  /* buttons default to inline-block, which computes a slightly shorter line
+     box than the plain-anchor .navlinks next to it (extra inline-block
+     leading) — matching display keeps both baselines level in the flex row. */
+  display: block;
 }
 
 .nav-dropdown-menu {
@@ -922,8 +926,67 @@ select.control {
 /* ------------------------------------------------------------------ */
 .record-book {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: 2rem;
+  /* wide enough that a 4th column never squeezes in on desktop — every
+     leaderboard row (name + team + value) needs the room to stay on one
+     line, and 3-up is where that stops breaking. Still collapses to fewer
+     columns on narrower screens via auto-fit. */
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 2rem 2.5rem;
+}
+
+.leaderboard-title {
+  font-size: 0.95rem;
+  margin-bottom: 0.1rem;
+}
+
+.leaderboard-subtitle {
+  font-size: 0.74rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.leaderboard {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.86rem;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.35rem 0.1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.leaderboard-rank {
+  min-width: 1.1rem;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+}
+
+.leaderboard-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.leaderboard-sub {
+  display: block;
+  font-size: 0.76rem;
+  margin-top: 0.05rem;
+}
+
+.leaderboard-value {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.leaderboard-toggle {
+  display: block;
+  margin-top: 0.6rem;
+  color: var(--accent);
 }
 
 /* Row headers are a label for that row, not a column heading — keep them

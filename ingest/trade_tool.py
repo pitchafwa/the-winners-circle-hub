@@ -154,6 +154,7 @@ def cmd_submit(payload: dict) -> dict:
     import valuation
     from trade_grades import _round_average
     dynasty_values, valuation_updated_at = valuation.values_by_name(offline=True)
+    pick_curves, _pick_curves_fetched_at = valuation.pick_curve_by_year(offline=True)
 
     manual = _load_manual_trades()
     trade_id = uuid.uuid4().hex[:8]
@@ -170,7 +171,7 @@ def cmd_submit(payload: dict) -> dict:
                 "value": value,
             })
         else:
-            pick_values = parse.pick_values_for_season(a["year"])
+            pick_values = parse.pick_values_for_season(a["year"], pick_curves)
             stored_assets.append({
                 "pick": f"{a['year']} {a['round']}{_ordinal_suffix(a['round'])}",
                 "from": a["from"], "to": a["to"],

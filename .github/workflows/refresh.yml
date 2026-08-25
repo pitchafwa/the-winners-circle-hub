@@ -2,23 +2,31 @@ name: Refresh league data
 
 # Live as of 2026-08-25 (Tommy's go-ahead).
 #
-# The game-window entries below are generated from the REAL NFL schedule
-# (ingest/generate_refresh_schedule.py, which reads ESPN's exact per-game
-# kickoff times) rather than a static day-of-week guess — every 15 minutes
-# during any actual game window, whichever day of the week it lands on
-# (Wed/Thu/Fri/Sat/Sun/Mon all appear some week: season openers, Thanksgiving,
-# Black Friday, Christmas, late-season Saturdays). Each entry pins an exact
-# UTC month/day, since GitHub Actions cron has no "this specific date" concept
-# otherwise — it's tied to season 2026 and needs regenerating for future
-# seasons (and re-running mid-season once any `startTimeTBD` flex-scheduled
-# games lock in a real time — the generator skips those and prints how many
-# it skipped). To regenerate, from ingest/ with the venv active:
-#   uv run python generate_refresh_schedule.py <season>
-# then replace the GENERATED block below with its output.
+# The game-window entries between the BEGIN/END markers below are generated
+# from the REAL NFL schedule (ingest/generate_refresh_schedule.py, which
+# reads ESPN's exact per-game kickoff times) rather than a static day-of-week
+# guess — every 15 minutes during any actual game window, whichever day of
+# the week it lands on (Wed/Thu/Fri/Sat/Sun/Mon all appear some week: season
+# openers, Thanksgiving, Black Friday, Christmas, late-season Saturdays).
+# Each entry pins an exact UTC month/day, since GitHub Actions cron has no
+# "this specific date" concept otherwise.
 #
-# The three hand-written entries are the always-on safety net: catches any
-# gap in the generated block (a TBD game whose window wasn't known yet, a
-# schedule change, this file going stale) without needing 15-min-everywhere
+# update-refresh-schedule.yml re-runs the generator weekly and rewrites just
+# the marked block in place (via `generate_refresh_schedule.py --write`),
+# so flex-scheduled games (`startTimeTBD` at generation time, skipped and
+# re-checked the following week) and next year's schedule both resolve on
+# their own — the only thing that still needs a human is bumping SEASON in
+# `.env`/the repo's `SEASON` variable once a year when a new league year
+# starts (the whole app keys off that, not just this file). See that
+# workflow for the one-time setup it needs (a PAT with `workflow` scope,
+# since GITHUB_TOKEN can't push changes under .github/workflows/ on its own).
+#
+# To regenerate by hand instead, from ingest/ with the venv active:
+#   uv run python generate_refresh_schedule.py <season> --write
+#
+# The three hand-written entries below are the always-on safety net: catches
+# any gap in the generated block (a TBD game whose window wasn't known yet,
+# a schedule change, this file going stale) without needing 15-min-everywhere
 # coverage the rest of the time.
 
 on:
@@ -28,88 +36,86 @@ on:
     - cron: "0 5-23 * * 1"       # Mon, hourly (post-MNF news even outside the generated window)
     - cron: "0 * * * 2"          # Tue, hourly (post-MNF/roster news)
     - cron: "0 */6 * * *"        # every 6 hours, every day (safety net for any gap above)
-    # --- generated from the real 2026 schedule (generate_refresh_schedule.py 2026) ---
-    - cron: "*/15 0-4 10 9 *"    # Wed 2026-09-09 ET games
-    - cron: "*/15 0-5 11 9 *"    # Thu 2026-09-10 ET games
+    # BEGIN GENERATED SCHEDULE (generate_refresh_schedule.py --write; do not hand-edit between these markers)
+    - cron: "*/15 0-4 10 9 *"  # Wed 2026-09-09 ET games
+    - cron: "*/15 0-5 11 9 *"  # Thu 2026-09-10 ET games
     - cron: "*/15 17-23 13 9 *"  # Sun 2026-09-13 ET games
-    - cron: "*/15 0-4 14 9 *"    # Sun 2026-09-13 ET games
-    - cron: "*/15 0-4 15 9 *"    # Mon 2026-09-14 ET games
-    - cron: "*/15 0-4 18 9 *"    # Thu 2026-09-17 ET games
+    - cron: "*/15 0-4 14 9 *"  # Sun 2026-09-13 ET games
+    - cron: "*/15 0-4 15 9 *"  # Mon 2026-09-14 ET games
+    - cron: "*/15 0-4 18 9 *"  # Thu 2026-09-17 ET games
     - cron: "*/15 17-23 20 9 *"  # Sun 2026-09-20 ET games
-    - cron: "*/15 0-4 21 9 *"    # Sun 2026-09-20 ET games
-    - cron: "*/15 0-4 22 9 *"    # Mon 2026-09-21 ET games
-    - cron: "*/15 0-4 25 9 *"    # Thu 2026-09-24 ET games
+    - cron: "*/15 0-4 21 9 *"  # Sun 2026-09-20 ET games
+    - cron: "*/15 0-4 22 9 *"  # Mon 2026-09-21 ET games
+    - cron: "*/15 0-4 25 9 *"  # Thu 2026-09-24 ET games
     - cron: "*/15 17-23 27 9 *"  # Sun 2026-09-27 ET games
-    - cron: "*/15 0-4 28 9 *"    # Sun 2026-09-27 ET games
-    - cron: "*/15 0-4 29 9 *"    # Mon 2026-09-28 ET games
-    - cron: "*/15 0-4 2 10 *"    # Thu 2026-10-01 ET games
+    - cron: "*/15 0-4 28 9 *"  # Sun 2026-09-27 ET games
+    - cron: "*/15 0-4 29 9 *"  # Mon 2026-09-28 ET games
+    - cron: "*/15 0-4 2 10 *"  # Thu 2026-10-01 ET games
     - cron: "*/15 13-23 4 10 *"  # Sun 2026-10-04 ET games
-    - cron: "*/15 0-4 5 10 *"    # Sun 2026-10-04 ET games
-    - cron: "*/15 0-4 6 10 *"    # Mon 2026-10-05 ET games
-    - cron: "*/15 0-4 9 10 *"    # Thu 2026-10-08 ET games
-    - cron: "*/15 13-23 11 10 *" # Sun 2026-10-11 ET games
-    - cron: "*/15 0-4 12 10 *"   # Sun 2026-10-11 ET games
-    - cron: "*/15 0-4 13 10 *"   # Mon 2026-10-12 ET games
-    - cron: "*/15 0-4 16 10 *"   # Thu 2026-10-15 ET games
-    - cron: "*/15 13-23 18 10 *" # Sun 2026-10-18 ET games
-    - cron: "*/15 0-4 19 10 *"   # Sun 2026-10-18 ET games
-    - cron: "*/15 0-4 20 10 *"   # Mon 2026-10-19 ET games
-    - cron: "*/15 0-4 23 10 *"   # Thu 2026-10-22 ET games
-    - cron: "*/15 13-23 25 10 *" # Sun 2026-10-25 ET games
-    - cron: "*/15 0-4 26 10 *"   # Sun 2026-10-25 ET games
-    - cron: "*/15 0-4 27 10 *"   # Mon 2026-10-26 ET games
-    - cron: "*/15 0-4 30 10 *"   # Thu 2026-10-29 ET games
+    - cron: "*/15 0-4 5 10 *"  # Sun 2026-10-04 ET games
+    - cron: "*/15 0-4 6 10 *"  # Mon 2026-10-05 ET games
+    - cron: "*/15 0-4 9 10 *"  # Thu 2026-10-08 ET games
+    - cron: "*/15 13-23 11 10 *"  # Sun 2026-10-11 ET games
+    - cron: "*/15 0-4 12 10 *"  # Sun 2026-10-11 ET games
+    - cron: "*/15 0-4 13 10 *"  # Mon 2026-10-12 ET games
+    - cron: "*/15 0-4 16 10 *"  # Thu 2026-10-15 ET games
+    - cron: "*/15 13-23 18 10 *"  # Sun 2026-10-18 ET games
+    - cron: "*/15 0-4 19 10 *"  # Sun 2026-10-18 ET games
+    - cron: "*/15 0-4 20 10 *"  # Mon 2026-10-19 ET games
+    - cron: "*/15 0-4 23 10 *"  # Thu 2026-10-22 ET games
+    - cron: "*/15 13-23 25 10 *"  # Sun 2026-10-25 ET games
+    - cron: "*/15 0-4 26 10 *"  # Sun 2026-10-25 ET games
+    - cron: "*/15 0-4 27 10 *"  # Mon 2026-10-26 ET games
+    - cron: "*/15 0-4 30 10 *"  # Thu 2026-10-29 ET games
     - cron: "*/15 18-23 1 11 *"  # Sun 2026-11-01 ET games
-    - cron: "*/15 0-5 2 11 *"    # Sun 2026-11-01 ET games
-    - cron: "*/15 1-5 3 11 *"    # Mon 2026-11-02 ET games
-    - cron: "*/15 1-5 6 11 *"    # Thu 2026-11-05 ET games
+    - cron: "*/15 0-5 2 11 *"  # Sun 2026-11-01 ET games
+    - cron: "*/15 1-5 3 11 *"  # Mon 2026-11-02 ET games
+    - cron: "*/15 1-5 6 11 *"  # Thu 2026-11-05 ET games
     - cron: "*/15 14-23 8 11 *"  # Sun 2026-11-08 ET games
-    - cron: "*/15 0-5 9 11 *"    # Sun 2026-11-08 ET games
-    - cron: "*/15 1-5 10 11 *"   # Mon 2026-11-09 ET games
-    - cron: "*/15 1-5 13 11 *"   # Thu 2026-11-12 ET games
-    - cron: "*/15 14-23 15 11 *" # Sun 2026-11-15 ET games
-    - cron: "*/15 0-5 16 11 *"   # Sun 2026-11-15 ET games
-    - cron: "*/15 1-5 17 11 *"   # Mon 2026-11-16 ET games
-    - cron: "*/15 1-5 20 11 *"   # Thu 2026-11-19 ET games
-    - cron: "*/15 18-23 22 11 *" # Sun 2026-11-22 ET games
-    - cron: "*/15 0-5 23 11 *"   # Sun 2026-11-22 ET games
-    - cron: "*/15 1-5 24 11 *"   # Mon 2026-11-23 ET games
-    - cron: "*/15 1-5 26 11 *"   # Wed 2026-11-25 ET games
-    - cron: "*/15 18-23 26 11 *" # Thu 2026-11-26 ET games (Thanksgiving)
-    - cron: "*/15 0-5 27 11 *"   # Thu 2026-11-26 ET games (Thanksgiving)
-    - cron: "*/15 20-23 27 11 *" # Fri 2026-11-27 ET games (Black Friday)
-    - cron: "*/15 0-0 28 11 *"   # Fri 2026-11-27 ET games (Black Friday)
-    - cron: "*/15 18-23 29 11 *" # Sun 2026-11-29 ET games
-    - cron: "*/15 0-5 30 11 *"   # Sun 2026-11-29 ET games
-    - cron: "*/15 1-5 1 12 *"    # Mon 2026-11-30 ET games
-    - cron: "*/15 1-5 4 12 *"    # Thu 2026-12-03 ET games
+    - cron: "*/15 0-5 9 11 *"  # Sun 2026-11-08 ET games
+    - cron: "*/15 1-5 10 11 *"  # Mon 2026-11-09 ET games
+    - cron: "*/15 1-5 13 11 *"  # Thu 2026-11-12 ET games
+    - cron: "*/15 14-23 15 11 *"  # Sun 2026-11-15 ET games
+    - cron: "*/15 0-5 16 11 *"  # Sun 2026-11-15 ET games
+    - cron: "*/15 1-5 17 11 *"  # Mon 2026-11-16 ET games
+    - cron: "*/15 1-5 20 11 *"  # Thu 2026-11-19 ET games
+    - cron: "*/15 18-23 22 11 *"  # Sun 2026-11-22 ET games
+    - cron: "*/15 0-5 23 11 *"  # Sun 2026-11-22 ET games
+    - cron: "*/15 1-5 24 11 *"  # Mon 2026-11-23 ET games
+    - cron: "*/15 1-5 26 11 *"  # Wed 2026-11-25 ET games
+    - cron: "*/15 18-23 26 11 *"  # Thu 2026-11-26 ET games
+    - cron: "*/15 0-5 27 11 *"  # Thu 2026-11-26 ET games
+    - cron: "*/15 20-23 27 11 *"  # Fri 2026-11-27 ET games
+    - cron: "*/15 0-0 28 11 *"  # Fri 2026-11-27 ET games
+    - cron: "*/15 18-23 29 11 *"  # Sun 2026-11-29 ET games
+    - cron: "*/15 0-5 30 11 *"  # Sun 2026-11-29 ET games
+    - cron: "*/15 1-5 1 12 *"  # Mon 2026-11-30 ET games
+    - cron: "*/15 1-5 4 12 *"  # Thu 2026-12-03 ET games
     - cron: "*/15 18-23 6 12 *"  # Sun 2026-12-06 ET games
-    - cron: "*/15 0-5 7 12 *"    # Sun 2026-12-06 ET games
-    - cron: "*/15 1-5 8 12 *"    # Mon 2026-12-07 ET games
-    - cron: "*/15 1-5 11 12 *"   # Thu 2026-12-10 ET games
-    - cron: "*/15 18-23 13 12 *" # Sun 2026-12-13 ET games
-    - cron: "*/15 0-5 14 12 *"   # Sun 2026-12-13 ET games
-    - cron: "*/15 1-5 15 12 *"   # Mon 2026-12-14 ET games
-    - cron: "*/15 1-5 18 12 *"   # Thu 2026-12-17 ET games
-    - cron: "*/15 22-23 19 12 *" # Sat 2026-12-19 ET games
-    - cron: "*/15 0-5 20 12 *"   # Sat 2026-12-19 ET games
-    - cron: "*/15 18-23 20 12 *" # Sun 2026-12-20 ET games
-    - cron: "*/15 0-5 21 12 *"   # Sun 2026-12-20 ET games
-    - cron: "*/15 1-5 22 12 *"   # Mon 2026-12-21 ET games
-    - cron: "*/15 1-5 25 12 *"   # Thu 2026-12-24 ET games
-    - cron: "*/15 18-23 25 12 *" # Fri 2026-12-25 ET games (Christmas)
-    - cron: "*/15 0-5 26 12 *"   # Fri 2026-12-25 ET games (Christmas)
-    - cron: "*/15 18-23 27 12 *" # Sun 2026-12-27 ET games
-    - cron: "*/15 0-5 28 12 *"   # Sun 2026-12-27 ET games
-    - cron: "*/15 1-5 29 12 *"   # Mon 2026-12-28 ET games
-    - cron: "*/15 1-5 1 1 *"     # Thu 2026-12-31 ET games
-    - cron: "*/15 18-23 3 1 *"   # Sun 2027-01-03 ET games
-    - cron: "*/15 0-5 4 1 *"     # Sun 2027-01-03 ET games
-    - cron: "*/15 1-5 5 1 *"     # Mon 2027-01-04 ET games
-    # --- end generated block: 24 late-season games are still startTimeTBD
-    # as of 2026-08-25 (flex scheduling) — re-run the generator once ESPN
-    # locks those in, likely closer to those weeks. Every 6h fallback above
-    # covers them until then.
+    - cron: "*/15 0-5 7 12 *"  # Sun 2026-12-06 ET games
+    - cron: "*/15 1-5 8 12 *"  # Mon 2026-12-07 ET games
+    - cron: "*/15 1-5 11 12 *"  # Thu 2026-12-10 ET games
+    - cron: "*/15 18-23 13 12 *"  # Sun 2026-12-13 ET games
+    - cron: "*/15 0-5 14 12 *"  # Sun 2026-12-13 ET games
+    - cron: "*/15 1-5 15 12 *"  # Mon 2026-12-14 ET games
+    - cron: "*/15 1-5 18 12 *"  # Thu 2026-12-17 ET games
+    - cron: "*/15 22-23 19 12 *"  # Sat 2026-12-19 ET games
+    - cron: "*/15 0-5 20 12 *"  # Sat 2026-12-19 ET games
+    - cron: "*/15 18-23 20 12 *"  # Sun 2026-12-20 ET games
+    - cron: "*/15 0-5 21 12 *"  # Sun 2026-12-20 ET games
+    - cron: "*/15 1-5 22 12 *"  # Mon 2026-12-21 ET games
+    - cron: "*/15 1-5 25 12 *"  # Thu 2026-12-24 ET games
+    - cron: "*/15 18-23 25 12 *"  # Fri 2026-12-25 ET games
+    - cron: "*/15 0-5 26 12 *"  # Fri 2026-12-25 ET games
+    - cron: "*/15 18-23 27 12 *"  # Sun 2026-12-27 ET games
+    - cron: "*/15 0-5 28 12 *"  # Sun 2026-12-27 ET games
+    - cron: "*/15 1-5 29 12 *"  # Mon 2026-12-28 ET games
+    - cron: "*/15 1-5 1 1 *"  # Thu 2026-12-31 ET games
+    - cron: "*/15 18-23 3 1 *"  # Sun 2027-01-03 ET games
+    - cron: "*/15 0-5 4 1 *"  # Sun 2027-01-03 ET games
+    - cron: "*/15 1-5 5 1 *"  # Mon 2027-01-04 ET games
+    # END GENERATED SCHEDULE
+    # (24 game(s) still startTimeTBD as of 2026-08-25 — picked up automatically once the weekly regenerate job sees a real kickoff time for them. Every-6h fallback above covers them until then.)
 
 permissions:
   contents: write

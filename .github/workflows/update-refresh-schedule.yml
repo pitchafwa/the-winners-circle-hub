@@ -1,0 +1,66 @@
+name: Update refresh schedule
+
+# Weekly self-check: re-fetches the real NFL schedule and rewrites just the
+# generated cron block in refresh.yml (ingest/generate_refresh_schedule.py
+# --write) so flex-scheduled games and a new season's slate both resolve
+# without anyone coming back to touch this by hand. See refresh.yml's header
+# for the full story.
+#
+# Requires a PAT with `workflow` scope in the WORKFLOW_PAT secret — the
+# default GITHUB_TOKEN is deliberately blocked by GitHub from pushing
+# changes under .github/workflows/, so there's no way around a real token
+# here. One-time setup:
+#   1. github.com/settings/tokens -> Generate new token (classic) -> check
+#      the "workflow" scope (this alone is enough; no other scopes needed)
+#   2. This repo's Settings -> Secrets and variables -> Actions -> New
+#      repository secret -> name it WORKFLOW_PAT, paste the token
+# Until that secret exists, this workflow's push step will fail — every
+# other workflow (refresh.yml) is unaffected either way.
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 9 * * 1"  # weekly, Monday ~4-5am ET (quiet, well before that day's Thu game prep)
+
+permissions:
+  contents: write
+
+jobs:
+  update-schedule:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.WORKFLOW_PAT }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install ingest dependencies
+        working-directory: ingest
+        run: ~/.local/bin/uv sync
+
+      - name: Fetch current NFL schedule
+        working-directory: ingest
+        env:
+          LEAGUE_ID: "29471"
+          ESPN_S2: ${{ secrets.ESPN_S2 }}
+          SWID: ${{ secrets.SWID }}
+        run: ~/.local/bin/uv run python -c "import fetch; fetch.fetch_schedule_only()"
+
+      - name: Regenerate refresh.yml's cron block
+        working-directory: ingest
+        run: ~/.local/bin/uv run python generate_refresh_schedule.py --write
+
+      - name: Commit if changed
+        run: |
+          git config user.name "league-hub-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/workflows/refresh.yml
+          git diff --cached --quiet && echo "No schedule changes." && exit 0
+          git commit -m "Update refresh schedule from real NFL kickoff times ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
+          git push

@@ -319,6 +319,20 @@ def fetch_draft_raw(league: League):
     return data
 
 
+def fetch_schedule_only() -> League:
+    """Connect and refresh just config.SEASON's pro schedule cache —
+    everything generate_refresh_schedule.py needs, without fetch_season()'s
+    much heavier box-score/transaction/valuation footprint. Used by the
+    weekly schedule-recheck workflow, which only cares about kickoff times
+    (flex-scheduling updates, a new season's slate landing), not scores.
+    (write_cache always writes under config.SEASON regardless of what
+    League.year was constructed with, same as every other fetcher here —
+    this season always follows config.SEASON, same as the rest of the app.)"""
+    league = connect()
+    fetch_pro_schedule_raw(league)
+    return league
+
+
 def fetch_pro_schedule_raw(league: League):
     """NFL pro schedule (game dates per scoring period) — refreshed each run."""
     data = league.espn_request.get_pro_schedule()

@@ -109,6 +109,183 @@ def optimal_lineup(candidates: list[PlayerWeek], starting_slots: list[int]) -> t
     return round(total, 2), assignment
 
 
+# ---------------------------------------------------------------------------
+# 4.1b Static market-value lineup — same matching, priced on a KTC value
+# instead of a week's actual score. Shared by the playoff-odds roster-
+# strength shift and the contend/rebuild spectrum's "contending value" so
+# both reflect one real-world-calibrated notion of team strength.
+# ---------------------------------------------------------------------------
+DST_SLOT = 16
+K_SLOT = 17
+# D/ST and K redraft/dynasty market prices are noise, not signal, for
+# roster-strength purposes — excluded entirely rather than counted.
+VALUATION_EXCLUDED_SLOTS = {DST_SLOT, K_SLOT}
+# FantasyPros' own power rankings score starters only, no bench — but
+# real bench depth has real (smaller) value as injury/breakout insurance,
+# so it's included as a minority share rather than zero or full weight.
+BENCH_WEIGHT = 0.10
+
+
+def best_lineup(players: list[tuple[int, frozenset[int], float]],
+                 starting_slots: list[int]) -> tuple[float, set[int], dict[int, int]]:
+    """Max-weight legal starting lineup — generic version of the matching
+    `optimal_lineup`/`redraft_lineup_value` each run, parameterized directly
+    on (player_id, eligible_slots, value) tuples so a caller can feed
+    whatever notion of "value" it needs (actual points, projected points,
+    a real/projected blend, market price) without this function caring
+    which. Returns (total_value, assigned player_ids, {player_id: slot_id})
+    — the assigned set is what `optimal_week_projection` needs to separate
+    "already played" from "still projected" within the SAME optimal
+    lineup, and the per-player slot is what lets a caller show a real
+    lineup (who started at QB, who was the FLEX) instead of just a total."""
+    n, m = len(players), len(starting_slots)
+    if m == 0 or n == 0:
+        return 0.0, set(), {}
+    cost = np.full((n + m, m), _FORBIDDEN)
+    cost[n:, :] = 0.0
+    for i, (pid, eligible, value) in enumerate(players):
+        for j, slot in enumerate(starting_slots):
+            if slot in eligible:
+                cost[i, j] = value
+    row_ind, col_ind = linear_sum_assignment(cost, maximize=True)
+    total = 0.0
+    assigned: set[int] = set()
+    slot_by_player: dict[int, int] = {}
+    for r, c in zip(row_ind, col_ind):
+        if r < n and cost[r, c] > _FORBIDDEN / 2:
+            total += cost[r, c]
+            pid = players[r][0]
+            assigned.add(pid)
+            slot_by_player[pid] = c  # slot INDEX into starting_slots, not the raw slot id — lets a caller sort a lineup back into the league's real slot order
+    return total, assigned, slot_by_player
+
+
+def redraft_lineup_value(players: list[tuple[int, frozenset[int]]], values_by_pid: dict[int, float],
+                          starting_slots: list[int], bench_weight: float = BENCH_WEIGHT) -> float:
+    """One roster-strength number: best-possible starting lineup value
+    (the dominant signal, via the same max-weight bipartite matching
+    `optimal_lineup` uses for a real played week) plus a smaller credit
+    for the rest of the roster's value (`bench_weight`, default 10%) —
+    real bench depth has some insurance value, just not equal to a
+    starter's. D/ST and K are excluded entirely from both the starting-
+    slot count and the candidate pool (`VALUATION_EXCLUDED_SLOTS`)."""
+    slots = [s for s in starting_slots if s not in VALUATION_EXCLUDED_SLOTS]
+    candidates = [(pid, elig) for pid, elig in players if not (elig & VALUATION_EXCLUDED_SLOTS)]
+    n, m = len(candidates), len(slots)
+    if m == 0 or n == 0:
+        return 0.0
+
+    cost = np.full((n + m, m), _FORBIDDEN)
+    cost[n:, :] = 0.0
+    for i, (pid, eligible) in enumerate(candidates):
+        v = values_by_pid.get(pid, 0.0)
+        for j, slot in enumerate(slots):
+            if slot in eligible:
+                cost[i, j] = v
+
+    row_ind, col_ind = linear_sum_assignment(cost, maximize=True)
+    assigned: set[int] = set()
+    starting_value = 0.0
+    for r, c in zip(row_ind, col_ind):
+        if r < n and cost[r, c] > _FORBIDDEN / 2:
+            starting_value += cost[r, c]
+            assigned.add(candidates[r][0])
+    bench_value = sum(values_by_pid.get(pid, 0.0) for pid, _ in candidates if pid not in assigned)
+    return starting_value + bench_weight * bench_value
+
+
+# ---------------------------------------------------------------------------
+# 4.1c Real (not simulated) division race — current standing under this
+# league's actual top-3-per-division, no-wildcards playoff format.
+# ---------------------------------------------------------------------------
+def current_records(league: LeagueData):
+    """Wins/losses (ties=0.5 each), PF, and the H2H win table from decided
+    regular-season games — shared by the Monte Carlo sim's per-draw seeding
+    (`simulate.py`) and the real, current `division_race` below."""
+    wins: dict[int, float] = defaultdict(float)
+    losses: dict[int, float] = defaultdict(float)
+    pf: dict[int, float] = defaultdict(float)
+    h2h: dict[tuple[int, int], float] = defaultdict(float)
+    for e in league.full_schedule:
+        if (e.winner == "UNDECIDED" or e.away_id is None
+                or e.matchup_period > league.reg_season_weeks):
+            continue
+        pf[e.home_id] += e.home_score
+        pf[e.away_id] += e.away_score
+        if e.winner == "HOME":
+            wins[e.home_id] += 1
+            losses[e.away_id] += 1
+            h2h[(e.home_id, e.away_id)] += 1
+        elif e.winner == "AWAY":
+            wins[e.away_id] += 1
+            losses[e.home_id] += 1
+            h2h[(e.away_id, e.home_id)] += 1
+        elif e.winner == "TIE":
+            wins[e.home_id] += 0.5
+            wins[e.away_id] += 0.5
+            losses[e.home_id] += 0.5
+            losses[e.away_id] += 0.5
+            h2h[(e.home_id, e.away_id)] += 0.5
+            h2h[(e.away_id, e.home_id)] += 0.5
+    return wins, losses, pf, h2h
+
+
+def division_race(league: LeagueData) -> dict[int, dict]:
+    """Real, CURRENT (not simulated) division standing under this league's
+    actual playoff format — top 3 per division make the playoffs, no
+    wildcards (see `simulate.py`'s module docstring for how that was
+    confirmed against real bracket data). Same tiebreak the Monte Carlo sim
+    uses per draw (wins -> head-to-head among the exact-tied group -> PF),
+    but with a deterministic team_id fallback instead of a random coin flip
+    — this is one real number for display, not one draw among 10,000.
+
+    Returns {team_id: {division_rank (1-based within division), games_back
+    (0.0 for a current playoff spot; real GB from the division's 3rd-place
+    cutline otherwise), cushion (games ahead of the first team out — only
+    set for a playoff-spot team, else None)}}."""
+    wins, losses, pf, h2h = current_records(league)
+
+    def order(group: list[int]) -> list[int]:
+        by_wins: dict[float, list[int]] = defaultdict(list)
+        for t in group:
+            by_wins[wins[t]].append(t)
+        out = []
+        for w in sorted(by_wins, reverse=True):
+            tied_group = by_wins[w]
+            ranked = sorted(tied_group, key=lambda t: (
+                sum(h2h.get((t, o), 0) for o in tied_group if o != t),
+                pf[t],
+                -t,
+            ), reverse=True)
+            out.extend(ranked)
+        return out
+
+    by_division: dict[int, list[int]] = defaultdict(list)
+    for tid, team in league.teams.items():
+        by_division[team.division_id].append(tid)
+
+    result: dict[int, dict] = {}
+    for group in by_division.values():
+        ranked = order(group)
+        cutoff = min(3, len(ranked))  # top 3 make it, per the confirmed real format
+        first_out_wins = wins[ranked[cutoff]] if len(ranked) > cutoff else None
+        first_out_losses = losses[ranked[cutoff]] if len(ranked) > cutoff else None
+        cut_wins = wins[ranked[cutoff - 1]] if cutoff >= 1 else 0.0
+        cut_losses = losses[ranked[cutoff - 1]] if cutoff >= 1 else 0.0
+        for i, tid in enumerate(ranked):
+            rank = i + 1
+            if rank <= cutoff:
+                cushion = (
+                    round(((wins[tid] - first_out_wins) + (first_out_losses - losses[tid])) / 2, 1)
+                    if first_out_wins is not None else None
+                )
+                result[tid] = {"division_rank": rank, "games_back": 0.0, "cushion": cushion}
+            else:
+                gb = round(((cut_wins - wins[tid]) + (losses[tid] - cut_losses)) / 2, 1)
+                result[tid] = {"division_rank": rank, "games_back": gb, "cushion": None}
+    return result
+
+
 def team_week_coach(tw: TeamWeek, starting_slots: list[int]) -> dict:
     """Coach quality is judged on lineup production only — the home-field
     bonus and commissioner adjustments in the official total aren't coaching."""

@@ -29,7 +29,7 @@ export default function ActivityFeed({ activity, limit = 12 }: { activity: Activ
             const diff = ga - gb;
             const leader = diff >= 0 ? a : b;
             return (
-              <div key={t.date} className="trade-card">
+              <div key={`${t.date}-${t.team_ids.join("-")}`} className="trade-card">
                 <div className="label">Trade · week {t.week}</div>
                 <div className="trade-teams">
                   {teamName(a)} <span className="muted">↔</span> {teamName(b)}

@@ -39,10 +39,27 @@ from every mention of a team yet.
 - Draft class survival rate
 - "On this day" callouts
 - League Constitution page
+- "Closest to the belt / closest to the cellar" recap blurb
 
 ## Kept on backlog (not approved yet)
 
 - Dynasty Power Rankings variant
+- League-wide positional trends over time (multi-week chart on top of the
+  existing single-snapshot heatmap) — parked, Tommy's not sold it's needed.
+
+## League dashboard ideas (2026-08-24)
+
+- **Waiver wire activity leaderboard** — this league doesn't use FAAB, but
+  waiver activity is heavy; Tommy wants to see who's gotten the most points
+  from waiver pickups and which individual adds were the best value. This
+  is almost entirely free once picked up: `ownership.json`'s stints already
+  track `acquired_via` ("waiver"/"fa") and `points_started` per stint —
+  the exact same computation that already powers the Franchise page's
+  "roster legends" (career value leader etc.), just filtered to a
+  different `acquired_via` value instead of "trade"/"draft". Overlaps with
+  the "recent transactions impact tracker" idea below — could ship as one
+  feature (an all-time leaderboard + a "recent" filtered view) rather than
+  two.
 
 ## From Tommy (2026-08-15) — dynasty tenure stats
 

@@ -15,6 +15,46 @@ import { ACCENT, FONT_MONO, INK_MUTED, PAPER_2, RULE } from "../lib/tokens";
 import type { Badges, Meta, Schedule, ScheduleEntry, ScheduleSwap } from "../types/data";
 import type { SeasonBundle } from "../lib/useAllSeasons";
 
+type BumpTooltipEntry = { dataKey?: string | number; value?: number };
+
+/** Recharts renders tooltip lines in the order the <Line> series were
+ * declared (fixed, by meta.teams order) — not by that week's actual
+ * standing. Sorting the payload by rank (the line's y-value; 1 = best,
+ * since the axis is reversed) makes the hover box read top-to-bottom as
+ * the real standings at that point in the season. */
+function BumpTooltip({
+  active,
+  payload,
+  label,
+  teamName,
+  myTeamId,
+}: {
+  active?: boolean;
+  payload?: BumpTooltipEntry[];
+  label?: string | number;
+  teamName: (id: number | null | undefined) => string;
+  myTeamId: number | null;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const sorted = [...payload].sort((a, b) => (a.value ?? 0) - (b.value ?? 0));
+  return (
+    <div style={{
+      background: PAPER_2, border: `1px solid ${RULE}`,
+      fontFamily: FONT_MONO, fontSize: "0.72rem", padding: "0.5rem 0.65rem",
+    }}>
+      <div style={{ marginBottom: "0.3rem", fontWeight: 600 }}>Week {label}</div>
+      {sorted.map((p) => {
+        const id = Number(String(p.dataKey).slice(1));
+        return (
+          <div key={p.dataKey} style={id === myTeamId ? { color: ACCENT } : undefined}>
+            #{p.value} {teamName(id)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Standings-by-week bump chart for the selected season. */
 export function BumpChart({ schedule, meta }: { schedule: Schedule; meta: Meta }) {
   const { myTeamId, teamName } = useApp();
@@ -60,11 +100,7 @@ export function BumpChart({ schedule, meta }: { schedule: Schedule; meta: Meta }
           tickLine={false} axisLine={{ stroke: RULE }} />
         <YAxis reversed domain={[1, teamIds.length]} tickCount={teamIds.length}
           tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }} tickLine={false} axisLine={false} />
-        <Tooltip
-          contentStyle={{ background: PAPER_2, border: `1px solid ${RULE}`, fontFamily: FONT_MONO, fontSize: "0.72rem" }}
-          formatter={(v, name) => [`#${v}`, teamName(Number(String(name).slice(1)))]}
-          labelFormatter={(w) => `Week ${w}`}
-        />
+        <Tooltip content={<BumpTooltip teamName={teamName} myTeamId={myTeamId} />} />
         {teamIds.map((id) => {
           const mine = id === myTeamId;
           return (
@@ -278,7 +314,7 @@ export function CareerTable({ bundles, badges }: { bundles: SeasonBundle[]; badg
       for (const r of b.standings.rows) {
         const a = acc.get(r.team_id) ?? { seasons: 0, w: 0, l: 0, t: 0, pf: 0 };
         a.seasons += 1;
-        a.w += r.wins; a.l += r.losses; a.t += r.ties; a.pf += r.points_for;
+        a.w += r.wins; a.l += r.losses; a.t += r.ties; a.pf += r.points_for ?? 0;
         acc.set(r.team_id, a);
       }
     }

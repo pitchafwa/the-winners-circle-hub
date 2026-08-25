@@ -355,6 +355,188 @@ def roster_player_names(season: int | None = None) -> dict[int, str]:
     return names
 
 
+def current_roster_players(season: int | None = None) -> dict[int, list[tuple[int, frozenset[int]]]]:
+    """team_id -> [(player_id, eligible_slots), ...] for every player
+    currently on that team's roster, read straight from the live
+    league.json roster snapshot. Unlike anything derived from completed
+    box scores, this works preseason too (zero weeks played) — the one
+    moment a roster-strength signal matters most, since that's exactly
+    when there's no real game data yet to fall back on. `eligible_slots`
+    (ESPN's own `eligibleSlots`) is what lets a caller solve "best possible
+    starting lineup" the same way `metrics.optimal_lineup` does for a
+    played week, just against a static value instead of that week's score."""
+    season = season or config.SEASON
+    raw = _load(season, "league")
+    rosters: dict[int, list[tuple[int, frozenset[int]]]] = {}
+    if not raw:
+        return rosters
+    for t in raw.get("teams", []):
+        players = []
+        for e in t.get("roster", {}).get("entries", []):
+            player = (e.get("playerPoolEntry") or {}).get("player") or {}
+            if "id" in player:
+                players.append((player["id"], frozenset(player.get("eligibleSlots", []))))
+        rosters[t["id"]] = players
+    return rosters
+
+
+def values_by_pid(season: int, market_values: dict[str, int]) -> dict[int, float]:
+    """player_id -> market value, resolved by name against whichever
+    KTC-sourced valuation table the caller passes in (redraft or dynasty).
+    Shared by every roster-value computation that needs per-player prices
+    keyed by id instead of name (playoff-odds roster strength, contend/
+    rebuild spectrum's contending value) so name normalization/matching
+    only happens in one place."""
+    names = {**global_player_names(), **roster_player_names(season)}
+    return {pid: market_values.get(_normalize_name(name), 0) for pid, name in names.items()}
+
+
+def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -> dict[int, dict]:
+    """team_id -> {current, projected_final, started, remaining,
+    total_starters, lineup} for a week that hasn't been played yet, or is
+    only partially played.
+
+    The lineup itself reflects REALITY first: whoever the manager actually
+    has entered in each starting slot on ESPN right now. Only a slot the
+    manager has genuinely left BLANK gets auto-filled — with the best
+    available bench player for that slot (via `metrics.best_lineup`, same
+    matching every other optimal-lineup feature uses), so an unset lineup
+    still reads as a real projection instead of "0" (a common state right
+    up until kickoff), while a lineup the manager HAS set is shown exactly
+    as set, never second-guessed even if a bench player would technically
+    score more — this is meant to track what's actually being scored, not
+    to suggest a better lineup.
+
+    Each player's value (real or bench-filled) is their ACTUAL score
+    (`statSourceId: 0`) if they've already played this week, else their
+    ESPN PROJECTED score (`statSourceId: 1`) — so the numbers blend in real
+    results as the week plays out.
+
+    `current` sums only the already-played members of the lineup (0.0
+    before anyone's played). `projected_final` sums the whole lineup
+    (actual for the played members, projected for the rest) — the single
+    best estimate of where the score ends up. `started` is true the moment
+    any lineup member has a real stat line, so the frontend can switch from
+    "projected score" to "current score, projected final below" at the
+    right moment. `remaining`/`total_starters` count how many of the real
+    starting slots (not bench, and not a genuinely-unfillable slot) still
+    haven't played, for an "N of M left to play" display. `lineup[]` is one
+    entry per real starting slot, in the league's real slot order:
+    `{player_id, name, position, slot, actual, projected, played}` —
+    `actual` is null until that player has a real stat line, `projected`
+    is ESPN's pre-game number (kept even after the player's played, so a
+    card can still show beat/missed-projection the way the real completed-
+    week box scores already do).
+
+    Reads straight from that week's box-score cache — `fetch_season()`
+    fetches the current week even before anything in it is decided
+    specifically so this has something to read. {} if that cache doesn't
+    exist yet (e.g. a fully offline build before any live fetch has ever
+    pulled this week)."""
+    box = _load(season, f"boxscores-week{week}")
+    if not box:
+        return {}
+    from metrics import best_lineup  # local import: metrics imports from parse, so this has to be deferred to call time to dodge a circular import at module load
+
+    out: dict[int, dict] = {}
+    for m in box.get("schedule", []):
+        for side in (m.get("home"), m.get("away")):
+            if not side or "teamId" not in side:
+                continue
+
+            real_by_slot: dict[int, list[dict]] = {}
+            bench: list[dict] = []
+            for e in side.get("rosterForCurrentScoringPeriod", {}).get("entries", []):
+                player = (e.get("playerPoolEntry") or {}).get("player") or {}
+                pid = player.get("id")
+                if pid is None:
+                    continue
+                eligible = frozenset(player.get("eligibleSlots", []))
+                actual, projected = None, 0.0
+                for stat in player.get("stats", []):
+                    if stat.get("scoringPeriodId") != week or stat.get("statSplitTypeId") != 1:
+                        continue
+                    if stat.get("statSourceId") == 0:
+                        actual = stat.get("appliedTotal", 0.0)
+                    elif stat.get("statSourceId") == 1:
+                        projected = stat.get("appliedTotal", 0.0)
+                entry = {
+                    "player_id": pid, "eligible": eligible,
+                    "name": player.get("fullName", ""),
+                    "position": POSITION_NAMES.get(player.get("defaultPositionId", 0), ""),
+                    "actual": actual, "projected": projected, "played": actual is not None,
+                }
+                lineup_slot = e.get("lineupSlotId", BENCH_SLOT)
+                if lineup_slot in NON_STARTING:
+                    bench.append(entry)
+                else:
+                    real_by_slot.setdefault(lineup_slot, []).append(entry)
+            if not real_by_slot and not bench:
+                continue
+
+            # Walk the league's real starting-slot structure; a slot the
+            # manager has genuinely entered a player into keeps that exact
+            # player (this tracks reality, not a suggested better lineup).
+            # Only a slot with nobody real assigned gets marked for the
+            # bench auto-fill pass below.
+            lineup_by_index: list[dict | None] = [None] * len(starting_slots)
+            empty_indices = []
+            for i, slot_id in enumerate(starting_slots):
+                pool = real_by_slot.get(slot_id)
+                if pool:
+                    lineup_by_index[i] = pool.pop(0)
+                else:
+                    empty_indices.append(i)
+
+            if empty_indices and bench:
+                empty_slot_ids = [starting_slots[i] for i in empty_indices]
+                candidates = [
+                    (b["player_id"], b["eligible"], b["actual"] if b["actual"] is not None else b["projected"])
+                    for b in bench
+                ]
+                _, _assigned, rel_index_by_player = best_lineup(candidates, empty_slot_ids)
+                bench_by_pid = {b["player_id"]: b for b in bench}
+                for pid, rel_i in rel_index_by_player.items():
+                    lineup_by_index[empty_indices[rel_i]] = bench_by_pid[pid]
+
+            # Always one entry per real starting slot, even when nobody at
+            # all (real or bench) is eligible to fill it (e.g. a team with
+            # no D/ST currently rostered) — an empty slot (player_id: null)
+            # instead of silently dropping it, same convention `metrics.
+            # optimal_lineup` uses for a real played week. Skipping it here
+            # would compact this team's list while the OTHER team's stayed
+            # full length, desyncing the two side-by-side columns a card
+            # renders them in.
+            lineup = [
+                {
+                    "player_id": entry["player_id"], "name": entry["name"], "position": entry["position"],
+                    "slot": SLOT_NAMES.get(slot_id, ""),
+                    "actual": round(entry["actual"], 2) if entry["actual"] is not None else None,
+                    "projected": round(entry["projected"], 2),
+                    "played": entry["played"],
+                }
+                if (entry := lineup_by_index[i]) else
+                {"player_id": None, "name": None, "position": None,
+                 "slot": SLOT_NAMES.get(slot_id, ""), "actual": None, "projected": None, "played": False}
+                for i, slot_id in enumerate(starting_slots)
+            ]
+            current = sum(p["actual"] for p in lineup if p["played"])
+            projected_final = sum(
+                (p["actual"] if p["played"] else p["projected"]) for p in lineup if p["player_id"] is not None
+            )
+            started = any(p["played"] for p in lineup)
+            filled = [p for p in lineup if p["player_id"] is not None]
+            out[side["teamId"]] = {
+                "current": round(current, 2),
+                "projected_final": round(projected_final, 2),
+                "started": started,
+                "remaining": sum(1 for p in filled if not p["played"]),
+                "total_starters": len(filled),
+                "lineup": lineup,
+            }
+    return out
+
+
 def _load(season: int, name: str):
     path = _season_dir(season) / f"{name}.json"
     if not path.exists():

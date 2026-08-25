@@ -61,10 +61,13 @@ export interface StandingsRow {
   ties: number;
   record: string;
   win_pct: number;
-  points_for: number;
-  points_against: number;
+  points_for: number | null;
+  points_against: number | null;
   division_id: number;
   division_record: string;
+  division_rank: number | null;
+  games_back: number | null;
+  cushion: number | null;
   streak: string;
   all_play_wins: number;
   all_play_losses: number;
@@ -344,12 +347,46 @@ export interface SimTeam {
   playoff_pct_by_final_wins: Record<string, number>;
 }
 
+export type ProjectionSource = "espn" | "model";
+
+export interface WeekLineupPlayer {
+  player_id: number | null;
+  name: string | null;
+  position: string | null;
+  slot: string;
+  actual: number | null;
+  projected: number | null;
+  played: boolean;
+}
+
+export interface SimMatchup {
+  matchup_period: number;
+  home_id: number;
+  away_id: number;
+  home_current: number | null;
+  away_current: number | null;
+  home_projected: number;
+  away_projected: number;
+  home_win_pct: number;
+  started: boolean;
+  home_lineup: WeekLineupPlayer[];
+  away_lineup: WeekLineupPlayer[];
+  home_remaining: number;
+  away_remaining: number;
+  home_total_starters: number;
+  away_total_starters: number;
+  projection_source: ProjectionSource;
+  playoff_impact_score: number;
+}
+
 export interface Sim {
   generated_at: string;
   n_sims: number;
   remaining_matchups: number;
   model: string;
+  roster_strength_active: boolean;
   teams: SimTeam[];
+  this_week_matchups: SimMatchup[];
 }
 
 export interface SwapRecord {
@@ -361,6 +398,19 @@ export interface SwapRecord {
 export interface ScheduleSwap {
   generated_at: string;
   rows: { team_id: number; records: Record<string, SwapRecord> }[];
+}
+
+export interface H2HPair {
+  team_a: number;
+  team_b: number;
+  a_wins: number;
+  b_wins: number;
+  ties: number;
+}
+
+export interface H2H {
+  generated_at: string;
+  pairs: H2HPair[];
 }
 
 export interface Positions {
@@ -496,6 +546,15 @@ export interface Ownership {
   };
 }
 
+export type TradeValueSource = "snapshot" | "current_fallback" | "unavailable";
+
+export interface TradeProductionSinceTrade {
+  points_started: number;
+  points_projected_started: number;
+  weeks_started: number;
+  still_held: boolean;
+}
+
 export interface TradeGradeAsset {
   player_id?: number | null;
   name?: string;
@@ -503,6 +562,13 @@ export interface TradeGradeAsset {
   from_team_id: number;
   to_team_id: number;
   value: number | null;
+  value_source: TradeValueSource;
+  /** Players only — absent (undefined) on pick assets. */
+  production_since_trade?: TradeProductionSinceTrade | null;
+  /** Players only — true if this player was traded again before this build,
+   * in which case production_since_trade is intentionally omitted (their
+   * value continues in that later trade's own grade instead). */
+  flipped_again?: boolean;
 }
 
 export interface TradeValueSide {
@@ -512,6 +578,7 @@ export interface TradeValueSide {
 }
 
 export interface TradeGrade {
+  id: string | null;
   season: number;
   date: number;
   week: number;
@@ -521,6 +588,15 @@ export interface TradeGrade {
   value_by_team: Record<string, TradeValueSide>;
   winner_team_id: number | null;
   has_estimated_asset: boolean;
+  uses_current_value_fallback: boolean;
+}
+
+export interface TradeLedgerRow {
+  team_id: number;
+  gained: number;
+  lost: number;
+  net: number;
+  trade_count: number;
 }
 
 export interface TradeGrades {
@@ -528,6 +604,7 @@ export interface TradeGrades {
   trades: TradeGrade[];
   valuation_available: boolean;
   valuation_updated_at: string | null;
+  team_ledger: TradeLedgerRow[];
 }
 
 export interface PickFuturesEntry {
@@ -551,8 +628,10 @@ export type SpectrumLabel = "Contending" | "Balanced" | "Rebuilding";
 
 export interface SpectrumTeam {
   team_id: number;
-  current_roster_value: number;
+  contending_value: number;
+  dynasty_roster_value: number;
   future_pick_capital: number;
+  rebuilding_value: number;
   ratio: number;
   percentile: number;
   label: SpectrumLabel;
@@ -560,5 +639,6 @@ export interface SpectrumTeam {
 
 export interface Spectrum {
   generated_at: string;
+  redraft_valuation_updated_at: string | null;
   teams: SpectrumTeam[];
 }

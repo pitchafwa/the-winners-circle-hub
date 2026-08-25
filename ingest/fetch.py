@@ -254,9 +254,19 @@ def fetch_season(league: League | None = None):
     season_over = league.scoringPeriodId > league.finalScoringPeriod
     weeks = completed_weeks(league)
     current = league.current_week
+    # In true preseason, current_week is 0 (nothing has kicked off), but
+    # currentMatchupPeriod already points at the upcoming week 1 — fall back
+    # to that so we still know which week's projections to fetch below.
+    upcoming = current if current >= 1 else league.currentMatchupPeriod
+    # Always include the upcoming week even if nothing in it has been
+    # decided yet — that's the ONLY way to get ESPN's real per-player
+    # projections for a week that hasn't kicked off (used for the weekly
+    # matchup-projection cards). completed_weeks() alone would leave a
+    # preseason/early-week build with no box-score cache at all for it.
+    target_weeks = sorted(set(weeks) | ({upcoming} if 1 <= upcoming <= config.FINAL_COUNTED_WEEK else set()))
     errors = []
     # week 0 = preseason transactions (post-draft pickups before week 1)
-    for w in [0] + weeks:
+    for w in [0] + target_weeks:
         is_final = season_over or w < current
         try:
             if w > 0:

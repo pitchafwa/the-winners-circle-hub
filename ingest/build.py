@@ -54,7 +54,8 @@ def _record_str(w, l, t):
 
 
 def build_season(season: int, dynasty_values: dict[str, int] | None = None,
-                 valuation_updated_at: str | None = None) -> dict:
+                 valuation_updated_at: str | None = None,
+                 redraft_values: dict[str, int] | None = None) -> dict:
     """Write every data file for one season. Returns summary for seasons.json."""
     league = parse.load_league(season)
     out_dir = config.DATA_DIR / str(season)
@@ -114,10 +115,12 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     _write(out_dir / "meta.json", meta)
 
     # ---- standings.json ---------------------------------------------------
+    race = metrics.division_race(league)
     rows = []
     for t in league.teams.values():
         ap = all_play[t.team_id]
         season_coach = coach[t.team_id]["season"]
+        team_race = race.get(t.team_id, {})
         rows.append({
             "team_id": t.team_id,
             "seed": t.playoff_seed,
@@ -125,10 +128,16 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             "wins": t.wins, "losses": t.losses, "ties": t.ties,
             "record": _record_str(t.wins, t.losses, t.ties),
             "win_pct": round((t.wins + 0.5 * t.ties) / max(t.wins + t.losses + t.ties, 1), 4),
-            "points_for": t.points_for,
-            "points_against": t.points_against,
+            # 0 before week 1 is a real ESPN value but not a meaningful one —
+            # null so the frontend renders "—" the same way it already does
+            # for every other not-yet-meaningful preseason stat below.
+            "points_for": t.points_for if completed else None,
+            "points_against": t.points_against if completed else None,
             "division_id": t.division_id,
             "division_record": _record_str(t.division_wins, t.division_losses, t.division_ties),
+            "division_rank": team_race.get("division_rank"),
+            "games_back": team_race.get("games_back"),
+            "cushion": team_race.get("cushion"),
             "streak": f"{t.streak_type[0]}{t.streak_length}" if t.streak_type else "",
             "all_play_wins": ap["wins"], "all_play_losses": ap["losses"], "all_play_ties": ap["ties"],
             "all_play_record": _record_str(ap["wins"], ap["losses"], ap["ties"]),
@@ -335,7 +344,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             if (config.CACHE_DIR / str(prev) / "league.json").exists():
                 history = parse.load_league(prev)
                 break
-        sim = simulate.run(league, history)
+        sim = simulate.run(league, history, redraft_values)
         if sim:
             _write(out_dir / "sim.json", {"generated_at": generated_at, **sim})
 
@@ -522,6 +531,37 @@ def _season_summary(season: int) -> dict:
     }
 
 
+def _all_time_h2h(all_seasons: list[int]) -> list[dict]:
+    """Every team pair's real all-time head-to-head record, aggregated
+    across every cached season — regular season AND playoffs (a playoff
+    meeting is still real history, no reason to exclude it). Keyed by
+    team_id, which is stable across seasons for this league's real
+    franchises. Reads straight from `parse.load_league()` (cache-backed,
+    no network) rather than the just-written per-season JSON files, so
+    this works the same whether it runs after a full rebuild or a
+    single-season admin-tool rebuild — same convention `build_badges` and
+    the ownership timeline already use for the same reason."""
+    pairs: dict[tuple[int, int], dict[str, int]] = {}
+    for season in all_seasons:
+        league = parse.load_league(season)
+        for e in league.full_schedule:
+            if e.winner == "UNDECIDED" or e.away_id is None:
+                continue
+            a, b = sorted((e.home_id, e.away_id))
+            rec = pairs.setdefault((a, b), {"a_wins": 0, "b_wins": 0, "ties": 0})
+            a_is_home = e.home_id == a
+            if e.winner == "TIE":
+                rec["ties"] += 1
+            elif (e.winner == "HOME") == a_is_home:
+                rec["a_wins"] += 1
+            else:
+                rec["b_wins"] += 1
+    return [
+        {"team_a": a, "team_b": b, "a_wins": v["a_wins"], "b_wins": v["b_wins"], "ties": v["ties"]}
+        for (a, b), v in sorted(pairs.items())
+    ]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--offline", action="store_true", help="rebuild from cache, no network")
@@ -559,9 +599,14 @@ def main():
     if not dynasty_values:
         print("  no valuation data available — draft grades will be skipped", file=sys.stderr)
 
+    print("Fetching redraft valuation data..." if not args.offline else "Using cached redraft valuation data...")
+    redraft_values, redraft_updated_at = valuation.redraft_values_by_name(offline=args.offline)
+    if not redraft_values:
+        print("  no redraft valuation data available — contend/rebuild spectrum will read 0 for the contending side", file=sys.stderr)
+
     for season in seasons:
         print(f"Building {season}...")
-        build_season(season, dynasty_values, valuation_updated_at)
+        build_season(season, dynasty_values, valuation_updated_at, redraft_values)
 
     # cross-season aggregates always span every season on record, even when
     # --season restricted the per-season build loop above (e.g. the trade/
@@ -579,11 +624,12 @@ def main():
     print("Building trade grades...")
     _write(config.DATA_DIR / "trades.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        **trade_grades.grade_trades(dynasty_values, valuation_updated_at),
+        **trade_grades.grade_trades(dynasty_values, valuation_updated_at, ownership_data["stints"]),
     })
 
     print("Building pick futures board...")
-    latest_teams = list(parse.load_league(max(all_seasons)).teams)
+    latest_league = parse.load_league(max(all_seasons))
+    latest_teams = list(latest_league.teams)
     all_pick_ownership = metrics.pick_ownership(0)  # unfiltered: every ledger entry on file
     pick_board = pick_tracking.all_picks_board(
         config.SEASON, latest_teams, DRAFT_ROUNDS, all_pick_ownership,
@@ -596,8 +642,17 @@ def main():
     print("Building contend/rebuild spectrum...")
     _write(config.DATA_DIR / "spectrum.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "redraft_valuation_updated_at": redraft_updated_at,
         "teams": spectrum.contend_rebuild_spectrum(
-            latest_teams, ownership_data["stints"], pick_board, dynasty_values),
+            latest_teams, ownership_data["stints"], pick_board, dynasty_values, redraft_values,
+            parse.current_roster_players(latest_league.season), latest_league.starting_slots,
+            latest_league.season),
+    })
+
+    print("Building all-time head-to-head...")
+    _write(config.DATA_DIR / "h2h.json", {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "pairs": _all_time_h2h(all_seasons),
     })
 
     # Always cover every cached season here, never just `seasons` (which is

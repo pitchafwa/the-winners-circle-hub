@@ -4,10 +4,21 @@ Model: each team-week is a normal draw from the team's lineup-production mean
 and stdev, shrunk toward league-wide priors while samples are tiny (< ~3
 games). Venue bonuses (+3 regular season, +5 playoffs here — read from
 settings) are added to the home side, since they decide real games in this
-league. The real remaining schedule is played out, seeds follow the league's
-division-winners-first rule with its tiebreaker hierarchy (H2H approximated
-within exact-tie groups, then points-for), and the 3-round bracket is played
-to a champion.
+league. The real remaining schedule is played out; the top 3 in EACH
+division make the playoffs (no wildcards — confirmed against real bracket
+participation in both 2024 and 2025), tiebroken H2H then points-for. Each
+division runs its own 3-team mini-bracket (#1 seed bye, #2v#3 play-in, then
+#1 vs that winner for the division title — also confirmed against the real
+2024/2025 playoff schedules), and the two division champions meet only at
+the very end for the league championship.
+
+Roster strength (redraft/this-season dynasty market value — same source as
+the contend/rebuild spectrum's "contending value") nudges each team's PRIOR
+mean before real results exist to override it — see
+`roster_strength_prior_shift`. This is the one place actual roster quality
+enters the model at all; before it, two teams with zero games played looked
+statistically identical regardless of whether one had rostered every stud
+in the league and the other was replacement-level.
 
 Honesty notes baked into the output: n_sims and standard errors are reported;
 a partially-played current week is re-simulated from scratch (the timestamp
@@ -15,18 +26,57 @@ tells the reader how stale that is).
 """
 from __future__ import annotations
 
+import math
 import random
 import statistics
 from collections import defaultdict
 
 import numpy as np
 
-from parse import LeagueData
+from metrics import current_records, redraft_lineup_value
+from parse import (
+    LeagueData,
+    current_roster_players,
+    optimal_week_projection,
+    values_by_pid,
+)
 
 N_SIMS = 10_000
 SHRINK_GAMES = 3          # sample weight below which priors dominate
 MIN_STD = 8.0             # nobody is this consistent; floor the noise
 FALLBACK_PRIOR = (120.0, 25.0)
+
+# This-week win probability from a projected-score gap: normal-CDF(diff /
+# WIN_PROB_SIGMA). A SEPARATE, simpler model from the season-long Monte
+# Carlo simulation above — it only answers "who's favored this one week,"
+# fed by the real optimal-lineup projection (see
+# parse.optimal_week_projection) rather than our shrunk-to-priors team
+# model. Sigma fit by hand against 8 real win-probability numbers pulled
+# from ESPN's own app (e.g. a 12-point favorite -> ~63% WP, a 55-point
+# favorite -> ~94% WP) — 35 matches all 8 within about a percentage point.
+WIN_PROB_SIGMA = 35.0
+
+
+def _normal_cdf(z: float) -> float:
+    return 0.5 * (1 + math.erf(z / math.sqrt(2)))
+
+# How hard roster strength leans on the PRIOR mean, before real games exist
+# to override it. Expressed as a fraction of the league's own scoring
+# stdev per 1 standard-deviation gap in roster redraft value from the
+# league average, so it scales with whatever this league/season's real
+# scoring variance actually is rather than a fixed point number that might
+# be huge in a low-scoring league and negligible in a high-scoring one.
+# Calibrated by hand against real 2026 preseason data: 0.15 puts the
+# best-rostered team's preseason playoff odds around 85-90% and the
+# worst-rostered around 35-40% — a real, visible edge, but nowhere near a
+# lock either way, matching how much randomness actually decides fantasy
+# outcomes week to week. (0.5 was tried first and produced a near-certainty
+# for the top roster by 14 games in — too deterministic for a signal that's
+# only ever a preseason prior, not a guarantee.)
+ROSTER_STRENGTH_WEIGHT = 0.15
+# Clip how many roster-value standard deviations count, so one absurdly
+# stacked (or bare) roster can't single-handedly dominate the field.
+ROSTER_STRENGTH_Z_CAP = 2.5
 
 
 def league_priors(history: LeagueData | None) -> tuple[float, float]:
@@ -53,8 +103,60 @@ def league_priors(history: LeagueData | None) -> tuple[float, float]:
     return (statistics.mean(scores), statistics.pstdev(scores))
 
 
-def team_models(league: LeagueData, prior: tuple[float, float]) -> dict[int, tuple[float, float]]:
+def roster_strength_prior_shift(league: LeagueData, redraft_values: dict[str, int] | None,
+                                prior_std: float) -> dict[int, float]:
+    """Points to nudge each team's PRIOR scoring mean by, based on this-
+    season (redraft) roster strength — the one signal `team_models()`'s
+    shrinkage otherwise has no way to see (the flat league-wide prior
+    treats a stacked roster and a bare one identically until real results
+    accumulate). Only the PRIOR side of the shrinkage blend is touched, so
+    this fades out on its own as a team plays real games — n games of
+    actual results already dominate that blend past ~3 weeks regardless.
+
+    Roster strength is `metrics.redraft_lineup_value()` — each team's best
+    possible starting lineup value (dominant signal) plus a 10% share of
+    remaining bench value (real but secondary insurance value), D/ST and K
+    excluded entirely. NOT a flat sum of the whole roster — only ~half a
+    roster starts in any given week, so a deep bench of replacement-level
+    players shouldn't out-rank a thinner roster stacked with elite
+    starters. (A flat roster-sum version of this shift used to ship here;
+    Tommy flagged it was ranking roster DEPTH over roster STARTING POWER,
+    cross-checked against FantasyPros' own weekly power rankings — which
+    score starters only, no bench — as a real-world reference point.)
+
+    Reads the CURRENT roster straight from the live league.json snapshot
+    (works preseason too, unlike anything derived from completed box
+    scores — the exact moment this signal matters most, since there's no
+    game data yet to fall back on). Returns all-zero shifts if no redraft
+    valuation data is available, rather than fabricating a signal."""
+    if not redraft_values:
+        return {tid: 0.0 for tid in league.teams}
+
+    rosters = current_roster_players(league.season)
+    pid_values = values_by_pid(league.season, redraft_values)
+    roster_value: dict[int, float] = {
+        tid: redraft_lineup_value(rosters.get(tid, []), pid_values, league.starting_slots)
+        for tid in league.teams
+    }
+
+    values = list(roster_value.values())
+    if len(values) < 2 or statistics.pstdev(values) == 0:
+        return {tid: 0.0 for tid in league.teams}
+    mean_v = statistics.mean(values)
+    std_v = statistics.pstdev(values)
+
+    shift = {}
+    for tid, v in roster_value.items():
+        z = (v - mean_v) / std_v
+        z = max(-ROSTER_STRENGTH_Z_CAP, min(ROSTER_STRENGTH_Z_CAP, z))
+        shift[tid] = z * ROSTER_STRENGTH_WEIGHT * prior_std
+    return shift
+
+
+def team_models(league: LeagueData, prior: tuple[float, float],
+                roster_shift: dict[int, float] | None = None) -> dict[int, tuple[float, float]]:
     prior_mean, prior_std = prior
+    roster_shift = roster_shift or {}
     models = {}
     for tid in league.teams:
         scores = []
@@ -66,40 +168,25 @@ def team_models(league: LeagueData, prior: tuple[float, float]) -> dict[int, tup
         m = statistics.mean(scores) if n else prior_mean
         s = statistics.stdev(scores) if n > 1 else prior_std
         weight = n / (n + SHRINK_GAMES)
+        team_prior_mean = prior_mean + roster_shift.get(tid, 0.0)
         models[tid] = (
-            weight * m + (1 - weight) * prior_mean,
+            weight * m + (1 - weight) * team_prior_mean,
             max(weight * s + (1 - weight) * prior_std, MIN_STD),
         )
     return models
 
 
-def _current_state(league: LeagueData):
-    """Wins (ties=0.5), PF, and the H2H win table from decided regular-season games."""
-    wins: dict[int, float] = defaultdict(float)
-    pf: dict[int, float] = defaultdict(float)
-    h2h: dict[tuple[int, int], float] = defaultdict(float)
-    for e in league.full_schedule:
-        if (e.winner == "UNDECIDED" or e.away_id is None
-                or e.matchup_period > league.reg_season_weeks):
-            continue
-        pf[e.home_id] += e.home_score
-        pf[e.away_id] += e.away_score
-        if e.winner == "HOME":
-            wins[e.home_id] += 1
-            h2h[(e.home_id, e.away_id)] += 1
-        elif e.winner == "AWAY":
-            wins[e.away_id] += 1
-            h2h[(e.away_id, e.home_id)] += 1
-        elif e.winner == "TIE":
-            wins[e.home_id] += 0.5
-            wins[e.away_id] += 0.5
-            h2h[(e.home_id, e.away_id)] += 0.5
-            h2h[(e.away_id, e.home_id)] += 0.5
-    return wins, pf, h2h
-
-
 def _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng):
-    """Division winners first, then wildcards; H2H settles exact win ties."""
+    """Top N per division make the playoffs — NO wildcards. Confirmed
+    against real bracket participation in both 2024 and 2025 (exactly 3-3
+    by division each year — not the division-leader-plus-overall-wildcard
+    mix a lot of other ESPN league formats use, which is what this used to
+    assume before Tommy flagged it and real bracket data settled it).
+
+    Returns (by_division, full_order): by_division{div_id: teams in that
+    division, best record first} for running each division's own
+    mini-bracket, and full_order (all teams, division ignored, best record
+    first) for display ranks and "which division champ hosts the final"."""
     def order(group: list[int]) -> list[int]:
         # exact-tie groups get an internal h2h table
         by_wins: dict[float, list[int]] = defaultdict(list)
@@ -120,17 +207,24 @@ def _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng):
             out.extend(tied)
         return out
 
-    div_winners = []
-    for div in set(divisions.values()):
-        members = [t for t in team_ids if divisions[t] == div]
-        div_winners.append(order(members)[0])
-    seeded = order(div_winners)
-    rest = order([t for t in team_ids if t not in seeded])
-    full = seeded + rest
-    return full[:playoff_count], full
+    by_division = {d: order([t for t in team_ids if divisions[t] == d]) for d in sorted(set(divisions.values()))}
+    full_order = order(team_ids)
+    return by_division, full_order
 
 
-def run(league: LeagueData, history: LeagueData | None = None) -> dict | None:
+def _division_bracket(seeded3: list[int], playoff_game) -> int:
+    """One division's 3-team bracket: the #1 seed gets a bye, #2 plays #3
+    (#2 hosts), then #1 hosts the winner for the division title. Confirmed
+    against the real 2024/2025 playoff schedules — this is genuinely how
+    each division runs its own mini-bracket; the two division champions
+    only meet each other at the very end, for the league championship."""
+    one, two, three = seeded3
+    r1_winner = playoff_game(two, three, home=two)
+    return playoff_game(one, r1_winner, home=one)
+
+
+def run(league: LeagueData, history: LeagueData | None = None,
+       redraft_values: dict[str, int] | None = None) -> dict | None:
     remaining = [
         e for e in league.full_schedule
         if e.winner == "UNDECIDED" and e.away_id is not None
@@ -140,8 +234,9 @@ def run(league: LeagueData, history: LeagueData | None = None) -> dict | None:
         return None
 
     prior = league_priors(history if history is not None else None)
-    models = team_models(league, prior)
-    base_wins, base_pf, base_h2h = _current_state(league)
+    roster_shift = roster_strength_prior_shift(league, redraft_values, prior[1])
+    models = team_models(league, prior, roster_shift)
+    base_wins, _, base_pf, base_h2h = current_records(league)
     team_ids = list(league.teams)
     divisions = {t: league.teams[t].division_id for t in team_ids}
     playoff_count = league.playoff_team_count
@@ -193,23 +288,23 @@ def run(league: LeagueData, history: LeagueData | None = None) -> dict | None:
             if next_game.get(e.away_id) == i:
                 won_next[e.away_id] = winner == e.away_id
 
-        field, full_order = _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng)
+        by_division, full_order = _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng)
+        per_division = playoff_count // len(by_division) if by_division else 0
+        field = [t for lst in by_division.values() for t in lst[:per_division]]
 
-        # 6-team bracket: 1,2 byes; 3v6 4v5; reseed; better seed hosts
-        if len(field) == 6:
-            sf1 = playoff_game(field[2], field[5], home=field[2])
-            sf2 = playoff_game(field[3], field[4], home=field[3])
-            low = sf1 if field.index(sf1) > field.index(sf2) else sf2
-            high = sf2 if low == sf1 else sf1
-            f1 = playoff_game(field[0], low, home=field[0])
-            f2 = playoff_game(field[1], high, home=field[1])
-            champ = playoff_game(f1, f2, home=f1 if full_order.index(f1) < full_order.index(f2) else f2)
-        elif len(field) == 4:
-            f1 = playoff_game(field[0], field[3], home=field[0])
-            f2 = playoff_game(field[1], field[2], home=field[1])
-            champ = playoff_game(f1, f2, home=f1 if full_order.index(f1) < full_order.index(f2) else f2)
+        if len(by_division) == 2 and per_division == 3:
+            div_champs = [_division_bracket(lst[:3], playoff_game) for lst in by_division.values()]
+            champ = playoff_game(
+                div_champs[0], div_champs[1],
+                home=div_champs[0] if full_order.index(div_champs[0]) < full_order.index(div_champs[1])
+                else div_champs[1],
+            )
         else:
-            champ = field[0] if field else None
+            # Every real season this league has run is 2 divisions x 3 —
+            # this is a deliberately simple fallback (no bracket, straight
+            # to the best remaining seed) for any other shape rather than a
+            # generalized bracket engine nobody's needed yet.
+            champ = next((t for t in full_order if t in field), None)
 
         for rank, t in enumerate(full_order, start=1):
             seeds[t][rank] += 1
@@ -257,11 +352,86 @@ def run(league: LeagueData, history: LeagueData | None = None) -> dict | None:
             },
         })
 
+    # This week's games: projected-final score and win probability prefer
+    # the real optimal-lineup projection (parse.optimal_week_projection —
+    # every rostered player's real ESPN actual-if-played-else-projected
+    # value, assigned to the best legal lineup, so a team that hasn't set
+    # its lineup yet doesn't read as "projected for 0") fed through the
+    # WIN_PROB_SIGMA normal-CDF model above — falls back to the season-long
+    # team-strength model + this-exact-matchup's own Monte Carlo draws only
+    # when that cache isn't available yet (a fully offline build before any
+    # live fetch has pulled this week). Playoff impact score is unrelated
+    # to either — the combined swing in playoff odds for BOTH teams between
+    # winning and losing this game, reusing the playoff_pct_if_win_next/
+    # playoff_pct_if_lose_next each team already got above (valid here
+    # because "this week" is by construction each involved team's next
+    # remaining game).
+    by_team = {r["team_id"]: r for r in teams_out}
+    this_week_period = min((e.matchup_period for e in remaining), default=None)
+    this_week_matchups = []
+    if this_week_period is not None:
+        week_proj = optimal_week_projection(league.season, this_week_period, league.starting_slots)
+        for i, e in enumerate(remaining):
+            if e.matchup_period != this_week_period:
+                continue
+            home_week, away_week = week_proj.get(e.home_id), week_proj.get(e.away_id)
+            if home_week is not None and away_week is not None:
+                # No home bonus on `current` — it's real accumulated play
+                # only, so "current: 3.0" can't show before anyone's
+                # actually scored a point. The bonus still belongs in the
+                # final total, so it's added to `projected_final` below.
+                home_current = round(home_week["current"], 1)
+                away_current = round(away_week["current"], 1)
+                home_projected = round(home_week["projected_final"] + bonus, 1)
+                away_projected = round(away_week["projected_final"], 1)
+                home_win_pct = round(_normal_cdf((home_projected - away_projected) / WIN_PROB_SIGMA), 4)
+                started = home_week["started"] or away_week["started"]
+                projection_source = "espn"
+                home_lineup, away_lineup = home_week["lineup"], away_week["lineup"]
+                home_remaining, away_remaining = home_week["remaining"], away_week["remaining"]
+                home_total_starters, away_total_starters = home_week["total_starters"], away_week["total_starters"]
+            else:
+                home_current = None
+                away_current = None
+                home_projected = round(models[e.home_id][0] + bonus, 1)
+                away_projected = round(models[e.away_id][0], 1)
+                home_win_pct = pct(float(np.sum(draws[:, i, 0] >= draws[:, i, 1])))
+                started = False
+                projection_source = "model"
+                home_lineup, away_lineup = [], []
+                home_remaining, away_remaining = 0, 0
+                home_total_starters, away_total_starters = 0, 0
+            impact = 0.0
+            for r in (by_team.get(e.home_id), by_team.get(e.away_id)):
+                if r and r["playoff_pct_if_win_next"] is not None and r["playoff_pct_if_lose_next"] is not None:
+                    impact += abs(r["playoff_pct_if_win_next"] - r["playoff_pct_if_lose_next"])
+            this_week_matchups.append({
+                "matchup_period": e.matchup_period,
+                "home_id": e.home_id, "away_id": e.away_id,
+                "home_current": home_current,
+                "away_current": away_current,
+                "home_projected": home_projected,
+                "away_projected": away_projected,
+                "home_win_pct": home_win_pct,
+                "started": started,
+                "home_lineup": home_lineup, "away_lineup": away_lineup,
+                "home_remaining": home_remaining, "away_remaining": away_remaining,
+                "home_total_starters": home_total_starters, "away_total_starters": away_total_starters,
+                "projection_source": projection_source,
+                "playoff_impact_score": round(impact, 4),
+            })
+        this_week_matchups.sort(key=lambda m: -m["playoff_impact_score"])
+
+    roster_strength_active = any(v != 0.0 for v in roster_shift.values())
     return {
         "n_sims": N_SIMS,
         "remaining_matchups": len(remaining),
         "model": "normal(team lineup mean, stdev) shrunk to league priors below "
-                 f"{SHRINK_GAMES} games; venue bonuses applied; division winners seeded first; "
-                 "H2H tiebreak within exact-tie groups, then PF",
+                 f"{SHRINK_GAMES} games; venue bonuses applied; top 3 per division make the "
+                 "playoffs, no wildcards; H2H tiebreak within exact-tie groups, then PF"
+                 + ("; prior mean nudged by this-season roster strength, fading out as real "
+                    "results accumulate" if roster_strength_active else ""),
+        "roster_strength_active": roster_strength_active,
         "teams": teams_out,
+        "this_week_matchups": this_week_matchups,
     }

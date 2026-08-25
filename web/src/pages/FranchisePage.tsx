@@ -86,7 +86,7 @@ export default function FranchisePage() {
       const row = b.standings.rows.find((r) => r.team_id === tid);
       if (!row) continue;
       seasons += 1;
-      w += row.wins; l += row.losses; t += row.ties; pf += row.points_for;
+      w += row.wins; l += row.losses; t += row.ties; pf += row.points_for ?? 0;
     }
     return { seasons, w, l, t, pf, pct: (w + 0.5 * t) / Math.max(w + l + t, 1) };
   }, [all.bundles, tid]);

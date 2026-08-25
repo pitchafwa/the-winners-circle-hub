@@ -2,12 +2,18 @@
   "_readme": [
     "Trades executed via LM tools (so ESPN has no TRADE_ACCEPT record) and",
     "pick swaps tracked in the commissioner's notes. Merged into activity.json.",
-    "Each trade: {season, date: 'YYYY-MM-DD', week (scoring period it lands in),",
-    "  teams: [teamA_id, teamB_id],",
+    "Each trade: {id, season, date: 'YYYY-MM-DD', week (scoring period it lands in),",
+    "  teams: [teamA_id, teamB_id], valuation_snapshot_at: ISO timestamp,",
     "  assets: [",
-    "    {player: 'Player Name', from: teamA_id, to: teamB_id}   -- players by name",
-    "    {pick: '2027 2nd', from: teamB_id, to: teamA_id}        -- picks as text",
+    "    {player: 'Player Name', from: teamA_id, to: teamB_id, value: int|null}",
+    "    {pick: '2027 2nd', from: teamB_id, to: teamA_id, value: int|null}",
     "  ]}",
+    "value on each asset is the dynasty market value FROZEN at submission",
+    "time (trade_tool.py cmd_submit) \u2014 trade_grades.py reads this back",
+    "forever after rather than re-pricing old trades against today's",
+    "market. Trades entered before this field existed have value: absent;",
+    "trade_grades.py falls back to a current-value estimate for those and",
+    "flags it (uses_current_value_fallback) so the UI can be honest about it.",
     "Player names are matched against the NFL player list; unmatched names fail",
     "the build loudly rather than guessing.",
     "pick_ownership: current holder of every traded future pick, one entry per",
@@ -637,16 +643,99 @@
           "to": 8
         }
       ]
+    },
+    {
+      "id": "222fc4ef",
+      "season": 2026,
+      "date": "2026-08-17",
+      "week": 0,
+      "teams": [
+        7,
+        10
+      ],
+      "assets": [
+        {
+          "player": "Justin Jefferson",
+          "from": 7,
+          "to": 10
+        },
+        {
+          "player": "Rico Dowdle",
+          "from": 7,
+          "to": 10
+        },
+        {
+          "pick": "2026 1st",
+          "from": 7,
+          "to": 10
+        },
+        {
+          "player": "Emeka Egbuka",
+          "from": 10,
+          "to": 7
+        },
+        {
+          "player": "Bucky Irving",
+          "from": 10,
+          "to": 7
+        },
+        {
+          "pick": "2026 1st",
+          "from": 10,
+          "to": 7
+        },
+        {
+          "pick": "2026 2nd",
+          "from": 10,
+          "to": 7
+        }
+      ]
+    },
+    {
+      "id": "2bb907f2",
+      "season": 2026,
+      "date": "2026-08-17",
+      "week": 0,
+      "teams": [
+        6,
+        8
+      ],
+      "assets": [
+        {
+          "player": "James Cook III",
+          "from": 6,
+          "to": 8,
+          "value": 6801
+        },
+        {
+          "player": "A.J. Brown",
+          "from": 8,
+          "to": 6,
+          "value": 5788
+        },
+        {
+          "player": "Chuba Hubbard",
+          "from": 8,
+          "to": 6,
+          "value": 3765
+        },
+        {
+          "pick": "2026 1st",
+          "from": 8,
+          "to": 6,
+          "value": 5544.5
+        },
+        {
+          "pick": "2027 1st",
+          "from": 8,
+          "to": 6,
+          "value": 6499.6
+        }
+      ],
+      "valuation_snapshot_at": "2026-08-15T16:29:29.191433+00:00"
     }
   ],
   "pick_ownership": [
-    {
-      "season": 2026,
-      "round": 1,
-      "original_team_id": 6,
-      "owned_by_team_id": 8,
-      "via": "traded 2026-08-10"
-    },
     {
       "season": 2027,
       "round": 2,
@@ -675,8 +764,9 @@
       "season": 2026,
       "round": 1,
       "original_team_id": 4,
-      "owned_by_team_id": 7,
-      "via": "traded 2025-11-26"
+      "owned_by_team_id": 10,
+      "via": "traded 2026-08-17",
+      "trade_id": "222fc4ef"
     },
     {
       "season": 2026,
@@ -703,8 +793,9 @@
       "season": 2026,
       "round": 2,
       "original_team_id": 2,
-      "owned_by_team_id": 10,
-      "via": "manually reassigned"
+      "owned_by_team_id": 7,
+      "via": "traded 2026-08-17",
+      "trade_id": "222fc4ef"
     },
     {
       "season": 2025,
@@ -885,6 +976,30 @@
       "original_team_id": 9,
       "owned_by_team_id": 10,
       "via": "manually reassigned"
+    },
+    {
+      "season": 2026,
+      "round": 1,
+      "original_team_id": 10,
+      "owned_by_team_id": 7,
+      "via": "traded 2026-08-17",
+      "trade_id": "222fc4ef"
+    },
+    {
+      "season": 2026,
+      "round": 1,
+      "original_team_id": 6,
+      "owned_by_team_id": 6,
+      "via": "traded 2026-08-17",
+      "trade_id": "2bb907f2"
+    },
+    {
+      "season": 2027,
+      "round": 1,
+      "original_team_id": 8,
+      "owned_by_team_id": 6,
+      "via": "traded 2026-08-17",
+      "trade_id": "2bb907f2"
     }
   ]
 }

@@ -446,6 +446,13 @@ table.stat tbody tr:hover {
   gap: 2.5rem;
 }
 
+/* Grid items default to min-width:auto, which lets a wide child (e.g. a
+   many-column table) refuse to shrink below its own content width and
+   blow the whole grid — and therefore the whole section — wider than
+   every other block on the page. min-width:0 lets the track win, so
+   .table-wrap's own overflow-x:auto scrolls within the block instead. */
+.two-col > * { min-width: 0; }
+
 @media (max-width: 760px) {
   .two-col { grid-template-columns: 1fr; }
 }
@@ -477,25 +484,7 @@ table.stat tbody tr:hover {
   flex: 1;
 }
 
-/* Playoff odds strip */
-.odds-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.odds-row {
-  display: grid;
-  grid-template-columns: minmax(8rem, 1fr) 2fr auto auto;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.35rem 0;
-  border-bottom: 1px solid var(--rule);
-  font-size: 0.85rem;
-}
-
-.odds-team { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
+/* Shared small progress bar (this-week matchup win %, playoff tracks) */
 .odds-bar-track {
   height: 0.5rem;
   background: var(--paper-2);
@@ -509,14 +498,88 @@ table.stat tbody tr:hover {
   background: var(--accent-2);
 }
 
-.odds-pct { font-size: 0.85rem; }
-.odds-se { font-size: 0.68rem; }
-.odds-title { font-size: 0.75rem; }
-
-@media (max-width: 640px) {
-  .odds-row { grid-template-columns: minmax(6rem, 1fr) auto auto; }
-  .odds-bar-track { display: none; }
+/* Division race table — tighter than the default table.stat padding, and
+   only for this table (not the main Standings table), so two of these sit
+   side by side in a .two-col block without needing horizontal scroll. */
+table.division-race-table th,
+table.division-race-table td {
+  padding: 0.5rem 0.5rem;
 }
+
+table.stat tr.in { background: color-mix(in srgb, var(--positive) 7%, transparent); }
+
+/* Thicker rule under the last playoff-position row, instead of a separate
+   "playoff cutline" label row — the cutline reads from the table's own
+   contents (rank order + this rule), not from a caption. */
+table.stat tr.cutline td { border-bottom: 2px solid var(--ink); }
+
+/* Trophy icon fixed on the left, % right-aligned in the rest of the cell —
+   text-align alone lets the icon drift left/right depending on how many
+   digits the percentage has (7.9% vs 18.2%), which is what made the
+   trophies look misaligned row to row. */
+.division-title-cell {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Playoff probability tracks — full-width bar per team, with the swing if
+   this week goes their way (green, extending past current) or against them
+   (red, the portion of the current bar that isn't guaranteed). */
+.playoff-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.playoff-track-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  font-size: 0.88rem;
+}
+
+/* Fixed width, not content-based — every row's bar starts at the exact
+   same x position, and the width is sized to fit this league's longest
+   real team name ("anthone's Astounding Team") in full, close to the bar
+   rather than leaving a lot of empty room past shorter names. */
+.playoff-track-team {
+  flex: 0 0 13rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Fixed width (not auto) for the same reason as the team column above —
+   otherwise a team with a shorter pct string (e.g. a single-digit title %)
+   leaves more remaining flex space for the bar than a team with a longer
+   one, so the track's actual pixel width — not just the colored fractions
+   inside it — would differ row to row even though the underlying odds
+   don't call for that. */
+.playoff-track-pct { flex: 0 0 7rem; font-size: 0.85rem; white-space: nowrap; text-align: right; }
+
+.playoff-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 0.75rem;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+}
+
+.playoff-track-floor,
+.playoff-track-risk,
+.playoff-track-upside {
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+
+.playoff-track-floor { left: 0; background: var(--accent-2); }
+.playoff-track-risk { background: var(--negative); opacity: 0.55; }
+.playoff-track-upside { background: var(--positive); opacity: 0.55; }
 
 /* Activity feed */
 .feed {
@@ -698,13 +761,27 @@ select.control {
 /* ------------------------------------------------------------------ */
 /* Matchup cards                                                       */
 /* ------------------------------------------------------------------ */
-.mu-list { display: flex; flex-direction: column; gap: 1.25rem; }
+/* Flexbox, not grid — a lone trailing card (odd matchup count, e.g. 5
+   games in a 10-team week) needs to end up centered on its own row at the
+   SAME width as a normal two-up card, not stretched to fill the row. A
+   grid item spanning both tracks with a percentage max-width looked right
+   in theory but a real browser check showed the percentage resolving
+   against something narrower than the actual container (a known grid
+   quirk) — undersizing the centered card. Flex with a fixed (non-growing)
+   basis and `justify-content: center` on the container gets the same
+   layout for free, no per-card "is this the odd one" class needed. */
+.mu-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.25rem 1.5rem; }
 
 .mu-card {
+  flex: 0 1 calc(50% - 0.75rem);
   background: var(--paper-2);
   border: 2px solid var(--ink);
   border-radius: 10px;
   padding: 1.1rem 1.25rem;
+}
+
+@media (max-width: 860px) {
+  .mu-card { flex-basis: 100%; }
 }
 
 .mu-head {
@@ -726,7 +803,66 @@ select.control {
   padding: 0.05rem 0.45rem;
 }
 .mu-total { font-size: 1.7rem; font-weight: 600; }
-.mu-at { font-size: 0.8rem; }
+.mu-at { font-size: 0.8rem; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+
+.mu-ribbons { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
+.mu-head .mu-team:last-child .mu-ribbons { justify-content: flex-end; }
+.mu-ribbon {
+  font-size: 0.62rem;
+  padding: 0.15rem 0.5rem;
+  border-width: 1px;
+  white-space: nowrap;
+}
+
+.mu-h2h {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.mu-name-row { display: flex; align-items: baseline; gap: 0.4rem; }
+.mu-head .mu-team:last-child .mu-name-row { justify-content: flex-end; }
+.mu-record { font-size: 0.72rem; white-space: nowrap; }
+.mu-proj-final { font-size: 0.78rem; }
+.mu-remaining { display: block; font-size: 0.68rem; }
+.mu-proj-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* "Tug of war" win-probability bar — taller than the odds-bar-track it
+   replaces so each team's own % fits printed inside it, and each side is
+   colored by whether THAT side is favored (green) or the underdog (red),
+   so it doesn't share the gold tone the "playoff stakes" pill uses right
+   below it and get mistaken for representing that instead. */
+.mu-wp-track {
+  position: relative;
+  height: 1.9rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mu-wp-seg { position: absolute; top: 0; height: 100%; }
+.mu-wp-seg.favored { background: var(--positive); }
+.mu-wp-seg.underdog { background: var(--negative); }
+
+.mu-wp-labels {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0.6rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--paper);
+}
 
 .mu-grid {
   display: grid;
@@ -744,7 +880,17 @@ select.control {
   padding: 0.28rem 0;
   border-bottom: 1px solid var(--rule);
   font-size: 0.85rem;
-  min-height: 1.9rem;
+  /* height, not min-height — .mu-player's larger text pushes its natural
+     content height past 1.9rem while .mu-slot's smaller text never
+     reaches it, so a shared min-height let them render at DIFFERENT
+     actual heights (32px vs 30px). Two independent flex columns (player
+     names/scores on the sides, slot labels in the middle) have no other
+     mechanism keeping their rows in sync, so that 2px-per-row gap
+     compounded linearly down the list — a real, confirmed, and
+     increasingly visible drift by the bottom rows, not a rounding
+     artifact. An explicit shared height forces both to match exactly. */
+  height: 2rem;
+  box-sizing: border-box;
   align-items: baseline;
 }
 

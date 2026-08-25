@@ -2,14 +2,14 @@ import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
 import { pts } from "../lib/format";
 import StandingsTable from "../components/StandingsTable";
-import PowerRankings from "../components/PowerRankings";
+import DivisionStandings from "../components/DivisionStandings";
+import PlayoffProbabilityTracks from "../components/PlayoffProbabilityTracks";
 import SuperlativeCard from "../components/SuperlativeCard";
 import ActivityFeed from "../components/ActivityFeed";
 import EmptyState from "../components/EmptyState";
-import OddsStrip from "../components/OddsStrip";
 import PositionHeatmap from "../components/PositionHeatmap";
 import ContendRebuildTable from "../components/ContendRebuildTable";
-import type { Activity, Award, Positions, Power, Recaps, Sim, Spectrum, Standings, Superlatives } from "../types/data";
+import type { Activity, Award, Positions, Recaps, Sim, Spectrum, Standings, Superlatives } from "../types/data";
 
 /** Pick the latest week's single biggest story for the hero. */
 function marquee(awards: Award[], week: number): Award | null {
@@ -26,7 +26,6 @@ export default function LeaguePage() {
   const { season, meta } = useApp();
   const base = season !== null ? `${season}` : null;
   const standings = useJson<Standings>(base ? `${base}/standings.json` : null);
-  const power = useJson<Power>(base ? `${base}/power.json` : null);
   const superlatives = useJson<Superlatives>(base ? `${base}/superlatives.json` : null);
   const activity = useJson<Activity>(base ? `${base}/activity.json` : null);
   const sim = useOptionalJson<Sim>(base ? `${base}/sim.json` : null);
@@ -37,6 +36,7 @@ export default function LeaguePage() {
   if (!meta) return null;
 
   const latestWeek = meta.completed_weeks.at(-1) ?? null;
+  const simByTeam = new Map((sim.data?.teams ?? []).map((t) => [t.team_id, t]));
   const story =
     latestWeek !== null && superlatives.data
       ? marquee(superlatives.data.awards, latestWeek)
@@ -77,57 +77,60 @@ export default function LeaguePage() {
           <span className="label">click a column to sort</span>
         </div>
         {standings.error && <div className="error-state">{standings.error}</div>}
-        {standings.data &&
-          (meta.season_started ? (
-            <StandingsTable rows={standings.data.rows} />
-          ) : (
-            <EmptyState>Standings appear once week 1 is in the books.</EmptyState>
-          ))}
+        {standings.data && <StandingsTable rows={standings.data.rows} />}
+      </section>
+
+      <section className="section" aria-labelledby="race-h">
+        <div className="section-head">
+          <h2 id="race-h">Division Race</h2>
+        </div>
+        {standings.error && <div className="error-state">{standings.error}</div>}
+        {standings.data && meta.divisions.length > 0 && (
+          <div className="two-col">
+            {meta.divisions.map((d) => (
+              <DivisionStandings
+                key={d.id}
+                name={d.name}
+                rows={standings.data!.rows.filter((r) => r.division_id === d.id)}
+                simByTeam={simByTeam}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="section" aria-labelledby="odds-h">
+        <div className="section-head">
+          <h2 id="odds-h">Playoff Probability</h2>
+          <span className="label">current odds · red = if you lose this week · green = if you win</span>
+        </div>
+        {sim.data ? (
+          <>
+            <PlayoffProbabilityTracks teams={sim.data.teams} />
+            <p className="muted" style={{ fontSize: "0.72rem", marginTop: "0.9rem", fontStyle: "italic" }}>
+              {sim.data.n_sims.toLocaleString()} simulations, {sim.data.remaining_matchups} games left. {sim.data.model}.
+            </p>
+          </>
+        ) : (
+          !sim.loading && (
+            <EmptyState>
+              {meta.season_over
+                ? "Season's over — no odds to simulate."
+                : "Not yet simulated — odds arrive with the first data refresh."}
+            </EmptyState>
+          )
+        )}
       </section>
 
       {spectrum.data && spectrum.data.teams.length > 0 && (
         <section className="section" aria-labelledby="spectrum-h">
           <div className="section-head">
             <h2 id="spectrum-h">Contend / Rebuild</h2>
-            <span className="label">current roster value vs. future pick capital</span>
+            <span className="label">redraft roster value vs. dynasty + pick capital</span>
           </div>
           <ContendRebuildTable spectrum={spectrum.data} />
         </section>
       )}
-
-      <div className="two-col">
-        <section className="section" aria-labelledby="power-h">
-          <div className="section-head">
-            <h2 id="power-h">Power Rankings</h2>
-            {power.data?.latest_week && <span className="label">through week {power.data.latest_week}</span>}
-          </div>
-          {power.error && <div className="error-state">{power.error}</div>}
-          {power.data &&
-            (power.data.latest_week ? (
-              <PowerRankings rows={power.data.weeks[String(power.data.latest_week)]} />
-            ) : (
-              <EmptyState>Power rankings need at least one completed week.</EmptyState>
-            ))}
-        </section>
-
-        <section className="section" aria-labelledby="odds-h">
-          <div className="section-head">
-            <h2 id="odds-h">Playoff Odds</h2>
-            {sim.data && <span className="label">playoff % · title %</span>}
-          </div>
-          {sim.data ? (
-            <OddsStrip sim={sim.data} />
-          ) : (
-            !sim.loading && (
-              <EmptyState>
-                {meta.season_over
-                  ? "Season's over — the odds all collapsed to 0 or 100."
-                  : "Not yet simulated — odds arrive with the first data refresh."}
-              </EmptyState>
-            )
-          )}
-        </section>
-      </div>
 
       {positions.data && (
         <section className="section" aria-labelledby="pos-h">

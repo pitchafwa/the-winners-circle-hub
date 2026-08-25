@@ -50,11 +50,42 @@ that same week).
 
 `rows[]`, pre-sorted by ESPN playoff seed; every column the standings table can sort on:
 `team_id, seed, final_rank, wins/losses/ties, record, win_pct, points_for, points_against,
-division_id, division_record, streak, all_play_wins/losses/ties, all_play_record,
-all_play_pct, expected_wins, luck, lineup_points, optimal_points, coach_rating,
-bench_points_lost`.
+division_id, division_record, division_rank, games_back, cushion, streak,
+all_play_wins/losses/ties, all_play_record, all_play_pct, expected_wins, luck,
+lineup_points, optimal_points, coach_rating, bench_points_lost`.
+
+`division_rank`/`games_back`/`cushion` (`metrics.division_race()`, new 2026-08)
+are the REAL, current standing within each team's division under this
+league's actual playoff format — top 3 per division make it, no wildcards
+(see `simulate.py`'s module docstring for how that was confirmed against
+real bracket data). Same tiebreak the Monte Carlo sim uses per draw (wins →
+head-to-head among the exact-tied group → points-for), but with a
+deterministic team_id fallback instead of a random coin flip, since this is
+one real number for display, not one draw among 10,000. `division_rank` is
+1-based within the division. `games_back` is the standard sports GB formula
+against the division's 3rd-place cutline team — `0.0` for a team currently
+holding a playoff spot (rank ≤ 3). `cushion` is the mirror number for a
+playoff-spot team — games ahead of the first team OUT — `null` for a team
+on the outside. A `games_back`/`cushion` of exactly `0.0` is a real,
+meaningful state (not a bug): two teams can be tied on wins/losses but
+split by the tiebreak, so one sits at rank 3 with `cushion: 0` and the
+other at rank 4 with `games_back: 0` — both mathematically "zero games
+back," just on opposite sides of the actual cutline.
+
+`points_for`/`points_against` are `null` before the season has started
+(`t.points_for` is a real ESPN `0.0` preseason, not a meaningful one —
+nulled out the same way every other not-yet-meaningful field above already
+is, so the frontend renders "—" instead of a misleading "0"). Once
+`completed` weeks exist, they're the real season totals.
 
 ## `{season}/power.json`
+
+Computed but no longer rendered anywhere in the frontend as of the
+2026-08-24 League-page redesign (folded into `standings.json`'s
+`all_play_pct`/`luck` plus the new `division_race` fields above — see
+below) — left in place since it's cheap to compute and may back a future
+feature (e.g. a week-over-week trend chart), not dead weight worth ripping
+out preemptively.
 
 `weights` (the blend), `weeks{"N": rows[]}`, `latest_week`.
 Row: `{team_id, rank, score, movement (vs prior week, +up/−down, null week 1),
@@ -170,11 +201,108 @@ auto-computed badge) + `badges[]` (adds the correct one). See its `_readme`.
 ## `{season}/sim.json` (absent when season is over or schedule unknown)
 
 Monte Carlo playoff odds. `n_sims`, `remaining_matchups`, `model` (plain-English
-method statement), `teams[]`: `{team_id, playoff_pct, playoff_se, title_pct,
+method statement), `roster_strength_active` (bool — whether redraft valuation
+data was available to compute the roster-strength nudge below; `false` reads
+as an honest "not applied," never silently skipped without saying so),
+`teams[]`: `{team_id, playoff_pct, playoff_se, title_pct,
 title_se, avg_final_wins, seed_dist{"seed": pct}, playoff_pct_if_win_next,
 playoff_pct_if_lose_next, playoff_pct_by_final_wins{"wins": pct}}` (final-wins
 buckets with <50 sims are omitted). Frontend renders absence as an explicit
 "not simulated" state and always shows ± the standard error.
+
+**Roster strength nudges the model's PRIOR mean** (`ingest/simulate.py:
+roster_strength_prior_shift`) — each team's value from
+`metrics.redraft_lineup_value()` (see the `spectrum.json` section below for
+the full method, shared by both), priced on REDRAFT market value
+(`valuation.redraft_values_by_name()`). That value is compared to the
+league average via a z-score (clipped to ±2.5), then scaled by
+`ROSTER_STRENGTH_WEIGHT` (0.15, hand-calibrated) × that season's own
+scoring stdev and added to the prior mean every team is shrunk toward
+before real results exist. Only the prior side of the existing shrinkage
+blend is touched, so this fades out on its own as real games accumulate
+(shrinkage weight `n / (n + 3)` already dominates past ~3 real games
+regardless) — it's a preseason/early-season signal, not a permanent thumb
+on the scale. `ROSTER_STRENGTH_WEIGHT` itself is z-score-based, so the same
+0.15 calibration (best-rostered team around 85-90% playoff odds, worst
+around 35-40%) holds regardless of exactly how the underlying roster value
+is computed.
+
+**`this_week_matchups[]`**: `{matchup_period, home_id, away_id,
+home_current, away_current, home_projected, away_projected, home_win_pct,
+started, home_lineup, away_lineup, home_remaining, away_remaining,
+home_total_starters, away_total_starters, projection_source,
+playoff_impact_score}` — one entry per matchup in the earliest remaining
+`matchup_period` (i.e. the next games to be played).
+
+`home_projected`/`away_projected` (the projected FINAL score) and
+`home_win_pct` prefer the real week projection (`parse.
+optimal_week_projection()`; `fetch_season()` fetches the current week even
+before anything in it is decided specifically so this data exists before
+kickoff) — `projection_source: "espn"` when both teams have this data.
+
+The lineup itself reflects REALITY first: whoever the manager has actually
+entered in each starting slot on ESPN right now, read straight off each
+player's real `lineupSlotId`. Only a slot the manager has genuinely left
+BLANK gets auto-filled — with the best available bench player for that
+slot specifically (via `metrics.best_lineup()`, same matching every other
+optimal-lineup feature uses, restricted to just the empty slots and the
+bench pool). A lineup the manager HAS set is shown exactly as set, never
+second-guessed even if a bench player would technically score more — this
+tracks what's actually being scored, not a suggested better lineup. Only a
+team with NO real lineup set at all (routine right up until kickoff) ends
+up close to fully bench-optimal-filled, which is what stops an unset
+lineup from reading as "projected for 0." Each player's value (real or
+bench-filled) is their ACTUAL score (`statSourceId: 0`) if they've already
+played this week, else their ESPN PROJECTED score (`statSourceId: 1`).
+`home_current`/`away_current` sum only the already-played
+members of that same lineup (`0.0` before anyone's played);
+`started` is true the moment either team has a real stat line, so the
+frontend can switch from "projected score" to "current score, projected
+final below." Win probability is `normal_cdf((home_projected −
+away_projected) / WIN_PROB_SIGMA)` (`simulate.py`, sigma = 35, hand-fit
+against 8 real win-probability numbers pulled from ESPN's own app, matching
+all 8 within about a percentage point) — a separate, simpler model from
+the season-long Monte Carlo sim, since it only needs to answer "who's
+favored this one week." Fed the projected-FINAL numbers throughout the
+week, so it naturally sharpens toward 0%/100% as real results replace
+projections inside that same optimal lineup — no separate in-week
+recalibration of `WIN_PROB_SIGMA` itself.
+
+When that cache isn't available yet (a fully offline build before any live
+fetch has pulled this week), falls back to `projection_source: "model"` —
+the same team-strength model (`team_models()`) that drives the rest of the
+sim for projected scores (`home_current`/`away_current: null`, `started:
+false`, `home_lineup`/`away_lineup: []`), and `home_win_pct` read straight
+off the `N_SIMS` draws already generated for that exact matchup instead of
+the normal-CDF calc.
+
+`home_lineup`/`away_lineup` are `optimal_week_projection()`'s real-first
+lineup, in the league's real slot order: `{player_id, name, position,
+slot, actual, projected, played}`. Each slot holds the manager's real
+ESPN-entered player when one exists; only a genuinely blank slot gets the
+best available bench player instead. ALWAYS one entry per real starting
+slot (`league.starting_slots`), even for a slot nobody on the roster (real
+or bench) can currently fill (e.g. a team with no D/ST rostered at all) —
+that slot gets a `player_id: null` placeholder rather than being silently
+dropped, so the two teams' lineups always line up entry-for-entry by index
+(a real bug caught here: compacting a short-a-player team's list while the
+other team's stayed full length desynced which slot label the frontend's
+shared middle column showed for each row). `actual` is `null` until that
+player has a real stat line this week; `projected` is ESPN's pre-game
+number, kept even after the player's played so a card can show
+beat/missed-projection the same way the real completed-week box scores do.
+`home_remaining`/`away_remaining` and `home_total_starters`/
+`away_total_starters` count only the REAL (non-placeholder) lineup slots —
+how many of that team's actual starters haven't played yet, out of how
+many real starters exist — for an "N of M left to play" display.
+
+`playoff_impact_score` is unrelated to either projection path — the
+combined swing in playoff odds for BOTH teams between winning and losing
+this specific game — `|playoff_pct_if_win_next − playoff_pct_if_lose_next|`
+summed across the two teams, reusing those same per-team fields from
+`teams[]` above (valid here because each of this week's games is, by
+construction, both involved teams' next remaining game). Sorted by
+`playoff_impact_score` descending — the biggest game of the week first.
 
 ## `{season}/schedule_swap.json` (absent preseason)
 
@@ -310,21 +438,52 @@ start_season, start_week, end_season, end_week}`.
 
 Every trade in `ingest/manual_trades.json`, graded on the same dynasty
 valuation table (`ingest/valuation.py`) that backs `draft.json` — no second
-baseline. `trades[]`: `{season, date, week, team_ids[], players[]
-{player_id, name, from_team_id, to_team_id, value}, picks[] {pick,
-from_team_id, to_team_id, value}, value_by_team{"<team_id>": {gained, lost,
-net}}, winner_team_id, has_estimated_asset}`.
+baseline. Two independent signals per asset, deliberately never blended
+into one number (different units): market value AT THE TRADE (the actual
+grade) and, for players still on the roster, real production SINCE the
+trade (context only).
 
-Player `value` resolves directly against the dynasty table. A traded pick
-can't be resolved to its exact draft slot from the trade record alone (that
-needs the original-owner + resolved-slot bookkeeping `pick_tracking.py`
-does at read time, not captured per historical trade), so pick `value` is
-that draft year's **round average** from `pick_values.json` and the trade
-gets `has_estimated_asset: true` — surfaced in the UI, never hidden as if
-it were a hard number. `winner_team_id` is `null` when valuation wasn't
-available for this build (explicit missing-data state, matching
-`draft.json`'s `valuation_available` convention) — see `valuation_available`
-/ `valuation_updated_at` at the top level.
+`trades[]`: `{id, season, date, week, team_ids[],
+players[] {player_id, name, from_team_id, to_team_id, value, value_source,
+production_since_trade, flipped_again},
+picks[] {pick, from_team_id, to_team_id, value, value_source},
+value_by_team{"<team_id>": {gained, lost, net}}, winner_team_id,
+has_estimated_asset, uses_current_value_fallback}`.
+
+**`value` / `value_source`** — every asset is priced the moment the trade
+is submitted: `trade_tool.py cmd_submit` snapshots the current dynasty
+value straight onto `manual_trades.json`'s asset record
+(`value_source: "snapshot"`), and that number is read back forever after,
+never re-priced against a later build's market. Trades entered before this
+existed have no stored snapshot; those fall back to whatever today's
+dynasty value is (`value_source: "current_fallback"`) and the whole trade
+gets `uses_current_value_fallback: true` so the UI can be honest that side
+isn't a true point-in-time read. A traded pick can't be resolved to its
+exact draft slot from the trade record alone (that needs the
+original-owner + resolved-slot bookkeeping `pick_tracking.py` does at read
+time, not captured per historical trade), so pick `value` is always that
+draft year's **round average** from `pick_values.json` (frozen at
+submission time same as players) and the trade gets
+`has_estimated_asset: true`.
+
+**`production_since_trade`** (players only, `null` when not applicable) —
+`{points_started, points_projected_started, weeks_started, still_held}`,
+pulled from the matching `ownership.json` stint: real points started (and
+vs. projection) since the trade, for whoever's STILL on the acquiring
+team's roster. **`flipped_again`** (players only) is `true` when that
+ownership stint ended via a later trade — deliberately no production shown
+in that case, since the asset's value continues in that SECOND trade's own
+grade instead of being force-fit into a near-zero production number here.
+This is also why `winner_team_id` / team trade records don't need any
+lineage-tracing: each trade is graded independently at its own moment, so
+a team that flips an asset well gets credit automatically once both trade
+legs are summed.
+
+`winner_team_id` is `null` when valuation wasn't available for this build
+(explicit missing-data state, matching `draft.json`'s `valuation_available`
+convention) — see `valuation_available` / `valuation_updated_at` at the top
+level. `team_ledger[]`: `{team_id, gained, lost, net, trade_count}` — net
+value across every trade a team's made, sorted by net descending.
 
 ## `pick_futures.json` (top level, cross-season)
 
@@ -341,11 +500,67 @@ default `current_owner_id` to `original_team_id`.
 
 Contend/rebuild signal per team. No player-age data exists anywhere in
 this league's cache (checked the raw ESPN player JSON directly — not
-exposed), so instead of roster age this compares two real numbers: current
-roster dynasty value (open `ownership.json` stints) against held future
-pick capital (`pick_futures.json`, valued the same round-average way as
-`trades.json`'s pick assets). `teams[]`: `{team_id, current_roster_value,
-future_pick_capital, ratio (pick_capital / (roster_value + pick_capital)),
-percentile (league-wide rank of ratio, 0–100), label
-("Contending"|"Balanced"|"Rebuilding")}` — percentile ≤33 Contending, ≥67
-Rebuilding, else Balanced.
+exposed), so instead of roster age this compares two different value
+lenses:
+
+- **Contending value** — `metrics.redraft_lineup_value()`: each team's
+  BEST POSSIBLE STARTING LINEUP value (dominant signal) plus a 10% share
+  of the rest of the roster's value (`BENCH_WEIGHT`, real bench depth has
+  real but secondary insurance value against injury/breakouts), all priced
+  on REDRAFT (this-season) value from `valuation.redraft_values_by_name()`
+  (KeepTradeCut's `fantasy-rankings` page, not `dynasty-rankings`) — "how
+  good is this team right now," independent of long-term keeper value.
+  D/ST and K are excluded entirely (`VALUATION_EXCLUDED_SLOTS`) — their
+  redraft market prices are noise, not signal, for roster strength. Reads
+  the current roster straight from the live league.json snapshot
+  (`parse.current_roster_players()`), not `ownership.json`'s stints —
+  works preseason, before any lineup data exists to build a stint from.
+  Same function and calibration as `sim.json`'s roster-strength shift
+  above, so both reflect one consistent notion of team strength.
+  - **Why not a flat roster sum**: shipped that way originally, but ranked
+    roster DEPTH over roster STARTING POWER — only ~half a roster starts
+    in a given week, so a deep bench of replacement-level players
+    shouldn't out-rank a thinner roster stacked with elite starters.
+    Cross-checked the fix against FantasyPros' own 2026 preseason power
+    rankings (which score starters only, no bench) as a real-world
+    reference: Spearman rank correlation went from ~0.58 (flat sum) to
+    ~0.85 (pure best-starting-lineup, no bench) to ~0.72 (starting lineup
+    + 10% bench) — the 10% bench share is Tommy's deliberate choice for a
+    more realistic model (injuries/breakouts genuinely happen), traded
+    knowingly against a slightly lower match to FantasyPros' starters-only
+    methodology, not an oversight.
+- **Rebuilding value** — a 50/50 blend of the same roster's DYNASTY value
+  (`valuation.values_by_name()`, the same table draft/trade grades use,
+  still a FLAT full-roster sum sourced from `ownership.json`'s open
+  stints — every rostered asset has real trade value regardless of
+  whether it could start today) and held future pick capital
+  (`pick_futures.json`, valued the same round-average way as
+  `trades.json`'s pick assets) — assets banked for the future rather than
+  playing right now.
+
+`redraft_valuation_updated_at`: ISO timestamp the redraft snapshot was
+last fetched (separate from `trades.json`/`draft.json`'s
+`valuation_updated_at`, which tracks the dynasty snapshot).
+
+`teams[]`: `{team_id, contending_value, dynasty_roster_value,
+future_pick_capital, rebuilding_value, ratio (rebuilding_value /
+(contending_value + rebuilding_value)), percentile (league-wide rank of
+ratio, 0–100), label ("Contending"|"Balanced"|"Rebuilding")}` — percentile
+≤33 Contending, ≥67 Rebuilding, else Balanced.
+
+## `h2h.json` (top level, cross-season)
+
+Every team pair's real all-time head-to-head record (`build.py:
+_all_time_h2h()`), aggregated across every cached season — regular season
+AND playoffs, since a playoff meeting is still real history, no reason to
+exclude it. Reads straight from `parse.load_league()` per season (cache-
+backed, no network), not the just-written per-season JSON output — same
+convention `build_badges`/the ownership timeline already use, so this
+works identically whether it runs after a full rebuild or a single-season
+admin-tool rebuild.
+
+`pairs[]`: `{team_a, team_b, a_wins, b_wins, ties}` — canonically ordered
+`team_a < team_b`, one entry per pair that's ever actually played (not
+every possible pair). The frontend's `lib/h2h.ts: h2hLookup()` resolves
+this to whichever team is asking, so callers never have to think about the
+canonical ordering themselves.

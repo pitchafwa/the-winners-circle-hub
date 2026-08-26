@@ -20,6 +20,7 @@ import metrics
 import ownership
 import parse
 import pick_tracking
+import roster_card
 import spectrum
 import trade_grades
 
@@ -418,6 +419,25 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         # block only ever regenerates it, never revisits an old one). Same
         # "stale file must not outlive its data source" rule as draft.json.
         (out_dir / "sim.json").unlink(missing_ok=True)
+
+    # ---- roster.json (live roster cards, current season only) -------------
+    # "Current roster" only means something for the season still being
+    # played — a finished season has no live lineup to show, and the raw
+    # league.json roster snapshot this reads doesn't reflect a past
+    # season's roster anyway (it's always TODAY'S roster). Same
+    # stale-file-must-not-outlive-its-data-source rule as sim.json/draft.json.
+    if not league.season_over:
+        cards = roster_card.build_roster_cards(season, league)
+        if cards:
+            _write(out_dir / "roster.json", {
+                "generated_at": generated_at,
+                "current_week": parse.current_fantasy_week(league),
+                "teams": cards,
+            })
+        else:
+            (out_dir / "roster.json").unlink(missing_ok=True)
+    else:
+        (out_dir / "roster.json").unlink(missing_ok=True)
 
     # ---- schedule.json (full season, for H2H matrix + bump chart) ---------
     _write(out_dir / "schedule.json", {

@@ -324,6 +324,58 @@ summed across the two teams, reusing those same per-team fields from
 construction, both involved teams' next remaining game). Sorted by
 `playoff_impact_score` descending — the biggest game of the week first.
 
+## `{season}/roster.json` (absent when season is over)
+
+Live roster cards for the My Team page — starters/bench/IR exactly as set on
+ESPN right now (`ingest/roster_card.py`), same "stale file must not outlive
+its data source" deletion rule as `sim.json`/`draft.json`: a finished season
+has no live lineup, so this gets unlinked the moment `season_over` flips
+true. Reads the live `league.json` roster snapshot directly rather than
+anything derived from box scores, so it works preseason too — the one
+moment this is most useful, since that's when there's no game data yet for
+anything else on the page.
+
+`current_week`: the fantasy week actually in progress/coming up
+(`parse.current_fantasy_week()` — `max(scoring_period_id,
+current_matchup_period)`, since `scoring_period_id` stays `0` all preseason
+while `current_matchup_period` is already the real answer).
+
+`teams`: `{"<team_id>": {starters[], bench[], ir[]}}`. `starters[]` is
+ALWAYS one entry per real starting slot (`league.starting_slots`, with
+multiplicity — e.g. two RB slots means two entries), in the league's real
+slot order — a slot nobody's currently in gets a `player_id: null`
+placeholder rather than being dropped, matching how ESPN's own roster page
+never hides an unfilled starting slot. `bench[]`/`ir[]` are whatever's
+actually in those slots, no placeholders (they're not slot-count-limited the
+same way). Deliberately WYSIWYG, unlike `sim.json`'s lineup above: no
+best-lineup auto-fill for an empty starting slot — this is a roster display,
+not a lineup optimizer, so an empty slot shows empty.
+
+Each player card: `{player_id, name, position, pro_team, slot,
+injury_status, on_bye, next_game, week_projection, recent[],
+recent_avg_diff}`.
+- `pro_team`: NFL team abbreviation (`parse.pro_team_schedule()`, sourced
+  from the same cached `proschedule.json` the refresh-schedule generator
+  uses for its own cron windows).
+- `next_game`: `{opponent, is_home, date}` for `current_week`, or `null`
+  if that team's schedule doesn't reach this far out yet. `on_bye` is `true`
+  specifically when there's no game AND this IS that team's real bye week
+  (distinct from "schedule not published yet").
+- `week_projection`: ESPN's real pre-game projection for `current_week`
+  (`statSourceId: 1`), read straight off the live roster snapshot — no
+  separate fetch needed, the projection is already embedded in the same
+  `league.json` response the roster itself comes from.
+- `recent[]`: up to the last 3 COMPLETED weeks' `{week, points, projected}`,
+  newest first (`parse.recent_player_performance()`) — scanned from every
+  team's real lineup that week (bench included), regardless of which
+  fantasy team started them, so a just-added or just-traded-for player still
+  shows real recent form. Empty preseason (no completed weeks exist yet).
+- `recent_avg_diff`: this app's own metric, not something ESPN shows —
+  `average(actual − projected)` across whatever's in `recent[]` (only
+  entries with a real projection count). `null` with fewer than one
+  qualifying entry. The frontend's own read of "who's running hot or cold
+  lately."
+
 ## `{season}/schedule_swap.json` (absent preseason)
 
 `rows[]`: `{team_id, records{"<other_team_id>": {wins, losses, ties}}}` — the

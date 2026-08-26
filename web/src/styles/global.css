@@ -333,6 +333,25 @@ table.stat tbody tr:hover {
   background: var(--paper-2);
 }
 
+/* Roster table's Starters/Bench/IR group dividers — a label row inside
+   the body, not a second header (the real column header stays put at the
+   top so it doesn't repeat three times down the table). */
+.roster-section-row td {
+  background: var(--paper-2);
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  padding: 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.roster-section-row:hover td {
+  background: var(--paper-2);
+}
+
 /* ------------------------------------------------------------------ */
 /* Superlative cards — the signature element. Award certificates.      */
 /* ------------------------------------------------------------------ */

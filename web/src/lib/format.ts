@@ -23,6 +23,15 @@ export function shortDate(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+/** Weekday + kickoff time for a "next game" card, e.g. "Sun 1:00 PM". */
+export function gameTime(ms: number): string {
+  return new Date(ms).toLocaleString(undefined, {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function dateTime(iso: string): string {
   if (!iso) return MISSING;
   return new Date(iso).toLocaleString(undefined, {

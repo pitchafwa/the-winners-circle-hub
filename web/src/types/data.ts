@@ -650,3 +650,41 @@ export interface Spectrum {
   redraft_valuation_updated_at: string | null;
   teams: SpectrumTeam[];
 }
+
+export interface RosterNextGame {
+  opponent: string;
+  is_home: boolean;
+  date: number;
+}
+
+export interface RosterRecentWeek {
+  week: number;
+  points: number;
+  projected: number | null;
+}
+
+export interface RosterPlayerCard {
+  player_id: number | null;
+  name: string | null;
+  position: string | null;
+  pro_team: string | null;
+  slot: string;
+  injury_status: string | null;
+  on_bye: boolean;
+  next_game: RosterNextGame | null;
+  week_projection: number | null;
+  recent: RosterRecentWeek[];
+  recent_avg_diff: number | null;
+}
+
+export interface TeamRoster {
+  starters: RosterPlayerCard[];
+  bench: RosterPlayerCard[];
+  ir: RosterPlayerCard[];
+}
+
+export interface Roster {
+  generated_at: string;
+  current_week: number;
+  teams: Record<string, TeamRoster>;
+}

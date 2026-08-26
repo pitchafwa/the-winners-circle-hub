@@ -6,8 +6,9 @@ import { MISSING, pct, pts, signed } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import BadgeShelf from "../components/BadgeShelf";
 import EmptyState from "../components/EmptyState";
+import RosterTable from "../components/RosterTable";
 import { BenchChart, CoachChart, ScoringChart } from "../components/TeamCharts";
-import type { Badges, ProjectionReportRow, Sim, Teams } from "../types/data";
+import type { Badges, ProjectionReportRow, Roster, Sim, Teams } from "../types/data";
 
 const PROJ_COLS: { key: keyof ProjectionReportRow | "player"; label: string; numeric: boolean }[] = [
   { key: "player", label: "Player", numeric: false },
@@ -34,6 +35,7 @@ export default function MyTeamPage() {
   const teams = useJson<Teams>(base ? `${base}/teams.json` : null);
   const badges = useJson<Badges>("badges.json");
   const sim = useOptionalJson<Sim>(base ? `${base}/sim.json` : null);
+  const roster = useOptionalJson<Roster>(base ? `${base}/roster.json` : null);
 
   const my = teams.data?.teams.find((t) => t.team_id === myTeamId) ?? null;
   const projSort = useSort<ProjectionReportRow>("diff", -1, (r, key) =>
@@ -94,6 +96,24 @@ export default function MyTeamPage() {
       </section>
 
       {teams.error && <div className="error-state">{teams.error}</div>}
+
+      {(() => {
+        const myRoster = roster.data?.teams[String(myTeamId)];
+        if (!myRoster) return null;
+        return (
+          <section className="section">
+            <div className="section-head">
+              <h2>Current roster</h2>
+              <span className="label">week {roster.data!.current_week}</span>
+            </div>
+            <RosterTable roster={myRoster} />
+            <p className="muted" style={{ fontSize: "0.72rem", marginTop: "0.5rem", fontStyle: "italic" }}>
+              Recent = actual points, most recent game first. Diff = average of actual minus projected over
+              those recent games — our own signal for who's running hot or cold lately, not something ESPN shows.
+            </p>
+          </section>
+        );
+      })()}
 
       {!meta.season_started || !my || my.weekly.length === 0 ? (
         <section className="section">

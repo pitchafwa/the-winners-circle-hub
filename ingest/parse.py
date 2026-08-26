@@ -385,6 +385,65 @@ def roster_player_names(season: int | None = None) -> dict[int, str]:
     return names
 
 
+def current_fantasy_week(league: "LeagueData") -> int:
+    """The fantasy week actually in progress/coming up right now.
+    `scoring_period_id` stays 0 all preseason (no real week has been played
+    yet); `current_matchup_period` is the real answer during that window
+    (1 all preseason, e.g.). Once games start the two generally agree —
+    max() is just the safe way to prefer whichever has actually advanced."""
+    return max(league.scoring_period_id, league.current_matchup_period)
+
+
+def pro_team_schedule(season: int | None = None) -> dict[int, dict]:
+    """pro_team_id -> {abbrev, bye_week, games: {week: {opponent_id, is_home,
+    date}}} from the cached NFL schedule (proschedule.json — already fetched
+    by every normal build, since generate_refresh_schedule.py needs it for
+    cron generation). This is the "next game" source for a roster card: a
+    scoring-period week with no entry in `games` and matching `bye_week` is
+    a real bye; a week with no entry and NOT the bye week just means the
+    schedule doesn't reach that far out yet."""
+    season = season or config.SEASON
+    raw = _load(season, "proschedule")
+    out: dict[int, dict] = {}
+    if not raw:
+        return out
+    for t in raw.get("settings", {}).get("proTeams", []):
+        tid = t["id"]
+        games: dict[int, dict] = {}
+        for week_str, glist in t.get("proGamesByScoringPeriod", {}).items():
+            week = int(week_str)
+            for g in glist:
+                opp_id = g["awayProTeamId"] if g["homeProTeamId"] == tid else g["homeProTeamId"]
+                games[week] = {"opponent_id": opp_id, "is_home": g["homeProTeamId"] == tid, "date": g.get("date")}
+        out[tid] = {"abbrev": t.get("abbrev", ""), "bye_week": t.get("byeWeek"), "games": games}
+    return out
+
+
+def recent_player_performance(league: "LeagueData", limit: int = 3) -> dict[int, list[dict]]:
+    """player_id -> up to the last `limit` completed weeks' real
+    {week, points, projected}, newest first — scanned from every team's
+    real lineup that week (bench included), regardless of which fantasy
+    team started them, so a just-added or just-traded-for player still
+    shows real recent form instead of nothing. `projected` is ESPN's real
+    pre-game number for that week (kept the same way completed-week box
+    scores already do), so a roster card can show beat/missed projection
+    historically — the basis for its own recent_avg_diff metric, not just
+    this week's number."""
+    out: dict[int, list[dict]] = {}
+    for week in sorted(league.weeks.keys(), reverse=True):
+        for m in league.weeks[week]:
+            for side in (m.home, m.away):
+                if not side:
+                    continue
+                for p in side.lineup:
+                    if not p.played:
+                        continue
+                    entries = out.setdefault(p.player_id, [])
+                    if len(entries) < limit:
+                        entries.append({"week": week, "points": p.actual, "projected": p.projected})
+    return out
+
+
 def current_roster_players(season: int | None = None) -> dict[int, list[tuple[int, frozenset[int]]]]:
     """team_id -> [(player_id, eligible_slots), ...] for every player
     currently on that team's roster, read straight from the live

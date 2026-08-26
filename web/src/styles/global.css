@@ -1032,7 +1032,8 @@ select.control {
   align-items: center;
 }
 
-.mu-slot { justify-content: center; font-size: 0.62rem; }
+.mu-slot { justify-content: center; padding: 0.28rem 0; }
+.mu-slot .c-badge { font-size: 0.62rem; padding: 0.12rem 0.4rem; }
 .mu-col.right .mu-player { flex-direction: row-reverse; }
 .mu-name-group {
   display: flex;
@@ -1066,23 +1067,70 @@ select.control {
 
 .mu-bench summary { cursor: pointer; padding: 0.5rem 0 0.2rem; }
 
+/* Option C mobile layout — a full-width stacked list per team, replacing
+   the side-by-side .mu-grid entirely below 640px (not a same-grid patch —
+   three columns squeezed into a phone width is what forced names to wrap
+   and rows to drift out of alignment in the first place). Desktop keeps
+   .mu-grid exactly as it was; .mobile-lineup only ever becomes visible
+   inside the mobile media query below. */
+.mobile-lineup { display: none; }
+
+.team-block + .team-block { margin-top: 0.9rem; }
+.team-block-head {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 0.2rem;
+}
+
+.c-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.32rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.c-badge {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 0.3rem;
+  padding: 0.15rem 0.35rem;
+  text-align: center;
+}
+
+.c-name-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.c-name { font-size: 0.85rem; }
+
+.c-stat {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
-  .mu-slots { display: none; }
-  .mu-grid { grid-template-columns: 1fr 1fr; }
-  /* Narrow columns + a headshot + name + position + points all fighting
-     for one line is exactly what was overflowing the fixed 2rem row and
-     bleeding into the row below. Below 640px each row grows to fit
-     whatever it actually needs (auto height, wrap allowed) instead of
-     clipping — rows between the two side-by-side columns no longer need
-     to line up pixel-for-pixel here since .mu-slots (the thing that
-     needed that alignment) is already hidden at this width. */
-  .mu-player {
-    height: auto;
-    min-height: 2rem;
-    flex-wrap: wrap;
-    row-gap: 0.1rem;
-  }
-  .mu-headshot { width: 0.875rem; height: 0.875rem; }
+  .mu-grid { display: none; }
+  .mobile-lineup { display: block; }
 }
 
 /* ------------------------------------------------------------------ */

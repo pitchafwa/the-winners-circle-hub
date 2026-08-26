@@ -2,6 +2,7 @@ import { useApp } from "../state/AppContext";
 import { MISSING, pct, pts } from "../lib/format";
 import { h2hLookup } from "../lib/h2h";
 import { displayOrderIndices } from "../lib/lineupOrder";
+import MobileLineupList from "./MobileLineupList";
 import PlayerHeadshot from "./PlayerHeadshot";
 import type { H2HPair, SimMatchup, WeekLineupPlayer } from "../types/data";
 
@@ -200,25 +201,31 @@ export default function WeeklyMatchupProjections({
             </div>
 
             {rows > 0 && (
-              <div className="mu-grid">
-                <div className="mu-col">
-                  {order.map((idx, i) => (
-                    <LineupRow key={i} p={m.away_lineup[idx]} />
-                  ))}
+              <>
+                <div className="mu-grid">
+                  <div className="mu-col">
+                    {order.map((idx, i) => (
+                      <LineupRow key={i} p={m.away_lineup[idx]} />
+                    ))}
+                  </div>
+                  <div className="mu-slots">
+                    {order.map((idx, i) => (
+                      <div key={i} className="label mu-slot">
+                        <span className="c-badge">{m.home_lineup[idx]?.slot ?? m.away_lineup[idx]?.slot ?? ""}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mu-col right">
+                    {order.map((idx, i) => (
+                      <LineupRow key={i} p={m.home_lineup[idx]} />
+                    ))}
+                  </div>
                 </div>
-                <div className="mu-slots">
-                  {order.map((idx, i) => (
-                    <div key={i} className="label mu-slot">
-                      {m.home_lineup[idx]?.slot ?? m.away_lineup[idx]?.slot ?? ""}
-                    </div>
-                  ))}
-                </div>
-                <div className="mu-col right">
-                  {order.map((idx, i) => (
-                    <LineupRow key={i} p={m.home_lineup[idx]} />
-                  ))}
-                </div>
-              </div>
+                <MobileLineupList
+                  awayName={teamName(m.away_id)} awayPlayers={order.map((idx) => m.away_lineup[idx])}
+                  homeName={teamName(m.home_id)} homePlayers={order.map((idx) => m.home_lineup[idx])}
+                />
+              </>
             )}
           </article>
         );

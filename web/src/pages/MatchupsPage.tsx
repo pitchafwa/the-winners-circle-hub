@@ -3,6 +3,7 @@ import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
 import { MISSING, pct, pts, signed } from "../lib/format";
 import EmptyState from "../components/EmptyState";
+import MobileLineupList from "../components/MobileLineupList";
 import PlayerHeadshot from "../components/PlayerHeadshot";
 import WeeklyMatchupProjections from "../components/WeeklyMatchupProjections";
 import type { TeamInfo } from "../components/WeeklyMatchupProjections";
@@ -247,7 +248,7 @@ function MatchupCard({
         </div>
         <div className="mu-slots">
           {slotOrder.map((slot, i) => (
-            <div key={i} className="label mu-slot">{slot}</div>
+            <div key={i} className="label mu-slot"><span className="c-badge">{slot}</span></div>
           ))}
         </div>
         <div className="mu-col right">
@@ -256,6 +257,10 @@ function MatchupCard({
           ))}
         </div>
       </div>
+      <MobileLineupList
+        awayName={teamName(m.away.team_id)} awayPlayers={awayAligned}
+        homeName={teamName(m.home.team_id)} homePlayers={homeAligned}
+      />
       <div className="mu-footer">
         <SideMeta side={m.away} />
         <SideMeta side={m.home} />
@@ -271,6 +276,10 @@ function MatchupCard({
             {m.home.lineup.filter((p) => !p.started).map((p) => <PlayerRow key={p.player_id} p={p} />)}
           </div>
         </div>
+        <MobileLineupList
+          awayName={teamName(m.away.team_id)} awayPlayers={m.away.lineup.filter((p) => !p.started)}
+          homeName={teamName(m.home.team_id)} homePlayers={m.home.lineup.filter((p) => !p.started)}
+        />
       </details>
     </article>
   );

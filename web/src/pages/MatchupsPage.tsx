@@ -120,12 +120,13 @@ function alignBySlot(lineup: LineupPlayer[], slotOrder: string[]): (LineupPlayer
 
 function PlayerRow({ p }: { p: LineupPlayer | undefined }) {
   if (!p) return <div className="mu-player" />;
-  // Same reasoning as the projected card's LineupRow: only show the
-  // position tag when it differs from the slot (flex slots, or the bench
-  // list where "slot" isn't a real position at all) — a redundant "QB"
-  // next to a QB-slot player just invited comparison against the slot
-  // column and read as a mismatch even though it wasn't one.
-  const showPosition = p.position !== p.slot;
+  // Same reasoning as the projected card's LineupRow: the position tag is
+  // only useful in the bench list, where "slot" (BE/IR) isn't a real
+  // position at all — for started players (including flex slots like
+  // RB/WR or FLEX) the slot badge already tells you what's needed, and
+  // repeating the player's actual position next to a name we already
+  // recognize is just noise.
+  const showPosition = p.slot === "BE" || p.slot === "IR";
   return (
     <div className="mu-player">
       <span className="mu-name-group">

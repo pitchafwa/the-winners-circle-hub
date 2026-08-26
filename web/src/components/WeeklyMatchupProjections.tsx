@@ -82,13 +82,10 @@ function TeamScore({
 
 function LineupRow({ p }: { p: WeekLineupPlayer | undefined }) {
   if (!p || p.player_id === null) return <div className="mu-player" />;
-  // Only print the position tag when it actually differs from the slot —
-  // a QB in the QB slot repeating "QB" is just noise, and on a flex slot
-  // (RB/WR, FLEX) a repeated-looking tag next to a DIFFERENT position
-  // read as "these don't line up" even though a flex slot legitimately
-  // holds any eligible position. Showing the tag only where it adds real
-  // information makes the genuinely-flexible rows the only ones with one.
-  const showPosition = p.position !== p.slot;
+  // Slot badge already tells you what's needed for every started player
+  // (including flex slots like RB/WR or FLEX) — repeating the player's
+  // actual position next to a name we already recognize is just noise.
+  const showPosition = p.slot === "BE" || p.slot === "IR";
   return (
     <div className="mu-player">
       <span className="mu-name-group">

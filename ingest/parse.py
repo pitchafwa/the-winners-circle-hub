@@ -385,6 +385,30 @@ def roster_player_names(season: int | None = None) -> dict[int, str]:
     return names
 
 
+# Points a player must beat their OWN pre-game projection by, in EACH of
+# their last 3 real games, to earn the "on fire" flame. Hand-calibrated:
+# high enough that it's a real hot streak (not just "happened to edge
+# projection by a point three times"), low enough that it's not
+# vanishingly rare — beating projection by 5+ in a single game is a
+# genuinely good week for most starters, so three straight is a real
+# signal without requiring three literal boom weeks in a row.
+ON_FIRE_MARGIN = 5.0
+
+
+def is_on_fire(recent: list[dict]) -> bool:
+    """True if EACH of a player's last 3 real games (parse.
+    recent_player_performance()'s shape — newest first) beat that game's
+    own projection by at least ON_FIRE_MARGIN. Deliberately per-game, not
+    an average — a huge week 1 game propping up two mediocre ones
+    shouldn't read the same as three genuinely strong games in a row."""
+    if len(recent) < 3:
+        return False
+    return all(
+        r["projected"] is not None and (r["points"] - r["projected"]) >= ON_FIRE_MARGIN
+        for r in recent[:3]
+    )
+
+
 def current_fantasy_week(league: "LeagueData") -> int:
     """The fantasy week actually in progress/coming up right now.
     `scoring_period_id` stays 0 all preseason (no real week has been played
@@ -419,7 +443,9 @@ def pro_team_schedule(season: int | None = None) -> dict[int, dict]:
     return out
 
 
-def recent_player_performance(league: "LeagueData", limit: int = 3) -> dict[int, list[dict]]:
+def recent_player_performance(
+    league: "LeagueData", limit: int = 3, upto_week: int | None = None,
+) -> dict[int, list[dict]]:
     """player_id -> up to the last `limit` completed weeks' real
     {week, points, projected}, newest first — scanned from every team's
     real lineup that week (bench included), regardless of which fantasy
@@ -428,9 +454,17 @@ def recent_player_performance(league: "LeagueData", limit: int = 3) -> dict[int,
     pre-game number for that week (kept the same way completed-week box
     scores already do), so a roster card can show beat/missed projection
     historically — the basis for its own recent_avg_diff metric, not just
-    this week's number."""
+    this week's number.
+
+    `upto_week`, when given, restricts this to weeks at or before it — "as
+    of week W" rather than "as of right now" — so a completed-week box
+    score (rewritten every build, matchups/week-N.json included) can badge
+    a hot streak using only what was actually known at that point in the
+    season, not retroactively using games that hadn't happened yet."""
     out: dict[int, list[dict]] = {}
     for week in sorted(league.weeks.keys(), reverse=True):
+        if upto_week is not None and week > upto_week:
+            continue
         for m in league.weeks[week]:
             for side in (m.home, m.away):
                 if not side:

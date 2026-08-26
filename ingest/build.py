@@ -206,7 +206,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         })
 
     # ---- matchups/week-N.json --------------------------------------------
-    def side_json(tw, week):
+    def side_json(tw, week, on_fire_by_pid):
         if tw is None:
             return None
         c = coach[tw.team_id]["weeks"][week]
@@ -224,7 +224,8 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             "lineup": [
                 {"player_id": p.player_id, "name": p.name, "position": p.position,
                  "slot": p.slot_name, "started": p.started, "actual": p.actual,
-                 "projected": p.projected, "played": p.played}
+                 "projected": p.projected, "played": p.played,
+                 "on_fire": on_fire_by_pid.get(p.player_id, False)}
                 for p in sorted(tw.lineup, key=lambda x: (not x.started, x.slot_id))
             ],
         }
@@ -244,13 +245,20 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             if int(old.stem.replace("week-", "")) not in completed:
                 old.unlink()
     for week in completed:
+        # "As of week W," not "as of right now" — see recent_player_performance's
+        # own docstring for why a rewritten-every-build historical box score
+        # can't just reuse a single global on-fire snapshot.
+        on_fire_by_pid = {
+            pid: parse.is_on_fire(r)
+            for pid, r in parse.recent_player_performance(league, upto_week=week).items()
+        }
         _write(out_dir / "matchups" / f"week-{week}.json", {
             "generated_at": generated_at,
             "week": week,
             "matchups": [
                 {"matchup_period": m.matchup_period, "winner": m.winner,
                  "is_playoff": m.is_playoff, "playoff_tier": m.playoff_tier,
-                 "home": side_json(m.home, week), "away": side_json(m.away, week)}
+                 "home": side_json(m.home, week, on_fire_by_pid), "away": side_json(m.away, week, on_fire_by_pid)}
                 for m in league.weeks[week]
             ],
             "late_swings": metrics.compute_late_swings(league, week, parse.pro_game_dates(season, week)),

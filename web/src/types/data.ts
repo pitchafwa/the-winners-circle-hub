@@ -142,6 +142,7 @@ export interface LineupPlayer {
   actual: number;
   projected: number | null;
   played: boolean;
+  on_fire: boolean;
 }
 
 export interface OptimalSlot {
@@ -357,6 +358,7 @@ export interface WeekLineupPlayer {
   actual: number | null;
   projected: number | null;
   played: boolean;
+  on_fire: boolean;
 }
 
 export interface SimMatchup {
@@ -675,6 +677,7 @@ export interface RosterPlayerCard {
   week_projection: number | null;
   recent: RosterRecentWeek[];
   recent_avg_diff: number | null;
+  on_fire: boolean;
   suggested: boolean;
 }
 

@@ -113,8 +113,22 @@ One file per completed week. `matchups[]`:
 Side: `{team_id, total, lineup_points, home_bonus, adjustment, is_home,
 optimal_points, coach_rating, bench_points_lost,
 optimal_lineup[] {slot, player_id, player, points},
-lineup[] {player_id, name, position, slot, started, actual, projected, played}}`.
-Lineup is sorted starters-first.
+lineup[] {player_id, name, position, slot, started, actual, projected, played,
+on_fire}}`. Lineup is sorted starters-first.
+
+`on_fire` (also on `sim.json`'s `home_lineup`/`away_lineup` and
+`roster.json`'s player cards — same field, same rule, computed once in
+`parse.is_on_fire()`): true when EACH of a player's last 3 real games beat
+that game's own projection by `ON_FIRE_MARGIN` (5.0) points — per-game, not
+an average, so one huge week propping up two mediocre ones doesn't count.
+For a completed week's box score specifically, this is computed "as of
+that week" (`recent_player_performance(..., upto_week=week)`), not "as of
+right now" — `matchups/week-N.json` is rewritten every build for every
+completed week, so a global current-moment snapshot would incorrectly
+retroactively badge old weeks using games that hadn't happened yet at the
+time. `sim.json`/`roster.json` are both inherently "right now" already
+(never built for a past/finished season), so they use the plain
+current-moment lookup.
 
 `late_swings[]`: matchups where the leader flipped once the week's final wave
 of games (in practice almost always Monday Night Football — computed from
@@ -298,7 +312,9 @@ the normal-CDF calc.
 
 `home_lineup`/`away_lineup` are `optimal_week_projection()`'s real-first
 lineup, in the league's real slot order: `{player_id, name, position,
-slot, actual, projected, played}`. Each slot holds the manager's real
+slot, actual, projected, played, on_fire}` (`on_fire` merged in at the
+`simulate.py` call site — see `matchups/week-N.json`'s section above for
+the full rule). Each slot holds the manager's real
 ESPN-entered player when one exists; only a genuinely blank slot gets the
 best available bench player instead. ALWAYS one entry per real starting
 slot (`league.starting_slots`), even for a slot nobody on the roster (real
@@ -361,7 +377,7 @@ slot-count-limited the same way starters are).
 
 Each player card: `{player_id, name, position, pro_team, slot,
 injury_status, on_bye, next_game, week_projection, recent[],
-recent_avg_diff, suggested}`.
+recent_avg_diff, on_fire, suggested}`.
 - `pro_team`: NFL team abbreviation (`parse.pro_team_schedule()`, sourced
   from the same cached `proschedule.json` the refresh-schedule generator
   uses for its own cron windows).
@@ -383,6 +399,15 @@ recent_avg_diff, suggested}`.
   entries with a real projection count). `null` with fewer than one
   qualifying entry. The frontend's own read of "who's running hot or cold
   lately."
+- `on_fire`: `parse.is_on_fire()` — `true` when EACH of the last 3 real
+  games individually beat that game's projection by `ON_FIRE_MARGIN` (5.0)
+  points, not just the average. Renders as a 🔥 next to the name on both
+  this table and the matchup cards. Calibrated by hand against real
+  2025 data (checked league-wide across the full season): ~15 total
+  on-fire instances across ~3,200 player-weeks (~0.5%), spread across most
+  weeks with 1-3 players each — a real, meaningful-but-not-common signal,
+  not something that lights up half a roster or something that only ever
+  fires for a handful of players all season.
 
 ## `{season}/schedule_swap.json` (absent preseason)
 

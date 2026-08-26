@@ -8,23 +8,17 @@ const SILHOUETTE =
   "%3Cpath d='M3.5 22c0-4.7 3.8-8 8.5-8s8.5 3.3 8.5 8' fill='%23AAB2C8'/%3E" +
   "%3C/svg%3E";
 
-export default function PlayerHeadshot({ playerId, size = 28 }: { playerId: number; size?: number }) {
+// Sizing lives in CSS (.player-headshot + a modifier class per call site),
+// not an inline style, specifically so a media query can shrink the
+// matchup-card variant on narrow viewports without a JS resize listener —
+// see .mu-headshot in global.css.
+export default function PlayerHeadshot({ playerId, className = "" }: { playerId: number; className?: string }) {
   return (
     <img
+      className={`player-headshot ${className}`.trim()}
       src={`https://a.espncdn.com/i/headshots/nfl/players/full/${playerId}.png`}
       alt=""
-      width={size}
-      height={size}
       loading="lazy"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        objectFit: "cover",
-        background: "var(--paper-2)",
-        verticalAlign: "middle",
-        flexShrink: 0,
-      }}
       onError={(e) => {
         const img = e.currentTarget;
         img.onerror = null;

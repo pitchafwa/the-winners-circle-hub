@@ -74,6 +74,7 @@ def build_roster_cards(season: int, league: parse.LeagueData) -> dict[int, dict]
                 "week_projection": week_projection,
                 "recent": player_recent,
                 "recent_avg_diff": round(sum(diffs) / len(diffs), 1) if diffs else None,
+                "on_fire": parse.is_on_fire(player_recent),
                 "suggested": False,
                 # kept off the final card — only needed for the bench-fill
                 # valuation pass below, stripped before this dict is used
@@ -123,7 +124,7 @@ def build_roster_cards(season: int, league: parse.LeagueData) -> dict[int, dict]
                     "pro_team": None, "slot": parse.SLOT_NAMES.get(slot_id, str(slot_id)),
                     "injury_status": None, "on_bye": False, "next_game": None,
                     "week_projection": None, "recent": [], "recent_avg_diff": None,
-                    "suggested": False,
+                    "on_fire": False, "suggested": False,
                 }
 
         for group in (starters, bench, ir):

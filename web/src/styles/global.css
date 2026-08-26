@@ -352,6 +352,27 @@ table.stat tbody tr:hover {
   background: var(--paper-2);
 }
 
+/* Player headshot — base size (roster table). Call sites needing a
+   different size add a modifier class (e.g. .mu-headshot) that
+   redeclares width/height; see PlayerHeadshot.tsx. */
+.player-headshot {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--paper-2);
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* "On fire" flame — beat projection by a real margin in each of the last
+   3 games (ingest/parse.py: ON_FIRE_MARGIN). Small enough to sit right
+   next to a name without competing with it. */
+.on-fire-flame {
+  font-size: 0.8em;
+  margin-left: 0.2rem;
+}
+
 /* ------------------------------------------------------------------ */
 /* Superlative cards — the signature element. Award certificates.      */
 /* ------------------------------------------------------------------ */
@@ -936,10 +957,16 @@ select.control {
      mechanism keeping their rows in sync, so that 2px-per-row gap
      compounded linearly down the list — a real, confirmed, and
      increasingly visible drift by the bottom rows, not a rounding
-     artifact. An explicit shared height forces both to match exactly. */
+     artifact. An explicit shared height forces both to match exactly.
+     center, not baseline — baseline positions each row's content relative
+     to ITS OWN font metrics, and .mu-slot's smaller font (0.62rem vs
+     0.85rem) has a higher baseline within the same 2rem box, which is
+     what made slot labels sit visibly higher than the player rows next
+     to them. Centering both the same way makes them align exactly
+     regardless of font-size differences. */
   height: 2rem;
   box-sizing: border-box;
-  align-items: baseline;
+  align-items: center;
 }
 
 .mu-slot { justify-content: center; font-size: 0.62rem; }
@@ -949,14 +976,20 @@ select.control {
   align-items: center;
   gap: 0.3rem;
   min-width: 0;
-  /* .mu-player's own align-items is baseline (see comment above), which
-     would sink an <img> to its own bottom edge — this centers just the
-     headshot+name group instead of changing the row's shared alignment. */
-  align-self: center;
 }
+/* Home side (right column): headshot is the LAST thing shown per player,
+   not the first — reversing just this inner group (not the whole
+   .mu-player row, which already reverses name-group vs. points above)
+   flips headshot/name to (name, headshot) while leaving the position tag
+   attached to the name text exactly where it was. */
+.mu-col.right .mu-name-group { flex-direction: row-reverse; }
 .mu-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mu-pos { font-size: 0.7rem; }
 .mu-proj { font-size: 0.72rem; }
+
+/* Headshot sizing lives here (not inline on the <img>) so the mobile
+   media query below can shrink it without a JS resize listener. */
+.mu-headshot { width: 1.125rem; height: 1.125rem; }
 
 .mu-footer {
   display: flex;
@@ -973,6 +1006,20 @@ select.control {
 @media (max-width: 640px) {
   .mu-slots { display: none; }
   .mu-grid { grid-template-columns: 1fr 1fr; }
+  /* Narrow columns + a headshot + name + position + points all fighting
+     for one line is exactly what was overflowing the fixed 2rem row and
+     bleeding into the row below. Below 640px each row grows to fit
+     whatever it actually needs (auto height, wrap allowed) instead of
+     clipping — rows between the two side-by-side columns no longer need
+     to line up pixel-for-pixel here since .mu-slots (the thing that
+     needed that alignment) is already hidden at this width. */
+  .mu-player {
+    height: auto;
+    min-height: 2rem;
+    flex-wrap: wrap;
+    row-gap: 0.1rem;
+  }
+  .mu-headshot { width: 0.875rem; height: 0.875rem; }
 }
 
 /* ------------------------------------------------------------------ */

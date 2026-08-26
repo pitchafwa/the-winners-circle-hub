@@ -42,10 +42,11 @@ function PlayerRow({ p }: { p: LineupPlayer | undefined }) {
   return (
     <div className="mu-player">
       <span className="mu-name-group">
-        <PlayerHeadshot playerId={p.player_id} size={18} />
+        <PlayerHeadshot playerId={p.player_id} className="mu-headshot" />
         <span className="mu-name">
           {p.name}
           {showPosition && <span className="muted mu-pos"> {p.position}</span>}
+          {p.on_fire && <span className="on-fire-flame" title="On fire — beat projection by 5+ points in each of the last 3 games">🔥</span>}
         </span>
       </span>
       <span className="num mu-pts">

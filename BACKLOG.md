@@ -160,6 +160,21 @@ built — greenlight individually.
   title drought, no longest playoff-miss streak — all computable from data
   already on file (`StandingsRow.streak` per season, badge history).
 
+## Parked (2026-08-26)
+
+Tommy's call, explicitly not building these for now:
+
+- **Recent transactions impact tracker** (League page section above) — the
+  Recent Activity feed already exists and already shows who added/dropped/
+  traded whom; this was specifically the extra "how's it panning out"
+  layer (points started since pickup, vs. projection) on top of it. Parked
+  as-is, not built.
+- **Waiver wire activity leaderboard** (see "League dashboard ideas" below)
+  — same status, parked.
+- **Record Book streak-based records** (History pages section above) —
+  longest win streak / title drought / playoff-miss streak. Parked, not
+  built.
+
 ## Built (2026-08-15)
 
 All of the below shipped in one batch: roster-ownership timeline (new
@@ -234,6 +249,46 @@ from every mention of a team yet.
     activity feed could follow), and whether `PlayerHeadshot.tsx` (built
     2026-08-27 for the roster table) gets reused inside the card too
     (yes, trivially — it's already a standalone component).
+
+### Built (2026-08-26)
+
+Tommy greenlit the spike above, scoped to League/My Team/Matchups only —
+explicitly NOT Franchise pages or Record Book.
+
+- New `lib/playerCard.ts` (fetch + types), `state/PlayerCardContext.tsx`
+  (a `PlayerCardProvider`/`usePlayerCard()` context so any component can
+  open a card without prop-drilling a callback down through every layer —
+  mounted once in `Layout.tsx`, wrapping every route), `components/
+  PlayerCardTrigger.tsx` (wraps a player's name, opens the card on click;
+  a D/ST's synthetic negative player_id renders as plain non-interactive
+  text — nothing to fetch, real ESPN athlete ids are always positive), and
+  `components/PlayerCardModal.tsx` (the card itself: fantasy rank/owned%
+  stat row, next game, latest Rotowire report or ESPN news as fallback,
+  season outlook paragraph, awards, recent games and season stats tables —
+  each table renders its own section label or nothing at all, rather than
+  the parent pre-checking "is there data" separately, after a real bug
+  where a stale duplicate of that check let an empty "Recent games" header
+  through for a rookie whose gameLog events didn't fully match the shared
+  per-game metadata dict).
+- Wired into: League's Recent Activity feed (trade players, waiver/FA/drop
+  events), My Team's roster table + season projection-report table +
+  schedule's top-scorers column, and every Matchups lineup row (completed-
+  week desktop grid, the mobile stacked list shared by both matchup card
+  types, the pre-game projection cards, and a completed week's award
+  headline cards). Verified NOT present on Franchise or Record Book pages,
+  per Tommy's scoping.
+- One real thing learned live: `gameLog` always reflects the CURRENT real
+  NFL season/week (it's a live ESPN endpoint, not scoped to whatever past
+  fantasy season the app happens to be displaying) — during the 2026
+  preseason this means "Recent games" is empty for literally everyone,
+  correctly hidden rather than showing an empty table.
+- Verified live end-to-end: real fetch/render for a League activity
+  player, a My Team roster player (with position/team subtitle), and a
+  completed 2025 Matchups player (real "Season stats" row); Escape key,
+  clicking the overlay, and the close button all close it; D/ST rows have
+  no trigger; zero triggers found on Franchise or Record Book pages; no
+  horizontal overflow at 375px width. `tsc --noEmit` and `pnpm build` both
+  clean, no console errors.
 
 - Dynasty Power Rankings variant
 - League-wide positional trends over time (multi-week chart on top of the

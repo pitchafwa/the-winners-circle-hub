@@ -751,20 +751,45 @@ def load_league(season: int | None = None) -> LeagueData:
         if matchups:
             league.weeks[week] = matchups
 
-    # Transaction history (for Waiver Hero and the activity feed)
+    # Transaction history (for Waiver Hero and the activity feed).
+    # ESPN's mTransactions2 endpoint ignores the `scoringPeriodId` request
+    # param entirely — every per-week fetch actually returns the league's
+    # FULL transaction history to date, not just that week's slice (checked
+    # directly: week0's and week1's cached responses are byte-for-byte the
+    # same 137 transactions). Since every cached `transactions-week*.json`
+    # file is really a full-history snapshot, looping over all of them and
+    # appending each one's transactions double/triple/N-counted every real
+    # event — dedup on ESPN's own transaction `id` (stable across every
+    # snapshot that happens to include it) fixes this without needing to
+    # change the fetch/cache layer itself.
+    seen_tx_ids: set[str] = set()
     for path in sorted(_season_dir(season).glob("transactions-week*.json")):
         week = int(path.stem.replace("transactions-week", ""))
         raw_tx = _load(season, f"transactions-week{week}")
         for tx in raw_tx.get("transactions", []):
             if tx.get("status") != "EXECUTED":
                 continue
+            tx_id = tx.get("id")
+            if tx_id is not None:
+                if tx_id in seen_tx_ids:
+                    continue
+                seen_tx_ids.add(tx_id)
             date = tx.get("processDate") or tx.get("proposedDate") or 0
             tx_type = tx.get("type")
+            # Since every snapshot is really full-history (see above), the
+            # loop's own `week` (from the filename) is meaningless as an
+            # event week now — a transaction that really happened in week 5
+            # would get permanently mislabeled week 0 just because week0's
+            # snapshot was fetched after it existed. Each transaction
+            # carries its own real `scoringPeriodId`, which is what
+            # actually matters downstream (ownership.py's stint-boundary
+            # logic keys off `ActivityEvent.week`).
+            tx_week = tx.get("scoringPeriodId", week)
             for item in tx.get("items", []):
                 item_type = item.get("type")
                 if item_type == "ADD" and tx_type in ("FREEAGENT", "WAIVER"):
                     action = "WAIVER_ADDED" if tx_type == "WAIVER" else "FA_ADDED"
-                    ev = ActivityEvent(date=date, week=week, action=action,
+                    ev = ActivityEvent(date=date, week=tx_week, action=action,
                                        team_id=item.get("toTeamId") or tx.get("teamId"),
                                        player_id=item["playerId"],
                                        bid=tx.get("bidAmount", 0) if tx_type == "WAIVER" else 0)
@@ -772,12 +797,12 @@ def load_league(season: int | None = None) -> LeagueData:
                     league.adds.setdefault((ev.team_id, ev.player_id), []).append(date)
                 elif item_type == "DROP":
                     league.activity.append(ActivityEvent(
-                        date=date, week=week, action="DROPPED",
+                        date=date, week=tx_week, action="DROPPED",
                         team_id=item.get("fromTeamId") or tx.get("teamId"),
                         player_id=item["playerId"]))
                 elif tx_type == "TRADE_ACCEPT":
                     league.activity.append(ActivityEvent(
-                        date=date, week=week, action="TRADED",
+                        date=date, week=tx_week, action="TRADED",
                         team_id=item.get("fromTeamId") or tx.get("teamId"),
                         player_id=item["playerId"],
                         to_team_id=item.get("toTeamId")))

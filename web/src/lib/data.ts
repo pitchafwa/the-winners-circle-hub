@@ -24,7 +24,7 @@ async function fetchJson(path: string, optional: boolean): Promise<unknown> {
   const key = `${path}|${optional}`;
   const cached = cache.get(key);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
-  const res = await fetch(`/data/${path}`);
+  const res = await fetch(`${import.meta.env.BASE_URL}data/${path}`);
   // Dev server and Netlify SPA fallbacks answer missing files with index.html
   // and a 200 — a non-JSON content-type means the file does not exist.
   const isJson = (res.headers.get("content-type") ?? "").includes("json");

@@ -82,25 +82,35 @@ built.
 
 ## Deploying
 
-Nothing is deployed publicly yet. When ready:
+Live on **GitHub Pages** — `.github/workflows/deploy-pages.yml` builds and
+deploys on every push to `main` (both real code pushes and `refresh.yml`'s
+automated data-commit pushes trigger it, since both push to `main`).
 
-1. **Push this repo to GitHub.**
-2. **Connect it to Netlify** (`netlify.toml` at the repo root already has the
-   right build config: base `web/`, `pnpm build`, publishes `web/dist`, with
-   the SPA redirect React Router needs).
+GitHub Pages was chosen over Netlify specifically because it has no
+per-deploy cost or limit — Netlify's credit-based pricing charges per
+production deploy, which adds up fast against a refresh cadence of up to
+~20 pushes on a single game day. See `deploy-pages.yml`'s own header for
+the full reasoning.
+
+One-time setup for a fresh clone of this repo:
+
+1. **Push this repo to GitHub** (must be public, or a paid GitHub plan, for
+   Pages to serve it).
+2. **Enable Pages via GitHub Actions**: Settings → Pages → Build and
+   deployment → Source → "GitHub Actions". Until this is set,
+   `deploy-pages.yml`'s deploy step fails even though the build succeeds.
 3. **If unlocking 2018–2023 history in CI**, add `ESPN_S2` and `SWID` as
    GitHub repository secrets (Settings → Secrets and variables → Actions).
-4. **The refresh workflow** (`.github/workflows/refresh.yml`) is
-   manual-trigger only (`workflow_dispatch`) by design — the intended cron
-   schedule is written in a comment at the top of that file. Uncomment it
-   only when the site is actually live and ready to auto-refresh; a *live*
-   `schedule:` trigger starts firing the moment it lands on the default
-   branch, so leaving it commented is the actual disable mechanism, not just
-   a note.
-5. Trigger the workflow once manually (Actions tab → Refresh league data →
-   Run workflow) before enabling the schedule, to confirm it runs clean
-   against real GitHub infrastructure — it hasn't been tested there yet,
-   only run locally.
+4. **`WORKFLOW_PAT`** (a PAT with `workflow` scope) as a repo secret — needed
+   by `update-refresh-schedule.yml` to push changes under
+   `.github/workflows/` (the default `GITHUB_TOKEN` is blocked from that).
+5. `refresh.yml`'s schedule is live by default — see that file's header for
+   the generated per-game cron windows.
+
+The site's base URL is a GitHub Pages *project* site
+(`https://<owner>.github.io/the-winners-circle-hub/`), not a root domain —
+`vite.config.ts`'s `base` and `main.tsx`'s router `basename` both key off
+the `GITHUB_PAGES` env var `deploy-pages.yml` sets during the build.
 
 ## Project structure
 
@@ -125,7 +135,9 @@ league-hub/
 │   ├── public/data/       generated JSON — the only data source the UI reads
 │   ├── vite-plugins/      local-dev-only admin API bridge
 │   └── src/
-├── .github/workflows/refresh.yml   scheduled data refresh (currently manual-only)
-├── netlify.toml
+├── .github/workflows/
+│   ├── refresh.yml                  scheduled data refresh (real per-game cron)
+│   ├── update-refresh-schedule.yml  weekly re-check of the real NFL schedule
+│   └── deploy-pages.yml             build + deploy to GitHub Pages
 └── DATA.md           the JSON contract — read this before touching schema
 ```

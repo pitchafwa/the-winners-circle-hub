@@ -1,0 +1,87 @@
+name: Deploy to GitHub Pages
+
+# Replaces the old Netlify git-integration. Netlify billed 15 credits per
+# production deploy, and refresh.yml pushes to main up to ~20 times on a
+# single game day (every 15 minutes while games are live) — that blew
+# through even Netlify's Pro tier over a season. GitHub Pages has no
+# per-deploy cost or limit, so it's the right host for a site that
+# redeploys this often. See refresh.yml's own header for the refresh
+# cadence this responds to.
+#
+# Runs on every push to main — both real code changes AND refresh.yml's
+# automated data-commit pushes trigger this the same way, since both are
+# pushes to main. `concurrency` cancels a still-running deploy if a newer
+# one starts (the common case on a game day: a new data push lands before
+# the previous deploy finished), so only the latest data ever actually
+# ships — an in-flight deploy for stale data is just wasted work.
+#
+# One-time manual setup this needs (can't be done from a workflow file):
+# this repo's Settings -> Pages -> Build and deployment -> Source ->
+# "GitHub Actions" (instead of "Deploy from a branch"). Until that's set,
+# this workflow's deploy step will fail with a "Pages site not found"
+# style error even though the build succeeds.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install web dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (GitHub Pages project-site base path)
+        working-directory: web
+        env:
+          GITHUB_PAGES: "true"
+        run: pnpm build
+
+      # React Router client-side routes (e.g. /team, /history, /admin/trades)
+      # need every path to fall through to index.html — GitHub Pages has no
+      # server-side rewrite engine like Netlify's old [[redirects]] block, so
+      # this is the standard SPA-on-Pages trick: Pages serves 404.html for
+      # any unknown path, so a copy of index.html there gets the app to load
+      # and let React Router take over client-side.
+      - name: SPA fallback (404.html = index.html)
+        run: cp web/dist/index.html web/dist/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

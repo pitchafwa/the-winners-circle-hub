@@ -30,15 +30,25 @@ PICK_FUTURES_HORIZON_YEARS = 3
 # ESPN's box-score API still returns per-player lineup + points data for
 # these seasons even though the box-score web page stops displaying it —
 # confirmed by reconciling summed starter points against ESPN's own recorded
-# team totals. 2024+ already gets this data through fetch_season() as each
-# year's "current" season. 2018 is full quality (same shape as 2019+, real
-# bench). 2017 is real but reduced: starters only, no bench, no exact lineup
-# slot (parse.py falls back to the player's default position). 2012-2016
-# were tested and rejected — ESPN's archive for those years is missing a
+# team totals. 2018 is full quality (same shape as 2019+, real bench). 2017
+# is real but reduced: starters only, no bench, no exact lineup slot
+# (parse.py falls back to the player's default position). 2012-2016 were
+# tested and rejected — ESPN's archive for those years is missing a
 # meaningful, inconsistent fraction of player entries per week (worse the
 # further back), so summed lineups don't reconcile against the real team
 # score and there's no reliable way to detect/fill the gaps.
-HISTORICAL_BOXSCORE_YEARS = range(2017, 2024)
+#
+# Upper bound is config.SEASON (exclusive), not a fixed year — fetch_season()
+# only ever fetches box scores for the CURRENT live season, so once a season
+# stops being current (2024, 2025, ...) it needs this same historical path
+# to stay regenerable at all, especially on a cache-cold environment (CI)
+# that can't just rely on a box-score cache fetched back when that season
+# WAS current (2026-08-26: this exact gap silently wiped 2024/2025's
+# matchups data on the first automated CI run, since nothing re-fetched
+# them and the stale-file cleanup below took the resulting empty
+# completed_weeks() as "these weeks don't exist" instead of "couldn't
+# check this run").
+HISTORICAL_BOXSCORE_YEARS = range(2017, config.SEASON)
 
 
 def _write(path, payload):
@@ -177,15 +187,22 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     })
 
     # ---- superlatives.json ------------------------------------------------
-    _write(out_dir / "superlatives.json", {
-        "generated_at": generated_at,
-        "awards_meta": metrics.AWARD_META,
-        "awards": [
-            {"week": a.week, "key": a.award_key, "team_id": a.team_id,
-             "value": a.value, "detail": a.detail}
-            for a in awards
-        ],
-    })
+    # Same cache-cold hazard as the matchups cleanup above: `awards` comes
+    # from `league.weeks` (via compute_superlatives), so a run that couldn't
+    # fetch this season's box scores computes an empty award list — writing
+    # that unconditionally would silently erase a season's real award
+    # history. Only skip the write when there's already a real file to
+    # protect; a genuinely new season with no games yet still gets one.
+    if completed or not (out_dir / "superlatives.json").exists():
+        _write(out_dir / "superlatives.json", {
+            "generated_at": generated_at,
+            "awards_meta": metrics.AWARD_META,
+            "awards": [
+                {"week": a.week, "key": a.award_key, "team_id": a.team_id,
+                 "value": a.value, "detail": a.detail}
+                for a in awards
+            ],
+        })
 
     # ---- matchups/week-N.json --------------------------------------------
     def side_json(tw, week):
@@ -212,9 +229,19 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         }
 
     # drop stale week files beyond what the league counts (e.g. old week-17s)
-    for old in (out_dir / "matchups").glob("week-*.json") if (out_dir / "matchups").exists() else []:
-        if int(old.stem.replace("week-", "")) not in completed:
-            old.unlink()
+    # — but only when this run actually has real box-score data to compare
+    # against. `completed` empty doesn't mean "this season has no weeks," it
+    # can just as easily mean "the box-score cache for this season wasn't
+    # available this run" (a cache-cold environment — CI never persists
+    # ingest/.cache/ between runs — and this season isn't the one live
+    # fetch_season() covers). Wiping every real matchup file on that
+    # ambiguity actually happened once (2026-08-26, cost 2024/2025's real
+    # historical data); only clean up once we have positive evidence
+    # (completed is non-empty) that we're looking at real, current data.
+    if completed:
+        for old in (out_dir / "matchups").glob("week-*.json") if (out_dir / "matchups").exists() else []:
+            if int(old.stem.replace("week-", "")) not in completed:
+                old.unlink()
     for week in completed:
         _write(out_dir / "matchups" / f"week-{week}.json", {
             "generated_at": generated_at,
@@ -298,29 +325,39 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
                              ("wins", "losses", "ties", "pct", "expected_wins", "luck")},
             },
         })
-    _write(out_dir / "teams.json", {
-        "generated_at": generated_at,
-        "league_weekly_avg": week_avgs,
-        "teams": teams_out,
-    })
+    # Same cache-cold hazard as matchups/superlatives/activity above —
+    # `weekly`/`projection_report` come from the per-week box-score cache,
+    # so an empty `completed` would otherwise wipe a season's real
+    # week-by-week team history.
+    if completed or not (out_dir / "teams.json").exists():
+        _write(out_dir / "teams.json", {
+            "generated_at": generated_at,
+            "league_weekly_avg": week_avgs,
+            "teams": teams_out,
+        })
 
-    # ---- activity.json ----------------------------------------------------
-    _write(out_dir / "activity.json", {
-        "generated_at": generated_at,
-        "events": [
-            {"date": e.date, "week": e.week, "action": e.action, "team_id": e.team_id,
-             "player_id": e.player_id,
-             "player_name": names.get(e.player_id, f"Player {e.player_id}"),
-             "bid": e.bid, "to_team_id": e.to_team_id}
-            for e in league.activity
-        ],
-        "trades": trades,
-        "pick_ownership": [
-            {**pick_tracking.resolve(p["season"], p["round"], p["original_team_id"], p["owned_by_team_id"]),
-             "via": p.get("via", "")}
-            for p in metrics.pick_ownership(season)
-        ],
-    })
+    # ---- activity.json ------------------------------------------------------
+    # `events` comes from the same per-week transaction cache as the
+    # matchups/superlatives box-score data — same cache-cold hazard, same
+    # guard: don't erase a season's real transaction history just because
+    # this run couldn't refetch it.
+    if completed or not (out_dir / "activity.json").exists():
+        _write(out_dir / "activity.json", {
+            "generated_at": generated_at,
+            "events": [
+                {"date": e.date, "week": e.week, "action": e.action, "team_id": e.team_id,
+                 "player_id": e.player_id,
+                 "player_name": names.get(e.player_id, f"Player {e.player_id}"),
+                 "bid": e.bid, "to_team_id": e.to_team_id}
+                for e in league.activity
+            ],
+            "trades": trades,
+            "pick_ownership": [
+                {**pick_tracking.resolve(p["season"], p["round"], p["original_team_id"], p["owned_by_team_id"]),
+                 "via": p.get("via", "")}
+                for p in metrics.pick_ownership(season)
+            ],
+        })
 
     # ---- extras: swap, positions, recaps, draft, sim ----------------------
     if completed:

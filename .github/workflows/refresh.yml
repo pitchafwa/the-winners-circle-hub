@@ -126,6 +126,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ingest/.cache/ is gitignored (it's raw ESPN/KTC API responses, not
+      # something that belongs in the repo) — but a fresh checkout with an
+      # empty cache means EVERY run has to cold-fetch everything, including
+      # immutable historical box scores that never change once a week is
+      # final. Worse than just slow: build.py takes an empty box-score cache
+      # for a past season as "this season has no data" and (before
+      # 2026-08-26) would erase that season's real matchups/superlatives/
+      # activity/teams history as a result. Restoring this across runs is
+      # the actual fix — the per-write guards added the same day are a
+      # backstop, not a substitute. Always saves under a fresh key (the
+      # cache only ever grows — a new completed week, a newly-fetched past
+      # season) and restores the most recent prior save via the key prefix.
+      - uses: actions/cache@v4
+        with:
+          path: ingest/.cache
+          key: espn-cache-${{ github.run_id }}
+          restore-keys: |
+            espn-cache-
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -143,7 +162,9 @@ jobs:
           LEAGUE_ID: "29471"
           # Set these as repository secrets before enabling the schedule above.
           # Public-league fetches work without them; they're only needed to
-          # keep 2018-2023 history refreshable (ESPN gates that far back).
+          # keep 2017-2023 history refreshable (ESPN gates that far back) —
+          # and only on the FIRST run that ever needs to fetch a given past
+          # season, since the cache above persists it after that.
           ESPN_S2: ${{ secrets.ESPN_S2 }}
           SWID: ${{ secrets.SWID }}
         run: ~/.local/bin/uv run python build.py

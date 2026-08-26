@@ -20,7 +20,7 @@ const POSTURE_ORDER: Record<SpectrumLabel, number> = {
 
 export default function ContendRebuildTable({ spectrum }: { spectrum: Spectrum }) {
   const { teamName } = useApp();
-  const sort = useSort<Spectrum["teams"][number]>("ratio", 1, (r, key) => {
+  const sort = useSort<Spectrum["teams"][number]>("label", 1, (r, key) => {
     if (key === "team") return teamName(r.team_id);
     if (key === "label") return POSTURE_ORDER[r.label];
     return r[key as keyof typeof r] as number;

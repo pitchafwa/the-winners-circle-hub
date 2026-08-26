@@ -62,76 +62,49 @@ export default function StandingsTable({ rows }: { rows: StandingsRow[] }) {
   };
 
   return (
-    <>
-      <div className="table-wrap standings-table">
-        <table className="stat">
-          <thead>
-            <tr>
-              {COLS.map((c) => (
-                <th
-                  key={c.key}
-                  title={c.title}
-                  className={`sortable${c.numeric ? " num" : ""}`}
-                  aria-sort={sort.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : undefined}
-                  onClick={() => clickSort(c)}
-                  scope="col"
-                >
-                  {c.label}
-                  {sort.key === c.key ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((r) => {
-              const team = teamsById.get(r.team_id);
-              return (
-                <tr key={r.team_id}>
-                  {COLS.map((c) =>
-                    c.key === "team" ? (
-                      <td key="team">
-                        <strong>{team?.name ?? `Team ${r.team_id}`}</strong>{" "}
-                        <span className="muted" style={{ fontSize: "0.78rem" }}>
-                          {team?.nickname ?? team?.owner}
-                        </span>
-                      </td>
-                    ) : (
-                      <td key={c.key} className={c.numeric ? "num" : undefined}>
-                        {c.render(r)}
-                      </td>
-                    ),
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="standings-cards">
-        {sorted.map((r) => {
-          const team = teamsById.get(r.team_id);
-          return (
-            <div className="standings-card" key={r.team_id}>
-              <div className="row">
-                <strong>
-                  {r.seed ? `${r.seed}. ` : ""}
-                  {team?.name ?? `Team ${r.team_id}`}
-                </strong>
-                <span className="num">{r.record}</span>
-              </div>
-              <div className="row muted">
-                <span>PF {pts(r.points_for)} · PA {pts(r.points_against)}</span>
-                <span>All-play {r.all_play_pct === null ? MISSING : r.all_play_record}</span>
-              </div>
-              <div className="row muted">
-                <span>Luck {signed(r.luck, 2)}</span>
-                <span>Optimal {pts(r.optimal_points)} · Coach {pct(r.coach_rating)}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </>
+    <div className="table-wrap">
+      <table className="stat">
+        <thead>
+          <tr>
+            {COLS.map((c) => (
+              <th
+                key={c.key}
+                title={c.title}
+                className={`sortable${c.numeric ? " num" : ""}`}
+                aria-sort={sort.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : undefined}
+                onClick={() => clickSort(c)}
+                scope="col"
+              >
+                {c.label}
+                {sort.key === c.key ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((r) => {
+            const team = teamsById.get(r.team_id);
+            return (
+              <tr key={r.team_id}>
+                {COLS.map((c) =>
+                  c.key === "team" ? (
+                    <td key="team">
+                      <strong>{team?.name ?? `Team ${r.team_id}`}</strong>{" "}
+                      <span className="muted" style={{ fontSize: "0.78rem" }}>
+                        {team?.nickname ?? team?.owner}
+                      </span>
+                    </td>
+                  ) : (
+                    <td key={c.key} className={c.numeric ? "num" : undefined}>
+                      {c.render(r)}
+                    </td>
+                  ),
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

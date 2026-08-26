@@ -585,6 +585,31 @@ table.stat tr.cutline td { border-bottom: 2px solid var(--ink); }
 .playoff-track-risk { background: var(--negative); opacity: 0.55; }
 .playoff-track-upside { background: var(--positive); opacity: 0.55; }
 
+/* Below ~640px the fixed team (13rem) + pct (7rem) columns alone exceed
+   the viewport, squeezing the bar's flex:1 1 auto share toward zero width
+   — the actual bug report (bars condensed to illegible slivers). A
+   horizontal-scroll wrapper (this site's usual fix for a wide table)
+   would work but reads worse for a bar chart specifically: you'd have to
+   scroll to see the far end of the very thing you're trying to read at a
+   glance. Wrapping onto two lines instead — name+pct on line one, the bar
+   at full width on line two — keeps the whole bar visible with no scroll,
+   and needs no JSX change since flex-basis:100% on the track alone is
+   enough to force the wrap. */
+@media (max-width: 640px) {
+  .playoff-track-row {
+    flex-wrap: wrap;
+    row-gap: 0.3rem;
+  }
+  .playoff-track-team {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .playoff-track {
+    flex: 1 1 100%;
+    height: 0.9rem;
+  }
+}
+
 /* Activity feed */
 .feed {
   list-style: none;
@@ -1004,27 +1029,7 @@ table.h2h th[scope="row"] {
   letter-spacing: normal;
 }
 
-/* Standings: table on desktop, stacked cards under 640px */
-.standings-cards { display: none; }
-
-@media (max-width: 640px) {
-  .standings-table { display: none; }
-  .standings-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  .standings-card {
-    background: var(--paper-2);
-    border: 2px solid var(--ink);
-    border-radius: 10px;
-    padding: 0.9rem 1rem;
-  }
-  .standings-card .row {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.15rem 0;
-    font-size: 0.86rem;
-  }
-}
+/* Standings: same real, sortable table at every width — mobile cards
+   couldn't carry column sorting and looked mediocre, so this is just
+   .table-wrap's usual horizontal-scroll pattern (every other table on
+   the site already handles narrow viewports this way). */

@@ -3,6 +3,7 @@ import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
 import { MISSING, pct, pts } from "../lib/format";
 import EmptyState from "../components/EmptyState";
+import PlayerHeadshot from "../components/PlayerHeadshot";
 import WeeklyMatchupProjections from "../components/WeeklyMatchupProjections";
 import type { TeamInfo } from "../components/WeeklyMatchupProjections";
 import { displayOrderIndices } from "../lib/lineupOrder";
@@ -40,9 +41,12 @@ function PlayerRow({ p }: { p: LineupPlayer | undefined }) {
   const showPosition = p.position !== p.slot;
   return (
     <div className="mu-player">
-      <span className="mu-name">
-        {p.name}
-        {showPosition && <span className="muted mu-pos"> {p.position}</span>}
+      <span className="mu-name-group">
+        <PlayerHeadshot playerId={p.player_id} size={18} />
+        <span className="mu-name">
+          {p.name}
+          {showPosition && <span className="muted mu-pos"> {p.position}</span>}
+        </span>
       </span>
       <span className="num mu-pts">
         {pts(p.actual)}

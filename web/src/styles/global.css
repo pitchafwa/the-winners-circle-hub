@@ -944,6 +944,16 @@ select.control {
 
 .mu-slot { justify-content: center; font-size: 0.62rem; }
 .mu-col.right .mu-player { flex-direction: row-reverse; }
+.mu-name-group {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  /* .mu-player's own align-items is baseline (see comment above), which
+     would sink an <img> to its own bottom edge — this centers just the
+     headshot+name group instead of changing the row's shared alignment. */
+  align-self: center;
+}
 .mu-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mu-pos { font-size: 0.7rem; }
 .mu-proj { font-size: 0.72rem; }

@@ -2,6 +2,7 @@ import { useApp } from "../state/AppContext";
 import { MISSING, pct, pts } from "../lib/format";
 import { h2hLookup } from "../lib/h2h";
 import { displayOrderIndices } from "../lib/lineupOrder";
+import PlayerHeadshot from "./PlayerHeadshot";
 import type { H2HPair, SimMatchup, WeekLineupPlayer } from "../types/data";
 
 export interface TeamInfo {
@@ -89,9 +90,12 @@ function LineupRow({ p }: { p: WeekLineupPlayer | undefined }) {
   const showPosition = p.position !== p.slot;
   return (
     <div className="mu-player">
-      <span className="mu-name">
-        {p.name}
-        {showPosition && <span className="muted mu-pos"> {p.position}</span>}
+      <span className="mu-name-group">
+        <PlayerHeadshot playerId={p.player_id} size={18} />
+        <span className="mu-name">
+          {p.name}
+          {showPosition && <span className="muted mu-pos"> {p.position}</span>}
+        </span>
       </span>
       <span className="num mu-pts">
         {p.played ? pts(p.actual) : <span className="muted">{MISSING}</span>}

@@ -3,6 +3,163 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Full-app page review (2026-08-26)
+
+Requested: a page-by-page pass with small/medium/large ideas across the
+whole site, using everything learned building it so far. Nothing here is
+built — greenlight individually.
+
+### Cross-cutting (small, applies to most pages)
+
+- **Team names aren't linked to their Franchise page almost anywhere** —
+  confirmed by reading the actual components: `StandingsTable.tsx` (the
+  league-wide standings, the single most-viewed table in the app),
+  `CareerTable`/`FranchiseLeaders`/`H2HMatrix`/`RecordBook` in
+  `HistoryCharts.tsx`, `TradesPage.tsx`, `DraftPage.tsx`,
+  `PickFuturesPage.tsx`, and `FranchisePage.tsx`'s own trade-history section
+  (doesn't even link the OTHER team in a trade it's displaying) all render
+  team names as bare text, not `<Link to={/franchise/:id}>`. This was
+  flagged as "not yet done" back when the Franchise pages were first built
+  and never got picked up. Single highest-value small fix on this list —
+  one component-level change (wrap team-name renders in a `Link`) fans out
+  correctly everywhere since they all already resolve team_id → name.
+- **There's no `/franchises` index page** — despite being described as
+  built in earlier project notes, `App.tsx` only has `franchise/:teamId`;
+  the only entry point is the "Franchises ▾" nav dropdown listing all 10
+  teams by name. A real index page (grid of team cards — record, titles,
+  current posture) is listed separately below as a medium item, but even
+  just confirming this gap is worth a look.
+
+### League page
+
+- Small: streak isn't shown on the league-wide Standings table (only on
+  the divisional Division Race tables) — cheap to add, data already exists
+  on `StandingsRow`.
+- Medium: **waiver wire activity leaderboard** — this league has heavy
+  waiver activity and no FAAB; `ownership.json` stints already carry
+  `acquired_via` and `points_started`, so filtering to `"waiver"/"fa"`
+  (instead of `"trade"/"draft"`, same as the Franchise page's "roster
+  legends") gets most of the way there almost for free. Could ship as one
+  feature with a "recent" time-windowed view (see below) rather than two.
+- Medium: **recent transactions impact tracker** — same mechanism,
+  windowed to the last 2-3 weeks instead of all-time: "here's how your
+  recent free-agent moves are panning out." Near-zero new computation once
+  the leaderboard above exists.
+- Large: **dynasty Power Rankings variant** — parked, not declined. Plain
+  Power Rankings (all-play/PF/trend/roster) got folded into Division Race
+  and deleted from display since it was redundant with standings — but a
+  genuinely *dynasty*-flavored ranking (blending current redraft roster
+  strength with held pick capital) would answer a different question than
+  the Contend/Rebuild spectrum does: not "which direction is this team
+  headed" but "who's actually built the best long-term team right now."
+
+### Matchups page
+
+- Small: **elimination-game flag** — badge a card when
+  `playoff_pct_if_lose_next` drops below some real threshold for either
+  team. Field already exists on `SimTeam`.
+- Small: **upset-alert flag** — badge when the projected underdog still
+  has a real (>35%) win chance. Same data already computed for the WP bar.
+- Small: visually distinguish the single biggest game of the week (already
+  sorted first by `playoff_impact_score`) with its own ribbon/border
+  instead of just position in the list.
+- Small: "jump to my game" anchor link at the top of a full week's card
+  list — the `mine` team's card is already accent-bordered, just no way to
+  scroll straight to it.
+
+### My Team page
+
+- Small: add a one-line tooltip/subtitle on the "Left on bench" stat
+  clarifying it's the sum of weekly (optimal − actual) shortfalls, not
+  Optimal PF minus PF — came up directly in conversation; those two read
+  as the same idea but aren't (Optimal PF − PF mixes in home-field bonus
+  and skips bench-blind weeks). Cheap to prevent the same question landing
+  again.
+- Medium: a compact "this week's opponent" preview card — H2H record,
+  streak, win probability — reusing the same data `WeeklyMatchupProjections`
+  already renders on the Matchups page, just surfaced here too so My Team
+  doesn't require a tab switch to see the upcoming game at a glance.
+- Medium/Large: **player pop-up cards** — already spiked and de-risked
+  (see "Kept on backlog" below): a public ESPN endpoint (no league auth
+  needed) returns season game log, news, and real analyst blurbs
+  (Rotowire) for any player, fetchable directly from the browser on click.
+  Roster table is the natural first place to wire it in. The real lift is
+  the modal/card component and picking which fields to show, not the data
+  — this is probably the single most ESPN-app-like feature left on the
+  list.
+
+### Franchise page
+
+- Small: color/label each trade-history line as "acquired"/"sent" relative
+  to the franchise being viewed, instead of a flat list of `player → team`
+  arrows the reader has to parse direction from.
+- Small: explicit "Championships: N · Playoff appearances: N" stat block —
+  the badge shelf shows championship chips visually, but there's no
+  countable number next to Seasons/Record/PF in the hero stats.
+- Medium: **head-to-head vs. every other franchise** — `h2h.json` already
+  has every pair's all-time record; a small table on this page filtered to
+  the one team ("this franchise's record against everyone it's ever
+  played") is a natural rivalry-flavored addition, near-zero new backend.
+- Medium: a small career PF-by-season or record-by-season sparkline in the
+  hero stats — reuses the app's existing small-chart pattern (My Team's
+  ScoringChart/BenchChart), gives the career numbers some shape instead of
+  three flat totals.
+- Large: **a real `/franchises` index page** — grid of all 10 franchise
+  cards (record, titles, current contend/rebuild posture, badge count),
+  each linking into its own `/franchise/:teamId`. See the cross-cutting
+  note above — this was apparently scoped originally but never actually
+  built; the nav dropdown is the only current entry point.
+
+### Trophy Case page
+
+- Small: this page still has the same headline+paragraph `.hero` block
+  Tommy just had removed from the League page for being distracting — same
+  visual pattern, worth deciding whether it gets the same treatment or
+  whether the Superlative Champion callout earns its keep here (it's a
+  genuine "who's winning the season" signal the League page's version
+  wasn't).
+- Small: link team names in the tally table to their Franchise page.
+- Medium: an **all-time tally** (across every season, not just the current
+  one) alongside the current-season table — "most Highest-Score awards
+  ever," career trophy leaders — reuses the same award data via
+  `useAllSeasons()`.
+
+### Trades page
+
+- Small: the team-ledger table renders as `table.stat` but isn't wired
+  into the app's usual `useSort` pattern — every other stat table in the
+  app sorts on click, this one doesn't.
+- Small: filter the trade-card list by team.
+- Small: link every team name (ledger + trade cards) to its Franchise page.
+- Medium: a "biggest trade" or "most lopsided trade all-time" callout,
+  pulled straight from data already computed (`net` per trade).
+
+### Draft page
+
+- Small: link team names to Franchise pages.
+- Medium: a global, all-time "Draft Hall of Fame" view — best value pick
+  ever, biggest bust ever, across every class — the per-team version of
+  this already exists on each Franchise page, but there's no cross-season,
+  cross-team leaderboard.
+
+### Pick Futures page
+
+- Small: per-team summary strip above the table ("Team X holds 2 firsts,
+  1 second over the next 3 classes") — cheap aggregation over data already
+  on the board.
+- Small: filter by team or by draft year.
+- Small: link team names to Franchise pages.
+
+### History pages (Records / H2H / Careers)
+
+- Small: link every team name across all three sub-pages to Franchise
+  pages (`CareerTable`'s Franchise column is the most obvious miss).
+- Medium: **streak-based records** — Record Book currently only tracks
+  Highest/Lowest scores and Biggest blowouts (checked `RecordBook` in
+  `HistoryCharts.tsx` directly). No longest win streak, no longest active
+  title drought, no longest playoff-miss streak — all computable from data
+  already on file (`StandingsRow.streak` per season, badge history).
+
 ## Built (2026-08-15)
 
 All of the below shipped in one batch: roster-ownership timeline (new

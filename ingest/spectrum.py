@@ -27,11 +27,13 @@ from two different value lenses:
   reads as "assets banked for the future" rather than "assets playing
   right now."
 
-Posture (`label`) is a genuinely qualitative, two-dimensional read of
-those two value lenses, not a single ratio's percentile rank — a team
-that ranks near the top on BOTH contending and rebuilding value is
-"Balanced" (well-set-up for now AND later), not forced into whichever
-side happens to edge out the other. See `_label` below.
+Posture (`label`) is read off fixed dollar thresholds on the two value
+lenses (Tommy's own intuition for what "contending" and "rebuilding"
+roster/capital levels look like on today's KTC scale), not a league-
+relative percentile rank — see `_label` below. **This means the
+thresholds are pegged to the current KTC valuation scale and may need
+retuning if the league's overall asset values drift a lot (e.g. a market-
+wide dynasty value inflation/deflation, or a much smaller/larger league).**
 """
 from __future__ import annotations
 
@@ -41,27 +43,19 @@ from parse import _normalize_name, pick_values_for_season, values_by_pid
 # dynasty roster value counts 3x as much as pick capital toward "rebuilding value"
 ROSTER_WEIGHT = 3
 
-# a team in the top third of the league on a given value lens reads as
-# genuinely strong there, not just "above average"
-HIGH_PCT = 67
+# fixed dollar thresholds on the KTC scale, not league-relative — Tommy's
+# own intuition for what "contending"/"rebuilding" levels look like today
+CONTEND_FLOOR = 53_000    # below this contending value, a team reads as rebuilding regardless of capital
+CONTEND_CEILING = 60_000  # at/above this contending value, a team reads as contending...
+REBUILD_HIGH = 70_000     # ...unless its rebuilding value is ALSO this high, which reads as balanced
 
 
-def _percentile_rank(values: dict[int, float]) -> dict[int, float]:
-    ordered = sorted(values.items(), key=lambda kv: kv[1])
-    n = len(ordered)
-    return {tid: round(100 * i / max(n - 1, 1), 1) for i, (tid, _) in enumerate(ordered)}
-
-
-def _label(contending_pct: float, rebuilding_pct: float) -> str:
-    high_contend = contending_pct >= HIGH_PCT
-    high_rebuild = rebuilding_pct >= HIGH_PCT
-    if high_contend and high_rebuild:
-        return "Balanced"  # elite on both lenses — set up for now AND later
-    if high_contend:
-        return "Contending"
-    if high_rebuild:
+def _label(contending_value: float, rebuilding_value: float) -> str:
+    if contending_value < CONTEND_FLOOR:
         return "Rebuilding"
-    return "Balanced"  # not standout on either lens
+    if contending_value >= CONTEND_CEILING:
+        return "Balanced" if rebuilding_value >= REBUILD_HIGH else "Contending"
+    return "Balanced"  # in between — not clearly either
 
 
 def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board: list[dict],
@@ -101,8 +95,6 @@ def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board
         rebuilding_value[tid] = rv
         cv = contending_value.get(tid, 0.0)
         ratio[tid] = rv / (cv + rv) if (cv + rv) else 0.0
-    contending_pct = _percentile_rank(contending_value)
-    rebuilding_pct = _percentile_rank(rebuilding_value)
 
     return [
         {
@@ -112,9 +104,7 @@ def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board
             "future_pick_capital": round(pick_capital.get(tid, 0.0), 0),
             "rebuilding_value": round(rebuilding_value[tid], 0),
             "ratio": round(ratio[tid], 3),
-            "contending_percentile": contending_pct[tid],
-            "rebuilding_percentile": rebuilding_pct[tid],
-            "label": _label(contending_pct[tid], rebuilding_pct[tid]),
+            "label": _label(contending_value.get(tid, 0.0), rebuilding_value[tid]),
         }
         for tid in team_ids
     ]

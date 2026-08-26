@@ -642,8 +642,6 @@ export interface SpectrumTeam {
   future_pick_capital: number;
   rebuilding_value: number;
   ratio: number;
-  contending_percentile: number;
-  rebuilding_percentile: number;
   label: SpectrumLabel;
 }
 

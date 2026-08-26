@@ -599,16 +599,18 @@ last fetched (separate from `trades.json`/`draft.json`'s
 
 `teams[]`: `{team_id, contending_value, dynasty_roster_value,
 future_pick_capital, rebuilding_value, ratio (rebuilding_value /
-(contending_value + rebuilding_value), informational only — no longer
-drives label), contending_percentile, rebuilding_percentile (each
-value's own league-wide rank, 0–100), label
-("Contending"|"Balanced"|"Rebuilding")}`. `label` is a qualitative
-two-dimension rule (`spectrum._label()`), not a single ratio's
-percentile: a team in the top third of the league (`HIGH_PCT = 67`) on
-BOTH contending_percentile and rebuilding_percentile reads "Balanced"
-(well set up for now AND later, not forced to whichever side edges out
-the other) — same as a team standout on neither. Top-third on only one
-side reads as that side's label.
+(contending_value + rebuilding_value), informational only — does not
+drive label), label ("Contending"|"Balanced"|"Rebuilding")}`. `label` is
+read off fixed dollar thresholds on the KTC scale (`spectrum._label()`),
+not a league-relative percentile — Tommy's own intuition for what each
+posture looks like today: contending_value < `CONTEND_FLOOR` (53,000)
+always reads "Rebuilding"; contending_value ≥ `CONTEND_CEILING` (60,000)
+reads "Contending", unless rebuilding_value is ALSO ≥ `REBUILD_HIGH`
+(70,000), in which case it reads "Balanced" (well set up for now AND
+later); everything in between (53,000–60,000 contending value) reads
+"Balanced". Since these are fixed dollar amounts rather than a
+percentile, they're pegged to the current KTC valuation scale and may
+need retuning if the league's overall asset values drift meaningfully.
 
 ## `h2h.json` (top level, cross-season)
 

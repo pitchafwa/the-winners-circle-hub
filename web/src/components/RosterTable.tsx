@@ -1,5 +1,6 @@
 import { pts, signed, gameTime } from "../lib/format";
 import { displayOrderIndices } from "../lib/lineupOrder";
+import PlayerHeadshot from "./PlayerHeadshot";
 import type { RosterPlayerCard, TeamRoster } from "../types/data";
 
 // ESPN's own short injury-designation letters — anything not in here (or
@@ -33,6 +34,11 @@ function PlayerRow({ card }: { card: RosterPlayerCard }) {
       ? (INJURY_ABBR[card.injury_status] ?? card.injury_status)
       : null;
 
+  const last = card.recent[0]?.points ?? null;
+  const last3 = card.recent.length
+    ? card.recent.reduce((sum, r) => sum + r.points, 0) / card.recent.length
+    : null;
+
   return (
     <tr>
       <td className="muted">{card.slot}</td>
@@ -40,29 +46,32 @@ function PlayerRow({ card }: { card: RosterPlayerCard }) {
         {card.player_id === null ? (
           <span className="muted">Empty</span>
         ) : (
-          <>
-            <strong style={card.suggested ? { fontStyle: "italic" } : undefined}>{card.name}</strong>{" "}
-            <span className="muted" style={{ fontSize: "0.78rem" }}>
-              {card.position} · {card.pro_team}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <PlayerHeadshot playerId={card.player_id} />
+            <span>
+              <strong style={card.suggested ? { fontStyle: "italic" } : undefined}>{card.name}</strong>{" "}
+              <span className="muted" style={{ fontSize: "0.78rem" }}>
+                {card.position} · {card.pro_team}
+              </span>
+              {injury && (
+                <span className="neg" style={{ fontSize: "0.72rem", marginLeft: "0.35rem" }}>
+                  {injury}
+                </span>
+              )}
+              {card.suggested && (
+                <span className="muted" style={{ fontSize: "0.72rem", marginLeft: "0.35rem" }}
+                  title="This slot is empty on ESPN — showing the best available bench player instead of leaving it blank">
+                  (suggested)
+                </span>
+              )}
             </span>
-            {injury && (
-              <span className="neg" style={{ fontSize: "0.72rem", marginLeft: "0.35rem" }}>
-                {injury}
-              </span>
-            )}
-            {card.suggested && (
-              <span className="muted" style={{ fontSize: "0.72rem", marginLeft: "0.35rem" }} title="This slot is empty on ESPN — showing the best available bench player instead of leaving it blank">
-                (suggested)
-              </span>
-            )}
-          </>
+          </div>
         )}
       </td>
       <td><OppCell card={card} /></td>
       <td className="num">{pts(card.week_projection)}</td>
-      <td className="num muted">
-        {card.recent.length > 0 ? card.recent.map((r) => pts(r.points)).join(", ") : "—"}
-      </td>
+      <td className="num muted">{pts(last)}</td>
+      <td className="num muted">{pts(last3)}</td>
       <td className={`num ${card.recent_avg_diff !== null ? (card.recent_avg_diff >= 0 ? "pos" : "neg") : ""}`}>
         {signed(card.recent_avg_diff)}
       </td>
@@ -70,11 +79,17 @@ function PlayerRow({ card }: { card: RosterPlayerCard }) {
   );
 }
 
-function RosterSection({ title, cards }: { title: string; cards: RosterPlayerCard[] }) {
+function RosterSection({ title, cards, totalProjected }: {
+  title: string; cards: RosterPlayerCard[]; totalProjected?: number;
+}) {
   if (cards.length === 0) return null;
   return (
     <>
-      <tr className="roster-section-row"><td colSpan={6}>{title}</td></tr>
+      <tr className="roster-section-row">
+        <td colSpan={3}>{title}</td>
+        <td className="num">{totalProjected !== undefined ? pts(totalProjected) : ""}</td>
+        <td colSpan={3}></td>
+      </tr>
       {cards.map((c, i) => (
         <PlayerRow key={c.player_id ?? `empty-${i}`} card={c} />
       ))}
@@ -89,6 +104,7 @@ export default function RosterTable({ roster }: { roster: TeamRoster }) {
   // same reorder MatchupsPage's lineup grid already uses.
   const slotLabels = roster.starters.map((s) => s.slot);
   const orderedStarters = displayOrderIndices(slotLabels).map((i) => roster.starters[i]);
+  const totalProjected = roster.starters.reduce((sum, s) => sum + (s.week_projection ?? 0), 0);
 
   return (
     <div className="table-wrap">
@@ -99,15 +115,16 @@ export default function RosterTable({ roster }: { roster: TeamRoster }) {
             <th scope="col">Player</th>
             <th scope="col">Next game</th>
             <th scope="col" className="num">Proj</th>
-            <th scope="col" className="num" title="Actual points, most recent games first">Recent</th>
+            <th scope="col" className="num" title="Points scored, most recent game">Last</th>
+            <th scope="col" className="num" title="Average points scored over the last 3 games">Last3</th>
             <th scope="col" className="num"
-              title="Average of actual minus projected over the last 3 games — our own signal, not something ESPN shows">
+              title="Average of actual minus projected points per game over the last 3 games — our own signal, not something ESPN shows">
               Diff
             </th>
           </tr>
         </thead>
         <tbody>
-          <RosterSection title="Starters" cards={orderedStarters} />
+          <RosterSection title="Starters" cards={orderedStarters} totalProjected={totalProjected} />
           <RosterSection title="Bench" cards={roster.bench} />
           <RosterSection title="IR" cards={roster.ir} />
         </tbody>

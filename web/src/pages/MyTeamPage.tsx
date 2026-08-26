@@ -108,8 +108,9 @@ export default function MyTeamPage() {
             </div>
             <RosterTable roster={myRoster} />
             <p className="muted" style={{ fontSize: "0.72rem", marginTop: "0.5rem", fontStyle: "italic" }}>
-              Recent = actual points, most recent game first. Diff = average of actual minus projected over
-              those recent games — our own signal for who's running hot or cold lately, not something ESPN shows.
+              Last = points in the most recent game. Last3 = average points over the last 3 games. Diff = average
+              of actual minus projected points per game over the last 3 games — our own signal for who's running
+              hot or cold lately, not something ESPN shows.
             </p>
           </section>
         );

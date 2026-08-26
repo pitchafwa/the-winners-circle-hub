@@ -40,6 +40,44 @@ from every mention of a team yet.
 
 ## Kept on backlog (not approved yet)
 
+- **Player pop-up cards** (click a player's name anywhere → a modal/card with
+  season game log, recent news, and analyst evaluations, like ESPN's own
+  app) — Tommy asked for a lift estimate + research spike (2026-08-27).
+  Findings:
+  - **Very feasible, moderate lift, no backend needed.** A single public
+    ESPN endpoint —
+    `https://site.web.api.espn.com/apis/common/v3/sports/football/nfl/athletes/{playerId}/overview`
+    (their general sports site API, NOT the private fantasy league API this
+    app already calls, so no `ESPN_S2`/`SWID` cookie needed) — returns
+    everything this feature wants in one response: `statistics`,
+    `gameLog` (real per-game stat lines for the season — covers "season
+    game log" outright, no need to extend `recent_player_performance`),
+    `news` (real headlines, several are video-clip items with thumbnails
+    and a link out to espn.com, not always plain text), `rotowire`
+    (**this is the real find** — genuine analyst prose, e.g. a real
+    2026-08-21 blurb on Nico Collins' target share outlook, with a
+    `published` date — exactly the "recent evaluations" Tommy described),
+    and `nextGame`/`fantasy` sections.
+  - **CORS is wide open** (`access-control-allow-origin: *`, confirmed via
+    a live request with an `Origin` header) — the frontend can fetch this
+    directly from the browser on click, same direct-fetch pattern the
+    trade/weekly-summary tools already use for the Anthropic API. No proxy,
+    no new backend, no admin-api.ts route.
+  - **Real lift**: per-player on-demand fetch (not bulk-cached at build
+    time — fetching this for every rostered player during `build.py` would
+    be slow and mostly wasted, since most players' cards never get opened)
+    triggered on click, a loading state, and a modal/popover component to
+    render it — stats table, a short news list, the Rotowire blurb.
+    Genuinely a multi-hour feature, not a quick add, but no open technical
+    risk left — the spike's whole point was confirming the data exists and
+    is reachable, and it clearly is.
+  - Not yet scoped: exactly which fields to show (the full response has a
+    lot more than a card needs), where "click a player's name" should be
+    wired up first (roster table is the obvious start; trades/drafts/
+    activity feed could follow), and whether `PlayerHeadshot.tsx` (built
+    2026-08-27 for the roster table) gets reused inside the card too
+    (yes, trivially — it's already a standalone component).
+
 - Dynasty Power Rankings variant
 - League-wide positional trends over time (multi-week chart on top of the
   existing single-snapshot heatmap) — parked, Tommy's not sold it's needed.

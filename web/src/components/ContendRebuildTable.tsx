@@ -9,11 +9,22 @@ const LABEL_TONE: Record<SpectrumLabel, "pos" | "neg" | ""> = {
   Rebuilding: "neg",
 };
 
+// Contending -> Balanced -> Rebuilding, not alphabetical (which would read
+// Balanced/Contending/Rebuilding) — this is what "Posture" should sort back
+// to as its natural/default order.
+const POSTURE_ORDER: Record<SpectrumLabel, number> = {
+  Contending: 0,
+  Balanced: 1,
+  Rebuilding: 2,
+};
+
 export default function ContendRebuildTable({ spectrum }: { spectrum: Spectrum }) {
   const { teamName } = useApp();
-  const sort = useSort<Spectrum["teams"][number]>("ratio", 1, (r, key) =>
-    key === "team" ? teamName(r.team_id) : (r[key as keyof typeof r] as number),
-  );
+  const sort = useSort<Spectrum["teams"][number]>("ratio", 1, (r, key) => {
+    if (key === "team") return teamName(r.team_id);
+    if (key === "label") return POSTURE_ORDER[r.label];
+    return r[key as keyof typeof r] as number;
+  });
   const rows = useSorted(spectrum.teams, sort);
 
   return (
@@ -38,7 +49,7 @@ export default function ContendRebuildTable({ spectrum }: { spectrum: Spectrum }
               onClick={() => sort.toggle("future_pick_capital")}>
               Pick capital{sort.marker("future_pick_capital")}
             </th>
-            <th scope="col" className="sortable num" title="50/50 blend of dynasty roster value and pick capital — assets banked for the future"
+            <th scope="col" className="sortable num" title="Dynasty roster value and pick capital, weighted 3:1 toward the roster — assets banked for the future"
               aria-sort={sort.ariaSort("rebuilding_value")}
               onClick={() => sort.toggle("rebuilding_value")}>
               Rebuilding value{sort.marker("rebuilding_value")}
@@ -61,8 +72,8 @@ export default function ContendRebuildTable({ spectrum }: { spectrum: Spectrum }
         </tbody>
       </table>
       <p className="muted" style={{ fontSize: "0.72rem", marginTop: "0.5rem", fontStyle: "italic" }}>
-        Contending value = current roster priced on this-season (redraft) value. Rebuilding value = a
-        50/50 blend of the same roster's long-term dynasty value and held future pick capital.
+        Contending value = current roster priced on this-season (redraft) value. Rebuilding value = the
+        same roster's long-term dynasty value and held future pick capital, weighted 3:1 toward the roster.
       </p>
     </div>
   );

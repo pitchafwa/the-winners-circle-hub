@@ -18,17 +18,32 @@ from two different value lenses:
   value (same table that backs draft grades and trade grades, still a
   FLAT full-roster sum — every rostered asset has real trade value
   regardless of whether it could start today) and future draft-pick
-  capital (same round-average estimate trade grades use for pick assets)
-  — a simple 50/50 average of the two, both already KTC-dynasty-scaled so
-  they're directly comparable. Dynasty value alone isn't a rebuilding
-  signal by itself (a stacked-but-young contender is dynasty-rich too) —
-  it's the blend WITH pick capital that reads as "assets banked for the
-  future" rather than "assets playing right now."
+  capital (same round-average estimate trade grades use for pick assets),
+  weighted 3:1 toward the roster — a team's own dynasty assets are the
+  more important half of "banked for the future" than picks are, both
+  already KTC-dynasty-scaled so they're directly comparable. Dynasty
+  value alone isn't a rebuilding signal by itself (a stacked-but-young
+  contender is dynasty-rich too) — it's the blend WITH pick capital that
+  reads as "assets banked for the future" rather than "assets playing
+  right now."
+
+Posture (`label`) is a genuinely qualitative, two-dimensional read of
+those two value lenses, not a single ratio's percentile rank — a team
+that ranks near the top on BOTH contending and rebuilding value is
+"Balanced" (well-set-up for now AND later), not forced into whichever
+side happens to edge out the other. See `_label` below.
 """
 from __future__ import annotations
 
 from metrics import redraft_lineup_value
 from parse import _normalize_name, pick_values_for_season, values_by_pid
+
+# dynasty roster value counts 3x as much as pick capital toward "rebuilding value"
+ROSTER_WEIGHT = 3
+
+# a team in the top third of the league on a given value lens reads as
+# genuinely strong there, not just "above average"
+HIGH_PCT = 67
 
 
 def _percentile_rank(values: dict[int, float]) -> dict[int, float]:
@@ -37,12 +52,16 @@ def _percentile_rank(values: dict[int, float]) -> dict[int, float]:
     return {tid: round(100 * i / max(n - 1, 1), 1) for i, (tid, _) in enumerate(ordered)}
 
 
-def _label(pct: float) -> str:
-    if pct <= 33:
+def _label(contending_pct: float, rebuilding_pct: float) -> str:
+    high_contend = contending_pct >= HIGH_PCT
+    high_rebuild = rebuilding_pct >= HIGH_PCT
+    if high_contend and high_rebuild:
+        return "Balanced"  # elite on both lenses — set up for now AND later
+    if high_contend:
         return "Contending"
-    if pct >= 67:
+    if high_rebuild:
         return "Rebuilding"
-    return "Balanced"
+    return "Balanced"  # not standout on either lens
 
 
 def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board: list[dict],
@@ -78,11 +97,12 @@ def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board
     ratio: dict[int, float] = {}
     for tid in team_ids:
         dv, pc = dynasty_roster_value.get(tid, 0.0), pick_capital.get(tid, 0.0)
-        rv = (dv + pc) / 2
+        rv = (ROSTER_WEIGHT * dv + pc) / (ROSTER_WEIGHT + 1)
         rebuilding_value[tid] = rv
         cv = contending_value.get(tid, 0.0)
         ratio[tid] = rv / (cv + rv) if (cv + rv) else 0.0
-    percentile = _percentile_rank(ratio)
+    contending_pct = _percentile_rank(contending_value)
+    rebuilding_pct = _percentile_rank(rebuilding_value)
 
     return [
         {
@@ -92,8 +112,9 @@ def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board
             "future_pick_capital": round(pick_capital.get(tid, 0.0), 0),
             "rebuilding_value": round(rebuilding_value[tid], 0),
             "ratio": round(ratio[tid], 3),
-            "percentile": percentile[tid],
-            "label": _label(percentile[tid]),
+            "contending_percentile": contending_pct[tid],
+            "rebuilding_percentile": rebuilding_pct[tid],
+            "label": _label(contending_pct[tid], rebuilding_pct[tid]),
         }
         for tid in team_ids
     ]

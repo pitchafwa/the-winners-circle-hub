@@ -582,14 +582,16 @@ lenses:
     more realistic model (injuries/breakouts genuinely happen), traded
     knowingly against a slightly lower match to FantasyPros' starters-only
     methodology, not an oversight.
-- **Rebuilding value** — a 50/50 blend of the same roster's DYNASTY value
+- **Rebuilding value** — the same roster's DYNASTY value
   (`valuation.values_by_name()`, the same table draft/trade grades use,
   still a FLAT full-roster sum sourced from `ownership.json`'s open
   stints — every rostered asset has real trade value regardless of
   whether it could start today) and held future pick capital
   (`pick_futures.json`, valued the same round-average way as
-  `trades.json`'s pick assets) — assets banked for the future rather than
-  playing right now.
+  `trades.json`'s pick assets), blended `(3*dynasty + picks) / 4` —
+  weighted 3:1 toward the roster (`spectrum.ROSTER_WEIGHT`) since a
+  team's own dynasty assets matter more to its future than picks do —
+  assets banked for the future rather than playing right now.
 
 `redraft_valuation_updated_at`: ISO timestamp the redraft snapshot was
 last fetched (separate from `trades.json`/`draft.json`'s
@@ -597,9 +599,16 @@ last fetched (separate from `trades.json`/`draft.json`'s
 
 `teams[]`: `{team_id, contending_value, dynasty_roster_value,
 future_pick_capital, rebuilding_value, ratio (rebuilding_value /
-(contending_value + rebuilding_value)), percentile (league-wide rank of
-ratio, 0–100), label ("Contending"|"Balanced"|"Rebuilding")}` — percentile
-≤33 Contending, ≥67 Rebuilding, else Balanced.
+(contending_value + rebuilding_value), informational only — no longer
+drives label), contending_percentile, rebuilding_percentile (each
+value's own league-wide rank, 0–100), label
+("Contending"|"Balanced"|"Rebuilding")}`. `label` is a qualitative
+two-dimension rule (`spectrum._label()`), not a single ratio's
+percentile: a team in the top third of the league (`HIGH_PCT = 67`) on
+BOTH contending_percentile and rebuilding_percentile reads "Balanced"
+(well set up for now AND later, not forced to whichever side edges out
+the other) — same as a team standout on neither. Top-third on only one
+side reads as that side's label.
 
 ## `h2h.json` (top level, cross-season)
 

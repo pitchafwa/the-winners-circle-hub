@@ -95,9 +95,9 @@ function LineupRow({ p }: { p: WeekLineupPlayer | undefined }) {
         <span className="mu-name">
           {p.name}
           {showPosition && <span className="muted mu-pos"> {p.position}</span>}
-          {p.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}
-          {p.on_ice && <span className="on-fire-flame" title="Ice cold — well behind projection">🧊</span>}
         </span>
+        {p.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}
+        {p.on_ice && <span className="on-fire-flame" title="Ice cold — well behind projection">🧊</span>}
       </span>
       <span className="num mu-pts">
         {p.played ? pts(p.actual) : <span className="muted">{MISSING}</span>}

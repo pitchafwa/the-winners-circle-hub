@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
 import { MISSING, pct, pts } from "../lib/format";
@@ -8,9 +8,63 @@ import WeeklyMatchupProjections from "../components/WeeklyMatchupProjections";
 import type { TeamInfo } from "../components/WeeklyMatchupProjections";
 import { displayOrderIndices } from "../lib/lineupOrder";
 import type {
-  Award, AwardMeta, H2H, LineupPlayer, Matchup, MatchupSide,
-  Recaps, Sim, Standings, Superlatives, WeekMatchups,
+  Award, AwardMeta, AwardTone, H2H, LineupPlayer, Matchup, MatchupSide,
+  Sim, SimMatchup, Standings, Superlatives, WeekMatchups,
 } from "../types/data";
+
+// Not present in the data (AwardMeta has no icon field) — a small, stable
+// set of weekly award keys, so a local map is simpler than threading an
+// icon through the backend for something purely decorative.
+const AWARD_ICON: Record<string, string> = {
+  highest_score: "🏆",
+  best_coach: "🧠",
+  blowout: "💥",
+  projection_buster: "🚀",
+  waiver_hero: "🦸",
+  nail_biter: "😬",
+  luckiest: "🍀",
+  unluckiest: "💔",
+  bust: "📉",
+  worst_benching: "🪑",
+  lowest_score: "🥶",
+};
+
+function headlineValue(award: Award): string {
+  if (award.key === "best_coach") return pct(award.value / 100, 1);
+  return pts(award.value);
+}
+
+/** Two small, cheap-to-compute storylines for the upcoming week — kept to
+ * just these two on purpose (Tommy's ask: "only a few and on the smaller
+ * side," shouldn't push the real matchup cards down). Game of the Week
+ * reuses this_week_matchups' own existing sort (already ordered by
+ * playoff_impact_score descending, so the first entry IS the pick — no
+ * separate sort needed). Biggest Underdog scans every team's own win
+ * probability across every game this week (not just favorites vs.
+ * underdogs within a single game) for the single longest shot. */
+function biggestUnderdog(matchups: SimMatchup[]): { team: number; winPct: number } | null {
+  let worst: { team: number; winPct: number } | null = null;
+  for (const m of matchups) {
+    const awayPct = 1 - m.home_win_pct;
+    if (!worst || m.home_win_pct < worst.winPct) worst = { team: m.home_id, winPct: m.home_win_pct };
+    if (!worst || awayPct < worst.winPct) worst = { team: m.away_id, winPct: awayPct };
+  }
+  return worst;
+}
+
+function HeadlineCard({ icon, label, tone, children }: {
+  icon: string; label: string; tone: AwardTone; children: ReactNode;
+}) {
+  return (
+    <div className="headline-card" data-tone={tone}>
+      <span className="headline-icon" aria-hidden="true">{icon}</span>
+      <div>
+        <div className="headline-label">{label}</div>
+        <div className="headline-value">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 /** Lines up a team's started lineup against the league's real slot order
  * (e.g. QB, RB, RB, RB/WR, WR, WR, TE, D/ST, K, FLEX) by each player's own
@@ -46,9 +100,9 @@ function PlayerRow({ p }: { p: LineupPlayer | undefined }) {
         <span className="mu-name">
           {p.name}
           {showPosition && <span className="muted mu-pos"> {p.position}</span>}
-          {p.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}
-          {p.on_ice && <span className="on-fire-flame" title="Ice cold — well behind projection">🧊</span>}
         </span>
+        {p.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}
+        {p.on_ice && <span className="on-fire-flame" title="Ice cold — well behind projection">🧊</span>}
       </span>
       <span className="num mu-pts">
         {pts(p.actual)}
@@ -107,6 +161,16 @@ function MatchupCard({
   }
   const homeWon = m.winner === "HOME";
   const awayWon = m.winner === "AWAY";
+  // The league's real bracket collapses to exactly one WINNERS_BRACKET
+  // game in the championship week (confirmed against real data — every
+  // other game that week is a consolation ladder of some kind), so this
+  // condition alone unambiguously identifies THE championship, no lookup
+  // against final standings needed. Once it's decided, the winner of
+  // THIS specific game is, by construction, the league champion.
+  const isChampionship = m.is_playoff && m.playoff_tier === "WINNERS_BRACKET"
+    && m.matchup_period === meta?.championship_week;
+  const decided = m.winner !== "UNDECIDED" && m.winner !== "TIE";
+  const cardClass = `mu-card${m.is_playoff ? " mu-playoff" : ""}${isChampionship ? " mu-championship" : ""}`;
   const realSlotOrder = meta?.starting_slots ?? [];
   // Reordered for display only — meta.starting_slots itself (the real
   // ESPN order) is untouched; this permutation just changes what order
@@ -116,17 +180,19 @@ function MatchupCard({
   const awayAligned = alignBySlot(m.away.lineup, slotOrder);
 
   return (
-    <article className="mu-card">
+    <article className={cardClass}>
       {m.is_playoff && <div className="label" style={{ marginBottom: "0.4rem" }}>
-        {m.playoff_tier === "WINNERS_BRACKET" ? "playoffs" : "consolation"}</div>}
+        {isChampionship ? "championship" : m.playoff_tier === "WINNERS_BRACKET" ? "playoffs" : "consolation"}</div>}
       <div className="mu-head">
         <div className={`mu-team ${awayWon ? "winner" : ""}`}>
+          {isChampionship && decided && awayWon && <span className="mu-crown" aria-hidden="true">👑</span>}
           <strong>{teamName(m.away.team_id)}</strong>
           <span className="num mu-total">{pts(m.away.total)}</span>
           <Ribbons awards={awardsByTeam.get(m.away.team_id) ?? []} awardsMeta={awardsMeta} />
         </div>
         <span className="muted mu-at">at</span>
         <div className={`mu-team ${homeWon ? "winner" : ""}`}>
+          {isChampionship && decided && homeWon && <span className="mu-crown" aria-hidden="true">👑</span>}
           <strong>{teamName(m.home.team_id)}</strong>
           <span className="num mu-total">{pts(m.home.total)}</span>
           <Ribbons awards={awardsByTeam.get(m.home.team_id) ?? []} awardsMeta={awardsMeta} />
@@ -170,14 +236,13 @@ function MatchupCard({
 }
 
 export default function MatchupsPage() {
-  const { season, meta } = useApp();
+  const { season, meta, teamName } = useApp();
   const weeks = meta?.completed_weeks ?? [];
   const [chosen, setChosen] = useState<number | null>(null);
   const week = chosen ?? weeks.at(-1) ?? null;
   const data = useJson<WeekMatchups>(
     season !== null && week !== null ? `${season}/matchups/week-${week}.json` : null,
   );
-  const recaps = useOptionalJson<Recaps>(season !== null ? `${season}/recaps.json` : null);
   const sim = useOptionalJson<Sim>(season !== null ? `${season}/sim.json` : null);
   const standings = useOptionalJson<Standings>(season !== null ? `${season}/standings.json` : null);
   const superlatives = useOptionalJson<Superlatives>(season !== null ? `${season}/superlatives.json` : null);
@@ -185,17 +250,17 @@ export default function MatchupsPage() {
 
   if (!meta) return null;
 
-  const recap = week !== null ? recaps.data?.recaps[String(week)] : undefined;
   const teamInfo = new Map<number, TeamInfo>(
     (standings.data?.rows ?? []).map((r) => [r.team_id, { record: r.record, streak: r.streak }]),
   );
+  const weekAwards = (superlatives.data?.awards ?? []).filter((a) => a.week === week);
   const awardsByTeam = new Map<number, Award[]>();
-  for (const a of superlatives.data?.awards ?? []) {
-    if (a.week !== week) continue;
+  for (const a of weekAwards) {
     const list = awardsByTeam.get(a.team_id) ?? [];
     list.push(a);
     awardsByTeam.set(a.team_id, list);
   }
+  const underdog = sim.data?.this_week_matchups?.length ? biggestUnderdog(sim.data.this_week_matchups) : null;
 
   return (
     <>
@@ -204,6 +269,16 @@ export default function MatchupsPage() {
           <div className="section-head">
             <h2 id="weekly-h">This Week's Games</h2>
             <span className="label">projected score · win probability · playoff stakes</span>
+          </div>
+          <div className="headline-row">
+            <HeadlineCard icon="🔥" label="Game of the Week" tone="gold">
+              {teamName(sim.data.this_week_matchups[0].away_id)} @ {teamName(sim.data.this_week_matchups[0].home_id)}
+            </HeadlineCard>
+            {underdog && (
+              <HeadlineCard icon="🐶" label="Biggest Underdog" tone="neutral">
+                {teamName(underdog.team)} <span className="muted">{pct(underdog.winPct, 0)} to win</span>
+              </HeadlineCard>
+            )}
           </div>
           <WeeklyMatchupProjections
             matchups={sim.data.this_week_matchups}
@@ -231,7 +306,17 @@ export default function MatchupsPage() {
         {data.error && <div className="error-state">{data.error}</div>}
         {data.data && (
           <>
-            {recap && <p className="recap" style={{ marginBottom: "0.5rem" }}>{recap}</p>}
+            {weekAwards.length > 0 && (
+              <div className="headline-row" style={{ marginBottom: "1rem" }}>
+                {weekAwards.map((a) => (
+                  <HeadlineCard key={a.key} icon={AWARD_ICON[a.key] ?? "🏅"}
+                    label={superlatives.data?.awards_meta[a.key]?.label ?? a.key}
+                    tone={superlatives.data?.awards_meta[a.key]?.tone ?? "neutral"}>
+                    {teamName(a.team_id)} <span className="muted">{headlineValue(a)}</span>
+                  </HeadlineCard>
+                ))}
+              </div>
+            )}
             <p className="muted" style={{ fontSize: "0.8rem", marginBottom: "1rem" }}>
               Player lines show actual /projected points.
             </p>

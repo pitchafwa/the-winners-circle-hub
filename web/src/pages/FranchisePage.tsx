@@ -7,6 +7,7 @@ import { pts, shortDate, signed } from "../lib/format";
 import BadgeShelf from "../components/BadgeShelf";
 import EmptyState from "../components/EmptyState";
 import { CareerLeaderboards } from "../components/HistoryCharts";
+import PlayerHeadshot from "../components/PlayerHeadshot";
 import type { Badges, Draft, DraftPick, Ownership, TradeGrades } from "../types/data";
 
 function useTeamDraftPicks(teamId: number): { picks: (DraftPick & { season: number })[]; loading: boolean } {
@@ -117,7 +118,10 @@ export default function FranchisePage() {
                   </div>
                   <ul className="trade-players muted">
                     {t.players.map((p, i) => (
-                      <li key={`p-${i}`}>{p.name} → {teamName(p.to_team_id)}</li>
+                      <li key={`p-${i}`} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        {p.player_id != null && <PlayerHeadshot playerId={p.player_id} className="leaderboard-headshot" />}
+                        {p.name} → {teamName(p.to_team_id)}
+                      </li>
                     ))}
                     {t.picks.map((p, i) => (
                       <li key={`k-${i}`}>{p.pick} → {teamName(p.to_team_id)}</li>
@@ -154,7 +158,12 @@ export default function FranchisePage() {
                   <tr key={`${p.season}-${p.overall}`}>
                     <td className="num">{p.season}</td>
                     <td className="num">{p.overall}</td>
-                    <td><strong>{p.name}</strong></td>
+                    <td>
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        {p.player_id !== null && <PlayerHeadshot playerId={p.player_id} position={p.position} className="leaderboard-headshot" />}
+                        <strong>{p.name}</strong>
+                      </span>
+                    </td>
                     <td className="muted">{p.position}</td>
                     <td className={p.value_diff === null ? "num muted" : `num ${p.value_diff >= 0 ? "pos" : "neg"}`}>
                       {p.value_diff === null ? "—" : signed(p.value_diff, 0)}

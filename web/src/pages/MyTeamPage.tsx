@@ -6,6 +6,7 @@ import { MISSING, pct, pts, signed } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import BadgeShelf from "../components/BadgeShelf";
 import EmptyState from "../components/EmptyState";
+import PlayerHeadshot from "../components/PlayerHeadshot";
 import RosterTable from "../components/RosterTable";
 import { BenchChart, CoachChart, ScoringChart } from "../components/TeamCharts";
 import type { Badges, ProjectionReportRow, Roster, Sim, Teams } from "../types/data";
@@ -219,7 +220,12 @@ export default function MyTeamPage() {
                     <tbody>
                       {projRows.map((p) => (
                         <tr key={p.player_id}>
-                          <td><strong>{p.name}</strong></td>
+                          <td>
+                            <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                              <PlayerHeadshot playerId={p.player_id} position={p.position} />
+                              <strong>{p.name}</strong>
+                            </span>
+                          </td>
                           <td className="muted">{p.position}</td>
                           <td className="num">{p.starts}</td>
                           <td className="num">{pts(p.actual)}</td>

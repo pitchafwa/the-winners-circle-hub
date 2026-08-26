@@ -38,10 +38,7 @@ export default function PickFuturesPage() {
   const filtered = useMemo(() => {
     return board.filter((p) => {
       if (yearFilter !== "all" && String(p.season) !== yearFilter) return false;
-      if (teamFilter !== "all") {
-        const tid = Number(teamFilter);
-        if (p.original_team_id !== tid && p.current_owner_id !== tid) return false;
-      }
+      if (teamFilter !== "all" && p.current_owner_id !== Number(teamFilter)) return false;
       return true;
     });
   }, [board, teamFilter, yearFilter]);

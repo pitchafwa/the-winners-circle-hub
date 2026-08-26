@@ -660,6 +660,7 @@ table.stat tr.cutline td { border-bottom: 2px solid var(--ink); }
 
 .feed-row {
   display: flex;
+  align-items: center;
   gap: 1rem;
   padding: 0.4rem 0.25rem;
   border-bottom: 1px solid var(--rule);
@@ -1066,6 +1067,12 @@ select.control {
   min-width: 1.1rem;
   color: var(--ink-muted);
   font-size: 0.78rem;
+}
+
+.leaderboard-headshot {
+  width: 1.5rem;
+  height: 1.5rem;
+  align-self: center;
 }
 
 .leaderboard-main {

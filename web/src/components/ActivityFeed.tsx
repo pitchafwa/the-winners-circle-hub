@@ -1,5 +1,6 @@
 import { useApp } from "../state/AppContext";
 import { pts, shortDate, signed } from "../lib/format";
+import PlayerHeadshot from "./PlayerHeadshot";
 import type { Activity } from "../types/data";
 
 const VERB: Record<string, string> = {
@@ -36,7 +37,8 @@ export default function ActivityFeed({ activity, limit = 12 }: { activity: Activ
                 </div>
                 <ul className="trade-players muted">
                   {t.players.map((p) => (
-                    <li key={p.player_id}>
+                    <li key={p.player_id} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <PlayerHeadshot playerId={p.player_id} className="leaderboard-headshot" />
                       {p.name} → {teamName(p.to_team_id)}{" "}
                       <span className="num">({pts(p.post_trade_started_points)} started pts)</span>
                     </li>
@@ -60,6 +62,7 @@ export default function ActivityFeed({ activity, limit = 12 }: { activity: Activ
         {events.map((e, i) => (
           <li key={`${e.date}-${e.player_id}-${i}`} className="feed-row">
             <span className="muted num feed-date">{shortDate(e.date)}</span>
+            <PlayerHeadshot playerId={e.player_id} className="leaderboard-headshot" />
             <span>
               <strong>{teamName(e.team_id)}</strong> {VERB[e.action] ?? e.action.toLowerCase()}{" "}
               {e.player_name}

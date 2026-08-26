@@ -4,6 +4,7 @@ import { useOptionalJson } from "../lib/data";
 import { pts, signed } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import EmptyState from "../components/EmptyState";
+import PlayerHeadshot from "../components/PlayerHeadshot";
 import type { Draft } from "../types/data";
 
 const BOARD_COLS: { key: string; label: string; numeric: boolean; title?: string }[] = [
@@ -108,6 +109,7 @@ function DraftCard({ draft }: { draft: Draft }) {
             {steals.map((p) => (
               <li key={p.player_id} className="feed-row">
                 <span className="num feed-date muted">pk {p.overall}</span>
+                {p.player_id !== null && <PlayerHeadshot playerId={p.player_id} position={p.position} className="leaderboard-headshot" />}
                 <span><strong>{p.name}</strong> <span className="muted">{teamName(p.team_id)}</span>{" "}
                   <span className="num pos">{signed(p.value_diff, 0)}</span></span>
               </li>
@@ -120,6 +122,7 @@ function DraftCard({ draft }: { draft: Draft }) {
             {busts.map((p) => (
               <li key={p.player_id} className="feed-row">
                 <span className="num feed-date muted">pk {p.overall}</span>
+                {p.player_id !== null && <PlayerHeadshot playerId={p.player_id} position={p.position} className="leaderboard-headshot" />}
                 <span><strong>{p.name}</strong> <span className="muted">{teamName(p.team_id)}</span>{" "}
                   <span className="num neg">{signed(p.value_diff, 0)}</span></span>
               </li>
@@ -150,7 +153,12 @@ function DraftCard({ draft }: { draft: Draft }) {
               {boardRows.map((p) => (
                 <tr key={`${p.overall}-${p.player_id ?? p.name}`}>
                   <td className="num">{p.overall}</td>
-                  <td><strong>{p.name}</strong>{p.keeper ? " ⭐" : ""}</td>
+                  <td>
+                    <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      {p.player_id !== null && <PlayerHeadshot playerId={p.player_id} position={p.position} />}
+                      <strong>{p.name}</strong>{p.keeper ? " ⭐" : ""}
+                    </span>
+                  </td>
                   <td className="muted">{p.position}</td>
                   <td>{teamName(p.team_id)}</td>
                   <td className="num">{p.value === null ? "—" : pts(p.value)}</td>

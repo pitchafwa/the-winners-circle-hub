@@ -11,6 +11,7 @@ import {
 import { useApp } from "../state/AppContext";
 import { pts, signed } from "../lib/format";
 import EmptyState from "./EmptyState";
+import PlayerHeadshot from "./PlayerHeadshot";
 import { ACCENT, FONT_MONO, INK_MUTED, PAPER_2, RULE } from "../lib/tokens";
 import type { Badges, Meta, Ownership, OwnershipStint, Schedule, ScheduleEntry, ScheduleSwap } from "../types/data";
 import type { SeasonBundle } from "../lib/useAllSeasons";
@@ -285,6 +286,8 @@ interface LeaderboardRow {
   primary: string;
   secondary?: string;
   value: string;
+  playerId?: number | null;
+  position?: string | null;
 }
 
 const LEADERBOARD_SHORT = 5;
@@ -315,6 +318,9 @@ function Leaderboard({ title, subtitle, rows }: {
           {shown.map((r, i) => (
             <li key={r.key} className="leaderboard-row">
               <span className="leaderboard-rank num">{i + 1}</span>
+              {r.playerId != null && (
+                <PlayerHeadshot playerId={r.playerId} position={r.position} className="leaderboard-headshot" />
+              )}
               <span className="leaderboard-main">
                 <strong>{r.primary}</strong>
                 {r.secondary && <span className="muted leaderboard-sub">{r.secondary}</span>}
@@ -371,9 +377,25 @@ export function FranchiseLeaders({ ownership, meta }: { ownership: Ownership | n
           {rows.map(({ team, scorer, starter }) => (
             <tr key={team.id}>
               <td><strong>{currentTeamName(team.id)}</strong></td>
-              <td>{scorer ? `${scorer.name} ${scorer.position}` : "—"}</td>
+              <td>
+                {scorer && (
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <PlayerHeadshot playerId={scorer.player_id} position={scorer.position} />
+                    {scorer.name} {scorer.position}
+                  </span>
+                )}
+                {!scorer && "—"}
+              </td>
               <td className="num">{scorer ? pts(scorer.points_started, 0) : "—"}</td>
-              <td>{starter ? `${starter.name} ${starter.position}` : "—"}</td>
+              <td>
+                {starter && (
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <PlayerHeadshot playerId={starter.player_id} position={starter.position} />
+                    {starter.name} {starter.position}
+                  </span>
+                )}
+                {!starter && "—"}
+              </td>
               <td className="num">{starter ? starter.weeks_started : "—"}</td>
             </tr>
           ))}
@@ -428,6 +450,8 @@ export function CareerLeaderboards({ ownership, teamId, teamName }: {
         primary: `${c.name} ${c.position}`,
         secondary: secondary(c),
         value: value(c),
+        playerId: c.player_id,
+        position: c.position,
       }));
 
     return {

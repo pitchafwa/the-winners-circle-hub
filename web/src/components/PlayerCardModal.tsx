@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { MISSING, pts } from "../lib/format";
 import { fetchPlayerOverview, type PlayerOverview } from "../lib/playerCard";
+import { fetchPlayerSeasonGameLog, type PlayerGameLogRow } from "../lib/playerGameLog";
+import { useApp } from "../state/AppContext";
 import type { PlayerCardTarget } from "../state/PlayerCardContext";
 import PlayerHeadshot from "./PlayerHeadshot";
 
@@ -44,49 +47,91 @@ function SeasonStatsSection({ statistics }: { statistics: PlayerOverview["statis
   );
 }
 
-/** Only the first (most relevant-to-position) stat category — ESPN orders
- * these itself (passing before rushing for a QB, receiving before rushing
- * for a WR, etc.) — merged with the shared per-event metadata (week,
- * opponent, result) that sits in gameLog.events, keyed by the same ids.
- * A category can list event ids that aren't in that shared metadata dict
- * (seen live: a rookie's early-week entries) — those rows have nothing
- * real to show and are dropped, which is why the "any data at all" check
- * has to happen AFTER that filter, not just on the raw event count. */
-function RecentGamesSection({ gameLog }: { gameLog: PlayerOverview["gameLog"] }) {
-  if (!gameLog || gameLog.statistics.length === 0) return null;
-  const category = gameLog.statistics[0];
-  const rows = Object.keys(category.events)
-    .map((id) => ({ id, meta: gameLog.events[id], stats: category.events[id].stats }))
-    .filter((r) => r.meta)
-    .sort((a, b) => b.meta.week - a.meta.week);
-  if (rows.length === 0) return null;
+/** This league's own real fantasy points, week by week — deliberately NOT
+ * the ESPN-sourced gameLog (raw box-score stats, and only ever the
+ * CURRENT real NFL season regardless of which fantasy season the rest of
+ * the app is browsing). Season-selectable back to whatever year the
+ * league has real box scores for; defaults to the latest season that's
+ * actually started (current season if it's underway, most recent one
+ * otherwise) via `seasons[0]` — `seasons.json` is already written
+ * newest-first. */
+function LeagueGameLogSection({ playerId }: { playerId: number }) {
+  const { seasonsIndex } = useApp();
+  const seasons = useMemo(
+    () => (seasonsIndex?.seasons ?? []).filter((s) => s.season_started),
+    [seasonsIndex],
+  );
+  const [season, setSeason] = useState<number | null>(null);
+  const [state, setState] = useState<{ rows: PlayerGameLogRow[]; loading: boolean; error: string | null }>({
+    rows: [], loading: false, error: null,
+  });
+
+  // seasonsIndex loads asynchronously — this settles the real default the
+  // first moment a real season list exists, then leaves the user's own
+  // choice alone on every render after.
+  useEffect(() => {
+    if (season === null && seasons.length > 0) setSeason(seasons[0].season);
+  }, [seasons, season]);
+
+  useEffect(() => {
+    if (season === null) return;
+    let alive = true;
+    setState({ rows: [], loading: true, error: null });
+    fetchPlayerSeasonGameLog(season, playerId)
+      .then((rows) => { if (alive) setState({ rows, loading: false, error: null }); })
+      .catch((err: Error) => { if (alive) setState({ rows: [], loading: false, error: err.message }); });
+    return () => { alive = false; };
+  }, [season, playerId]);
+
+  if (seasons.length === 0) return null;
+
   return (
     <div style={{ marginBottom: "1.25rem" }}>
-      <div className="label" style={{ marginBottom: "0.3rem" }}>Recent games</div>
-      <div className="table-wrap">
-        <table className="stat">
-          <thead>
-            <tr>
-              <th scope="col">Wk</th>
-              <th scope="col">Opp</th>
-              <th scope="col">Result</th>
-              {category.labels.map((l, i) => <th key={i} scope="col" className="num">{l}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td className="num muted">{r.meta.week}</td>
-                <td className="muted">{r.meta.atVs}{r.meta.opponent?.abbreviation ?? "?"}</td>
-                <td className={r.meta.gameResult === "W" ? "num pos" : r.meta.gameResult === "L" ? "num neg" : "num muted"}>
-                  {r.meta.gameResult} {r.meta.score}
-                </td>
-                {r.stats.map((s, i) => <td key={i} className="num">{s}</td>)}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+        <span className="label">Game log</span>
+        <label>
+          <span className="label">Season&nbsp;</span>
+          <select className="control" style={{ fontSize: "0.78rem", padding: "0.15rem 0.45rem" }}
+            value={season ?? ""} onChange={(e) => setSeason(Number(e.target.value))}>
+            {seasons.map((s) => <option key={s.season} value={s.season}>{s.season}</option>)}
+          </select>
+        </label>
       </div>
+      {state.loading && <p className="muted" style={{ fontStyle: "italic", fontSize: "0.85rem" }}>Loading...</p>}
+      {state.error && <div className="error-state">{state.error}</div>}
+      {!state.loading && !state.error && state.rows.length === 0 && (
+        <p className="muted" style={{ fontStyle: "italic", fontSize: "0.85rem" }}>
+          No game log on file for {season}.
+        </p>
+      )}
+      {state.rows.length > 0 && (
+        <div className="table-wrap">
+          <table className="stat">
+            <thead>
+              <tr>
+                <th scope="col">Wk</th>
+                <th scope="col">Status</th>
+                <th scope="col" className="num">Points</th>
+                <th scope="col" className="num">Proj</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.rows.map((r) => (
+                <tr key={r.week}>
+                  <td className="num muted">{r.week}</td>
+                  <td className="muted">
+                    {!r.played ? MISSING : r.started ? "Started" : "Bench"}
+                    {r.onFire && " 🔥"}
+                    {r.onIce && " 🧊"}
+                  </td>
+                  <td className="num">{r.played ? pts(r.actual) : <span className="muted">{MISSING}</span>}</td>
+                  <td className="num muted">{pts(r.projected)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -129,6 +174,8 @@ export default function PlayerCardModal({ target, onClose }: { target: PlayerCar
             <p className="muted">{[target.position, target.proTeam].filter(Boolean).join(" · ")}</p>
           </div>
         </div>
+
+        <LeagueGameLogSection playerId={target.playerId} />
 
         {state.loading && <p className="muted" style={{ fontStyle: "italic" }}>Loading...</p>}
         {state.error && <div className="error-state">{state.error}</div>}
@@ -197,7 +244,6 @@ export default function PlayerCardModal({ target, onClose }: { target: PlayerCar
               </p>
             )}
 
-            <RecentGamesSection gameLog={d.gameLog} />
             <SeasonStatsSection statistics={d.statistics} />
           </>
         )}

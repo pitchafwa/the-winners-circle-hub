@@ -6,6 +6,7 @@ import { MISSING, pct, pts, signed } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import BadgeShelf from "../components/BadgeShelf";
 import EmptyState from "../components/EmptyState";
+import PlayerCardTrigger from "../components/PlayerCardTrigger";
 import PlayerHeadshot from "../components/PlayerHeadshot";
 import RosterTable from "../components/RosterTable";
 import TeamLink from "../components/TeamLink";
@@ -251,7 +252,11 @@ export default function MyTeamPage() {
                           <td>
                             <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                               <PlayerHeadshot playerId={p.player_id} position={p.position} proTeam={p.pro_team} />
-                              <strong>{p.name}</strong>
+                              <strong>
+                                <PlayerCardTrigger playerId={p.player_id} name={p.name} position={p.position} proTeam={p.pro_team}>
+                                  {p.name}
+                                </PlayerCardTrigger>
+                              </strong>
                             </span>
                           </td>
                           <td className="muted">{p.position}</td>
@@ -307,7 +312,9 @@ export default function MyTeamPage() {
                       {r.topScorers?.map((p) => (
                         <span key={p.player_id} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", marginRight: "0.7rem" }}>
                           <PlayerHeadshot playerId={p.player_id} position={p.position} proTeam={p.pro_team} className="leaderboard-headshot" />
-                          {p.name} <span className="muted num">{pts(p.points)}</span>
+                          <PlayerCardTrigger playerId={p.player_id} name={p.name} position={p.position} proTeam={p.pro_team}>
+                            {p.name}
+                          </PlayerCardTrigger> <span className="muted num">{pts(p.points)}</span>
                         </span>
                       ))}
                     </td>

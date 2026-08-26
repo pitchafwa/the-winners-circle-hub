@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { pts } from "../lib/format";
+import PlayerCardTrigger from "./PlayerCardTrigger";
 import PlayerHeadshot from "./PlayerHeadshot";
 
 // LineupPlayer and WeekLineupPlayer (the two real per-player shapes this
@@ -77,7 +78,11 @@ function StackedRow({ p }: { p: StackablePlayer | undefined }) {
         <>
           <PlayerHeadshot playerId={p.player_id} position={p.position} proTeam={p.pro_team} className="leaderboard-headshot" />
           <span className="c-name-wrap" ref={wrapRef}>
-            <span className="c-name">{displayName}</span>
+            <span className="c-name">
+              <PlayerCardTrigger playerId={p.player_id} name={p.name} position={p.position} proTeam={p.pro_team}>
+                {displayName}
+              </PlayerCardTrigger>
+            </span>
             {p.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}
             {p.on_ice && <span className="on-fire-flame" title="Ice cold — well behind projection">🧊</span>}
           </span>

@@ -1,5 +1,6 @@
 import { pts, signed, gameTime } from "../lib/format";
 import { displayOrderIndices } from "../lib/lineupOrder";
+import PlayerCardTrigger from "./PlayerCardTrigger";
 import PlayerHeadshot from "./PlayerHeadshot";
 import type { RosterPlayerCard, TeamRoster } from "../types/data";
 
@@ -49,7 +50,11 @@ function PlayerRow({ card }: { card: RosterPlayerCard }) {
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <PlayerHeadshot playerId={card.player_id} position={card.position} proTeam={card.pro_team} />
             <span>
-              <strong style={card.suggested ? { fontStyle: "italic" } : undefined}>{card.name}</strong>{" "}
+              <strong style={card.suggested ? { fontStyle: "italic" } : undefined}>
+                <PlayerCardTrigger playerId={card.player_id} name={card.name} position={card.position} proTeam={card.pro_team}>
+                  {card.name}
+                </PlayerCardTrigger>
+              </strong>{" "}
               {card.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}
               {card.on_ice && <span className="on-fire-flame" title="Ice cold — well behind projection">🧊</span>}
               <span className="muted" style={{ fontSize: "0.78rem" }}>

@@ -4,6 +4,7 @@ import { useJson, useOptionalJson } from "../lib/data";
 import { MISSING, pct, pts, signed } from "../lib/format";
 import EmptyState from "../components/EmptyState";
 import MobileLineupList from "../components/MobileLineupList";
+import PlayerCardTrigger from "../components/PlayerCardTrigger";
 import PlayerHeadshot from "../components/PlayerHeadshot";
 import TeamLink from "../components/TeamLink";
 import WeeklyMatchupProjections from "../components/WeeklyMatchupProjections";
@@ -134,7 +135,9 @@ function PlayerRow({ p }: { p: LineupPlayer | undefined }) {
       <span className="mu-name-group">
         <PlayerHeadshot playerId={p.player_id} position={p.position} proTeam={p.pro_team} className="mu-headshot" />
         <span className="mu-name">
-          {p.name}
+          <PlayerCardTrigger playerId={p.player_id} name={p.name} position={p.position} proTeam={p.pro_team}>
+            {p.name}
+          </PlayerCardTrigger>
           {showPosition && <span className="muted mu-pos"> {p.position}</span>}
         </span>
         {p.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}
@@ -382,7 +385,10 @@ export default function MatchupsPage() {
                     label={superlatives.data?.awards_meta[a.key]?.label ?? a.key}
                     tone={superlatives.data?.awards_meta[a.key]?.tone ?? "neutral"}>
                     {a.player_name ? (
-                      <>{a.player_name} <span className="muted">(<TeamLink id={a.team_id}>{teamName(a.team_id)}</TeamLink>) {headlineValue(a)}</span></>
+                      <>
+                        <PlayerCardTrigger playerId={a.player_id} name={a.player_name}>{a.player_name}</PlayerCardTrigger>{" "}
+                        <span className="muted">(<TeamLink id={a.team_id}>{teamName(a.team_id)}</TeamLink>) {headlineValue(a)}</span>
+                      </>
                     ) : (
                       <><TeamLink id={a.team_id}>{teamName(a.team_id)}</TeamLink> <span className="muted">{headlineValue(a)}</span></>
                     )}

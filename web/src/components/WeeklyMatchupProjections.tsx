@@ -3,6 +3,7 @@ import { MISSING, pct, pts } from "../lib/format";
 import { h2hLookup } from "../lib/h2h";
 import { displayOrderIndices } from "../lib/lineupOrder";
 import MobileLineupList from "./MobileLineupList";
+import PlayerCardTrigger from "./PlayerCardTrigger";
 import PlayerHeadshot from "./PlayerHeadshot";
 import TeamLink from "./TeamLink";
 import type { AwardTone, H2HPair, SimMatchup, SimTeam, WeekLineupPlayer } from "../types/data";
@@ -156,7 +157,9 @@ function LineupRow({ p }: { p: WeekLineupPlayer | undefined }) {
       <span className="mu-name-group">
         <PlayerHeadshot playerId={p.player_id} position={p.position} proTeam={p.pro_team} className="mu-headshot" />
         <span className="mu-name">
-          {p.name}
+          <PlayerCardTrigger playerId={p.player_id} name={p.name} position={p.position} proTeam={p.pro_team}>
+            {p.name}
+          </PlayerCardTrigger>
           {showPosition && <span className="muted mu-pos"> {p.position}</span>}
         </span>
         {p.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}

@@ -1,5 +1,6 @@
 import { useApp } from "../state/AppContext";
 import { pts, shortDate, signed } from "../lib/format";
+import PlayerCardTrigger from "./PlayerCardTrigger";
 import PlayerHeadshot from "./PlayerHeadshot";
 import TeamLink from "./TeamLink";
 import type { Activity } from "../types/data";
@@ -40,7 +41,8 @@ export default function ActivityFeed({ activity, limit = 12 }: { activity: Activ
                   {t.players.map((p) => (
                     <li key={p.player_id} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                       <PlayerHeadshot playerId={p.player_id} className="leaderboard-headshot" />
-                      {p.name} → <TeamLink id={p.to_team_id}>{teamName(p.to_team_id)}</TeamLink>{" "}
+                      <PlayerCardTrigger playerId={p.player_id} name={p.name}>{p.name}</PlayerCardTrigger>{" "}
+                      → <TeamLink id={p.to_team_id}>{teamName(p.to_team_id)}</TeamLink>{" "}
                       <span className="num">({pts(p.post_trade_started_points)} started pts)</span>
                     </li>
                   ))}
@@ -66,7 +68,7 @@ export default function ActivityFeed({ activity, limit = 12 }: { activity: Activ
             <PlayerHeadshot playerId={e.player_id} className="leaderboard-headshot" />
             <span>
               <strong><TeamLink id={e.team_id}>{teamName(e.team_id)}</TeamLink></strong> {VERB[e.action] ?? e.action.toLowerCase()}{" "}
-              {e.player_name}
+              <PlayerCardTrigger playerId={e.player_id} name={e.player_name}>{e.player_name}</PlayerCardTrigger>
               {e.action === "WAIVER_ADDED" && e.bid > 0 ? (
                 <span className="muted num"> (bid {e.bid})</span>
               ) : null}

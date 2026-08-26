@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useApp } from "../state/AppContext";
 import { useJson } from "../lib/data";
 import { dateTime } from "../lib/format";
+import { PlayerCardProvider } from "../state/PlayerCardContext";
 import NavDropdown from "./NavDropdown";
 import type { Meta, Spectrum, TradeGrades } from "../types/data";
 
@@ -63,6 +64,7 @@ export default function Layout() {
     .sort()[0] ?? null;
 
   return (
+    <PlayerCardProvider>
     <div className="shell">
       <header className="masthead">
         <div className="masthead-top">
@@ -163,5 +165,6 @@ export default function Layout() {
         <NavLink to="/admin/data" className="muted" style={{ fontSize: "0.7rem" }}>backup/restore</NavLink>
       </footer>
     </div>
+    </PlayerCardProvider>
   );
 }

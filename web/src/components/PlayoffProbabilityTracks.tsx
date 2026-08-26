@@ -1,5 +1,6 @@
 import { useApp } from "../state/AppContext";
 import { pct } from "../lib/format";
+import TeamLink from "./TeamLink";
 import type { SimTeam } from "../types/data";
 
 export default function PlayoffProbabilityTracks({ teams }: { teams: SimTeam[] }) {
@@ -16,7 +17,9 @@ export default function PlayoffProbabilityTracks({ teams }: { teams: SimTeam[] }
 
         return (
           <div className="playoff-track-row" key={t.team_id}>
-            <span className="playoff-track-team">{teamName(t.team_id)}</span>
+            <span className="playoff-track-team">
+              <TeamLink id={t.team_id}>{teamName(t.team_id)}</TeamLink>
+            </span>
             <div className="playoff-track" aria-hidden="true">
               {hasSwing ? (
                 <>

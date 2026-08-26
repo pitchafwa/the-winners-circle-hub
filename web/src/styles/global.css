@@ -61,6 +61,13 @@ a {
   text-decoration: none;
 }
 
+/* A team name linked to its Franchise page, dropped into a dense stat
+   table or card — inherits the surrounding text's own color/weight so it
+   reads exactly like the plain text it replaces, just clickable, with the
+   link-ness signaled only by an underline on hover. */
+.team-link { color: inherit; text-decoration: none; }
+.team-link:hover { text-decoration: underline; text-underline-offset: 0.15em; }
+
 a:hover {
   text-decoration: underline;
   text-underline-offset: 0.15em;

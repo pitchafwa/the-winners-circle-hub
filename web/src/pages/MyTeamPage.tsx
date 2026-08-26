@@ -8,6 +8,7 @@ import BadgeShelf from "../components/BadgeShelf";
 import EmptyState from "../components/EmptyState";
 import PlayerHeadshot from "../components/PlayerHeadshot";
 import RosterTable from "../components/RosterTable";
+import TeamLink from "../components/TeamLink";
 import { BenchChart, CoachChart, ScoringChart } from "../components/TeamCharts";
 import type { Badges, ProjectionReportRow, Roster, Sim, Teams, TopScorer } from "../types/data";
 
@@ -203,7 +204,9 @@ export default function MyTeamPage() {
                 {best && (
                   <p>
                     <span className="num" style={{ fontSize: "1.6rem" }}>{pts(best.points)}</span>{" "}
-                    <span className="muted">week {best.week} {best.result === "W" ? "win" : best.result === "L" ? "loss" : "tie"} vs {teamName(best.opponent_id)}</span>
+                    <span className="muted">week {best.week} {best.result === "W" ? "win" : best.result === "L" ? "loss" : "tie"} vs{" "}
+                      {best.opponent_id !== null ? <TeamLink id={best.opponent_id}>{teamName(best.opponent_id)}</TeamLink> : teamName(best.opponent_id)}
+                    </span>
                   </p>
                 )}
               </section>
@@ -212,7 +215,9 @@ export default function MyTeamPage() {
                 {worst && (
                   <p>
                     <span className="num" style={{ fontSize: "1.6rem" }}>{pts(worst.points)}</span>{" "}
-                    <span className="muted">week {worst.week} {worst.result === "W" ? "win" : worst.result === "L" ? "loss" : "tie"} vs {teamName(worst.opponent_id)}</span>
+                    <span className="muted">week {worst.week} {worst.result === "W" ? "win" : worst.result === "L" ? "loss" : "tie"} vs{" "}
+                      {worst.opponent_id !== null ? <TeamLink id={worst.opponent_id}>{teamName(worst.opponent_id)}</TeamLink> : teamName(worst.opponent_id)}
+                    </span>
                   </p>
                 )}
               </section>
@@ -286,7 +291,7 @@ export default function MyTeamPage() {
                       {r.opponentId === null ? (
                         <span className="muted">bye</span>
                       ) : (
-                        <>{r.isHome ? "vs" : "at"} <strong>{teamName(r.opponentId)}</strong></>
+                        <>{r.isHome ? "vs" : "at"} <strong><TeamLink id={r.opponentId}>{teamName(r.opponentId)}</TeamLink></strong></>
                       )}
                     </td>
                     <td className="num">

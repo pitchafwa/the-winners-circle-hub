@@ -3,12 +3,24 @@ import { useParams } from "react-router-dom";
 import { useApp } from "../state/AppContext";
 import { loadJson, useJson } from "../lib/data";
 import { useAllSeasons } from "../lib/useAllSeasons";
+import { h2hLookup } from "../lib/h2h";
 import { pts, shortDate, signed } from "../lib/format";
+import { useSort, useSorted } from "../lib/useSort";
 import BadgeShelf from "../components/BadgeShelf";
 import EmptyState from "../components/EmptyState";
 import { CareerLeaderboards } from "../components/HistoryCharts";
 import PlayerHeadshot from "../components/PlayerHeadshot";
-import type { Badges, Draft, DraftPick, Ownership, TradeGrades } from "../types/data";
+import TeamLink from "../components/TeamLink";
+import type { Badges, Draft, DraftPick, H2H, Ownership, TradeGrades } from "../types/data";
+
+interface H2HRow {
+  opponentId: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  games: number;
+  pct: number;
+}
 
 function useTeamDraftPicks(teamId: number): { picks: (DraftPick & { season: number })[]; loading: boolean } {
   const { seasonsIndex } = useApp();
@@ -42,15 +54,32 @@ function useTeamDraftPicks(teamId: number): { picks: (DraftPick & { season: numb
 export default function FranchisePage() {
   const { teamId } = useParams<{ teamId: string }>();
   const tid = Number(teamId);
-  const { teamsById, teamName, currentTeamName } = useApp();
+  const { teamsById, teamName, currentTeamName, meta } = useApp();
   const badges = useJson<Badges>("badges.json");
   const trades = useJson<TradeGrades>("trades.json");
   const ownership = useJson<Ownership>("ownership.json");
+  const h2h = useJson<H2H>("h2h.json");
   const all = useAllSeasons();
   const draftPicks = useTeamDraftPicks(tid);
 
   const info = teamsById.get(tid);
   const myBadges = badges.data?.teams[String(tid)] ?? [];
+
+  const h2hRows: H2HRow[] = useMemo(() => {
+    const pairs = h2h.data?.pairs ?? [];
+    return (meta?.teams ?? [])
+      .filter((t) => t.id !== tid)
+      .map((t): H2HRow => {
+        const rec = h2hLookup(pairs, tid, t.id) ?? { wins: 0, losses: 0, ties: 0 };
+        const games = rec.wins + rec.losses + rec.ties;
+        return { opponentId: t.id, ...rec, games, pct: games ? (rec.wins + 0.5 * rec.ties) / games : 0 };
+      })
+      .filter((r) => r.games > 0);
+  }, [h2h.data, meta, tid]);
+  const h2hSort = useSort<H2HRow>("pct", -1, (r, key) =>
+    key === "opponent" ? teamName(r.opponentId) : (r[key as keyof H2HRow] as number),
+  );
+  const h2hSorted = useSorted(h2hRows, h2hSort);
 
   const career = useMemo(() => {
     let seasons = 0, w = 0, l = 0, t = 0, pf = 0;
@@ -94,6 +123,54 @@ export default function FranchisePage() {
 
       <section className="section">
         <div className="section-head">
+          <h2>Head-to-head</h2>
+          <span className="label">this franchise's all-time record against every other</span>
+        </div>
+        {h2h.error && <div className="error-state">{h2h.error}</div>}
+        {h2hRows.length === 0 ? (
+          !h2h.loading && <EmptyState>No head-to-head games on file yet.</EmptyState>
+        ) : (
+          <div className="table-wrap">
+            <table className="stat">
+              <thead>
+                <tr>
+                  <th scope="col" className="sortable" aria-sort={h2hSort.ariaSort("opponent")}
+                    onClick={() => h2hSort.toggle("opponent", 1)}>
+                    Opponent{h2hSort.marker("opponent")}
+                  </th>
+                  <th scope="col" className="num sortable" aria-sort={h2hSort.ariaSort("games")}
+                    onClick={() => h2hSort.toggle("games")}>
+                    Games{h2hSort.marker("games")}
+                  </th>
+                  <th scope="col" className="num sortable" aria-sort={h2hSort.ariaSort("wins")}
+                    onClick={() => h2hSort.toggle("wins")}>
+                    Record{h2hSort.marker("wins")}
+                  </th>
+                  <th scope="col" className="num sortable" aria-sort={h2hSort.ariaSort("pct")}
+                    onClick={() => h2hSort.toggle("pct")}>
+                    Win%{h2hSort.marker("pct")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {h2hSorted.map((r) => (
+                  <tr key={r.opponentId}>
+                    <td><TeamLink id={r.opponentId}><strong>{teamName(r.opponentId)}</strong></TeamLink></td>
+                    <td className="num muted">{r.games}</td>
+                    <td className="num">{r.wins}-{r.losses}{r.ties ? `-${r.ties}` : ""}</td>
+                    <td className={`num ${r.pct > 0.5 ? "pos" : r.pct < 0.5 ? "neg" : ""}`}>
+                      {(r.pct * 100).toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="section">
+        <div className="section-head">
           <h2>Roster legends</h2>
           <span className="label">from the roster-ownership timeline</span>
         </div>
@@ -114,17 +191,21 @@ export default function FranchisePage() {
                 <div key={`${t.date}-${t.team_ids.join("-")}`} className="trade-card">
                   <div className="label">{t.season} · week {t.week} · {shortDate(t.date)}</div>
                   <div className="trade-teams">
-                    {t.team_ids.filter((id) => id !== tid).map((id) => teamName(id)).join(", ")}
+                    {t.team_ids.filter((id) => id !== tid).map((id, i, arr) => (
+                      <span key={id}>
+                        <TeamLink id={id}>{teamName(id)}</TeamLink>{i < arr.length - 1 ? ", " : ""}
+                      </span>
+                    ))}
                   </div>
                   <ul className="trade-players muted">
                     {t.players.map((p, i) => (
                       <li key={`p-${i}`} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                         {p.player_id != null && <PlayerHeadshot playerId={p.player_id} className="leaderboard-headshot" />}
-                        {p.name} → {teamName(p.to_team_id)}
+                        {p.name} → <TeamLink id={p.to_team_id}>{teamName(p.to_team_id)}</TeamLink>
                       </li>
                     ))}
                     {t.picks.map((p, i) => (
-                      <li key={`k-${i}`}>{p.pick} → {teamName(p.to_team_id)}</li>
+                      <li key={`k-${i}`}>{p.pick} → <TeamLink id={p.to_team_id}>{teamName(p.to_team_id)}</TeamLink></li>
                     ))}
                   </ul>
                   {side && <div className="trade-verdict num">{signed(side.net, 0)}</div>}

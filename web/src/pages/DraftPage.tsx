@@ -5,6 +5,7 @@ import { pts, signed } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import EmptyState from "../components/EmptyState";
 import PlayerHeadshot from "../components/PlayerHeadshot";
+import TeamLink from "../components/TeamLink";
 import type { Draft } from "../types/data";
 
 const BOARD_COLS: { key: string; label: string; numeric: boolean; title?: string }[] = [
@@ -49,7 +50,7 @@ function GradeTable({
                   <td className="mono" style={{ fontSize: "1.1rem", fontWeight: 600, textAlign: "left" }}>
                     {g.grade}
                   </td>
-                  <td><strong>{teamName(g.team_id)}</strong></td>
+                  <td><TeamLink id={g.team_id}><strong>{teamName(g.team_id)}</strong></TeamLink></td>
                   <td className={`num ${v.tone}`}>{v.text}</td>
                 </tr>
               );
@@ -110,7 +111,7 @@ function DraftCard({ draft }: { draft: Draft }) {
               <li key={p.player_id} className="feed-row">
                 <span className="num feed-date muted">pk {p.overall}</span>
                 {p.player_id !== null && <PlayerHeadshot playerId={p.player_id} position={p.position} className="leaderboard-headshot" />}
-                <span><strong>{p.name}</strong> <span className="muted">{teamName(p.team_id)}</span>{" "}
+                <span><strong>{p.name}</strong> <span className="muted"><TeamLink id={p.team_id}>{teamName(p.team_id)}</TeamLink></span>{" "}
                   <span className="num pos">{signed(p.value_diff, 0)}</span></span>
               </li>
             ))}
@@ -123,7 +124,7 @@ function DraftCard({ draft }: { draft: Draft }) {
               <li key={p.player_id} className="feed-row">
                 <span className="num feed-date muted">pk {p.overall}</span>
                 {p.player_id !== null && <PlayerHeadshot playerId={p.player_id} position={p.position} className="leaderboard-headshot" />}
-                <span><strong>{p.name}</strong> <span className="muted">{teamName(p.team_id)}</span>{" "}
+                <span><strong>{p.name}</strong> <span className="muted"><TeamLink id={p.team_id}>{teamName(p.team_id)}</TeamLink></span>{" "}
                   <span className="num neg">{signed(p.value_diff, 0)}</span></span>
               </li>
             ))}
@@ -160,7 +161,7 @@ function DraftCard({ draft }: { draft: Draft }) {
                     </span>
                   </td>
                   <td className="muted">{p.position}</td>
-                  <td>{teamName(p.team_id)}</td>
+                  <td><TeamLink id={p.team_id}>{teamName(p.team_id)}</TeamLink></td>
                   <td className="num">{p.value === null ? "—" : pts(p.value)}</td>
                   <td className="num muted">{p.expected_value === null ? "—" : pts(p.expected_value)}</td>
                   <td className={p.value_diff === null ? "num muted" : `num ${p.value_diff >= 0 ? "pos" : "neg"}`}>

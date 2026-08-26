@@ -12,6 +12,7 @@ import { useApp } from "../state/AppContext";
 import { pts, signed } from "../lib/format";
 import EmptyState from "./EmptyState";
 import PlayerHeadshot from "./PlayerHeadshot";
+import TeamLink from "./TeamLink";
 import { ACCENT, FONT_MONO, INK_MUTED, PAPER_2, RULE } from "../lib/tokens";
 import type { Badges, Meta, Ownership, OwnershipStint, Schedule, ScheduleEntry, ScheduleSwap } from "../types/data";
 import type { SeasonBundle } from "../lib/useAllSeasons";
@@ -136,7 +137,9 @@ export function SwapMatrix({ swap, meta }: { swap: ScheduleSwap; meta: Meta }) {
             const ownPct = own ? (own.wins + 0.5 * own.ties) : 0;
             return (
               <tr key={r.team_id}>
-                <th scope="row" style={{ borderBottom: `1px solid ${RULE}` }}>{fullName.get(r.team_id)}</th>
+                <th scope="row" style={{ borderBottom: `1px solid ${RULE}` }}>
+                  <TeamLink id={r.team_id}>{fullName.get(r.team_id)}</TeamLink>
+                </th>
                 {teams.map((c) => {
                   const rec = r.records[String(c.id)];
                   if (!rec) return <td key={c.id} className="num muted">—</td>;
@@ -200,7 +203,9 @@ export function H2HMatrix({ bundles, meta }: { bundles: SeasonBundle[]; meta: Me
         <tbody>
           {teams.map((row) => (
             <tr key={row.id}>
-              <th scope="row" style={{ borderBottom: `1px solid ${RULE}` }}>{currentName(row.id)}</th>
+              <th scope="row" style={{ borderBottom: `1px solid ${RULE}` }}>
+                <TeamLink id={row.id}>{currentName(row.id)}</TeamLink>
+              </th>
               {teams.map((col) => {
                 if (row.id === col.id) return <td key={col.id} className="num muted">·</td>;
                 const w = wins.get(`${row.id}>${col.id}`) ?? 0;
@@ -286,7 +291,9 @@ function tenureLabel(c: CareerStint): string {
 interface LeaderboardRow {
   key: string;
   primary: string;
+  primaryTeamId?: number;
   secondary?: string;
+  secondaryTeamId?: number;
   value: string;
   playerId?: number | null;
   position?: string | null;
@@ -325,8 +332,14 @@ function Leaderboard({ title, subtitle, rows }: {
                 <PlayerHeadshot playerId={r.playerId} position={r.position} proTeam={r.proTeam} className="leaderboard-headshot" />
               )}
               <span className="leaderboard-main">
-                <strong>{r.primary}</strong>
-                {r.secondary && <span className="muted leaderboard-sub">{r.secondary}</span>}
+                <strong>
+                  {r.primaryTeamId !== undefined ? <TeamLink id={r.primaryTeamId}>{r.primary}</TeamLink> : r.primary}
+                </strong>
+                {r.secondary && (
+                  <span className="muted leaderboard-sub">
+                    {r.secondaryTeamId !== undefined ? <TeamLink id={r.secondaryTeamId}>{r.secondary}</TeamLink> : r.secondary}
+                  </span>
+                )}
               </span>
               <span className="num leaderboard-value">{r.value}</span>
             </li>
@@ -379,7 +392,7 @@ export function FranchiseLeaders({ ownership, meta }: { ownership: Ownership | n
         <tbody>
           {rows.map(({ team, scorer, starter }) => (
             <tr key={team.id}>
-              <td><strong>{currentTeamName(team.id)}</strong></td>
+              <td><TeamLink id={team.id}><strong>{currentTeamName(team.id)}</strong></TeamLink></td>
               <td>
                 {scorer && (
                   <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
@@ -452,6 +465,7 @@ export function CareerLeaderboards({ ownership, teamId, teamName }: {
         key: `${c.team_id}-${c.player_id}`,
         primary: `${c.name} ${c.position}`,
         secondary: secondary(c),
+        secondaryTeamId: teamId === undefined ? c.team_id : undefined,
         value: value(c),
         playerId: c.player_id,
         position: c.position,
@@ -544,15 +558,15 @@ export function RecordBook({ bundles, ownership }: { bundles: SeasonBundle[]; ow
 
   const games = useMemo(() => ({
     high: rows.high.map((g): LeaderboardRow => ({
-      key: `${g.season}-${g.e.matchup_period}-${g.team}`, primary: teamName(g.team),
+      key: `${g.season}-${g.e.matchup_period}-${g.team}`, primary: teamName(g.team), primaryTeamId: g.team,
       secondary: `${g.season} wk ${g.e.matchup_period}`, value: pts(g.score),
     })),
     low: rows.low.map((g): LeaderboardRow => ({
-      key: `${g.season}-${g.e.matchup_period}-${g.team}`, primary: teamName(g.team),
+      key: `${g.season}-${g.e.matchup_period}-${g.team}`, primary: teamName(g.team), primaryTeamId: g.team,
       secondary: `${g.season} wk ${g.e.matchup_period}`, value: pts(g.score),
     })),
     blowouts: rows.blowouts.map((g): LeaderboardRow => ({
-      key: `${g.season}-${g.e.matchup_period}-${g.team}`, primary: teamName(g.team),
+      key: `${g.season}-${g.e.matchup_period}-${g.team}`, primary: teamName(g.team), primaryTeamId: g.team,
       secondary: `${g.season} wk ${g.e.matchup_period}`,
       value: `${pts(g.margin)} (${pts(g.winnerScore)}–${pts(g.loserScore)})`,
     })),
@@ -660,7 +674,7 @@ export function CareerTable({ bundles, badges }: { bundles: SeasonBundle[]; badg
         <tbody>
           {sorted.map((r) => (
             <tr key={r.id}>
-              <td><strong>{teamName(r.id)}</strong></td>
+              <td><TeamLink id={r.id}><strong>{teamName(r.id)}</strong></TeamLink></td>
               <td className="num">{r.seasons}</td>
               <td className="num">
                 {r.w}-{r.l}{r.t ? `-${r.t}` : ""}{" "}

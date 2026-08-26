@@ -1,5 +1,6 @@
 import { useApp } from "../state/AppContext";
 import { pct, pts, MISSING } from "../lib/format";
+import TeamLink from "./TeamLink";
 import type { SimTeam, StandingsRow } from "../types/data";
 
 const PLAYOFF_SPOTS_PER_DIVISION = 3;
@@ -59,7 +60,7 @@ export default function DivisionStandings({
               return (
                 <tr key={r.team_id} className={cls}>
                   <td className="num">{i + 1}</td>
-                  <td><strong>{teamName(r.team_id)}</strong></td>
+                  <td><TeamLink id={r.team_id}><strong>{teamName(r.team_id)}</strong></TeamLink></td>
                   <td className="num">{r.record}</td>
                   <td className="num">{started ? (r.streak || MISSING) : MISSING}</td>
                   <td className="num">{r.division_record}</td>

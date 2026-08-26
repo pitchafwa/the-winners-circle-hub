@@ -1,6 +1,7 @@
 import { useApp } from "../state/AppContext";
 import { MISSING, signed } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
+import TeamLink from "./TeamLink";
 import type { Positions } from "../types/data";
 
 type Row = Positions["rows"][number];
@@ -50,7 +51,7 @@ export default function PositionHeatmap({ positions }: { positions: Positions })
         <tbody>
           {rows.map((r) => (
             <tr key={r.team_id}>
-              <td><strong>{teamName(r.team_id)}</strong></td>
+              <td><TeamLink id={r.team_id}><strong>{teamName(r.team_id)}</strong></TeamLink></td>
               {positions.positions.map((p) => {
                 const v = r.values[p];
                 return (

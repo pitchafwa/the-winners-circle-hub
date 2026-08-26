@@ -5,6 +5,7 @@ import { signed } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import EmptyState from "../components/EmptyState";
 import SuperlativeCard from "../components/SuperlativeCard";
+import TeamLink from "../components/TeamLink";
 import type { Superlatives } from "../types/data";
 
 interface TallyRow {
@@ -118,7 +119,7 @@ export default function TrophyCasePage() {
               <tbody>
                 {sortedTally.map((t) => (
                   <tr key={t.id}>
-                    <td><strong>{teamName(t.id)}</strong></td>
+                    <td><TeamLink id={t.id}><strong>{teamName(t.id)}</strong></TeamLink></td>
                     {keys.map((k) => {
                       const n = t.counts.get(k) ?? 0;
                       return (

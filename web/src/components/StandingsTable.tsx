@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useApp } from "../state/AppContext";
 import { pts, pct, signed, MISSING } from "../lib/format";
+import TeamLink from "./TeamLink";
 import type { StandingsRow } from "../types/data";
 
 type Col = {
@@ -89,7 +90,9 @@ export default function StandingsTable({ rows }: { rows: StandingsRow[] }) {
                 {COLS.map((c) =>
                   c.key === "team" ? (
                     <td key="team">
-                      <strong>{team?.name ?? `Team ${r.team_id}`}</strong>{" "}
+                      <TeamLink id={r.team_id}>
+                        <strong>{team?.name ?? `Team ${r.team_id}`}</strong>
+                      </TeamLink>{" "}
                       <span className="muted" style={{ fontSize: "0.78rem" }}>
                         {team?.nickname ?? team?.owner}
                       </span>

@@ -2,6 +2,7 @@ import { useApp } from "../state/AppContext";
 import { useJson } from "../lib/data";
 import { pts, shortDate, signed } from "../lib/format";
 import EmptyState from "../components/EmptyState";
+import TeamLink from "../components/TeamLink";
 import type { TradeGradeAsset, TradeGrades } from "../types/data";
 
 function AssetLine({ p, teamName }: { p: TradeGradeAsset; teamName: (id: number) => string }) {
@@ -10,7 +11,7 @@ function AssetLine({ p, teamName }: { p: TradeGradeAsset; teamName: (id: number)
   const prod = p.production_since_trade;
   return (
     <li>
-      {label} → {teamName(p.to_team_id)}{" "}
+      {label} → <TeamLink id={p.to_team_id}>{teamName(p.to_team_id)}</TeamLink>{" "}
       <span className="num">({valueText})</span>
       {p.value_source === "current_fallback" && (
         <span className="muted" style={{ fontSize: "0.72rem" }}> · current-value estimate</span>
@@ -66,7 +67,7 @@ export default function TradesPage() {
                 <tbody>
                   {ledger.map((r) => (
                     <tr key={r.team_id}>
-                      <td><strong>{teamName(r.team_id)}</strong></td>
+                      <td><TeamLink id={r.team_id}><strong>{teamName(r.team_id)}</strong></TeamLink></td>
                       <td className="num">{r.trade_count}</td>
                       <td className={`num ${r.net >= 0 ? "pos" : "neg"}`}>{signed(r.net, 0)}</td>
                     </tr>
@@ -90,7 +91,12 @@ export default function TradesPage() {
                   <div key={t.id ?? `${t.date}-${t.team_ids.join("-")}`} className="trade-card">
                     <div className="label">{t.season} · week {t.week} · {shortDate(t.date)}</div>
                     <div className="trade-teams">
-                      {t.team_ids.map((tid) => teamName(tid)).join(" ↔ ")}
+                      {t.team_ids.map((tid, i) => (
+                        <span key={tid}>
+                          {i > 0 && " ↔ "}
+                          <TeamLink id={tid}>{teamName(tid)}</TeamLink>
+                        </span>
+                      ))}
                     </div>
                     <ul className="trade-players muted">
                       {t.players.map((p, i) => <AssetLine key={`player-${i}`} p={p} teamName={teamName} />)}
@@ -106,7 +112,7 @@ export default function TradesPage() {
                     )}
                     {t.winner_team_id !== null && winnerSide ? (
                       <div className="trade-verdict num">
-                        {signed(winnerSide.net, 0)} for {teamName(t.winner_team_id)} so far
+                        {signed(winnerSide.net, 0)} for <TeamLink id={t.winner_team_id}>{teamName(t.winner_team_id)}</TeamLink> so far
                       </div>
                     ) : (
                       <div className="trade-verdict muted">grade unavailable</div>

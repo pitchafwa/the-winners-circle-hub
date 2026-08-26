@@ -5,12 +5,13 @@ import { MISSING, pct, pts, signed } from "../lib/format";
 import EmptyState from "../components/EmptyState";
 import MobileLineupList from "../components/MobileLineupList";
 import PlayerHeadshot from "../components/PlayerHeadshot";
+import TeamLink from "../components/TeamLink";
 import WeeklyMatchupProjections from "../components/WeeklyMatchupProjections";
 import type { TeamInfo } from "../components/WeeklyMatchupProjections";
 import { displayOrderIndices } from "../lib/lineupOrder";
 import type {
   Award, AwardMeta, AwardTone, H2H, LineupPlayer, Matchup, MatchupSide,
-  Sim, SimMatchup, Standings, Superlatives, WeekMatchups,
+  Sim, SimMatchup, SimTeam, Standings, Superlatives, WeekMatchups,
 } from "../types/data";
 
 // Not present in the data (AwardMeta has no icon field) — a small, stable
@@ -50,8 +51,8 @@ function headlineValue(award: Award): string {
  * through the win-probability model) and call whichever side projected
  * higher the pre-game favorite. Works for any real completed week,
  * current or years-old, with no new backend field. */
-function worstLoss(matchups: Matchup[], teamName: (id: number) => string): { team: string; margin: number } | null {
-  let worst: { team: string; margin: number } | null = null;
+function worstLoss(matchups: Matchup[], teamName: (id: number) => string): { team: string; teamId: number; margin: number } | null {
+  let worst: { team: string; teamId: number; margin: number } | null = null;
   for (const m of matchups) {
     if (!m.away || m.winner === "UNDECIDED" || m.winner === "TIE") continue;
     const homeProj = m.home.lineup.filter((p) => p.started).reduce((s, p) => s + (p.projected ?? 0), 0);
@@ -61,7 +62,8 @@ function worstLoss(matchups: Matchup[], teamName: (id: number) => string): { tea
     if (favoriteWon) continue;
     const margin = Math.abs(homeProj - awayProj);
     if (!worst || margin > worst.margin) {
-      worst = { team: teamName(homeFavored ? m.home.team_id : m.away.team_id), margin };
+      const teamId = homeFavored ? m.home.team_id : m.away.team_id;
+      worst = { team: teamName(teamId), teamId, margin };
     }
   }
   return worst;
@@ -187,7 +189,7 @@ function MatchupCard({
     return (
       <article className="mu-card">
         <div className="mu-head">
-          <strong>{teamName(m.home.team_id)}</strong>
+          <strong><TeamLink id={m.home.team_id}>{teamName(m.home.team_id)}</TeamLink></strong>
           <span className="muted">bye</span>
         </div>
       </article>
@@ -226,7 +228,7 @@ function MatchupCard({
         <div className={`mu-team ${awayWon ? "winner" : ""}`}>
           <span className="mu-name-row">
             {isChampionship && decided && awayWon && <span className="mu-crown" aria-hidden="true">👑</span>}
-            <strong>{teamName(m.away.team_id)}</strong>
+            <strong><TeamLink id={m.away.team_id}>{teamName(m.away.team_id)}</TeamLink></strong>
           </span>
           <span className="num mu-total">{pts(m.away.total)}</span>
           <Ribbons awards={awardsByTeam.get(m.away.team_id) ?? []} awardsMeta={awardsMeta} />
@@ -234,7 +236,7 @@ function MatchupCard({
         <span className="muted mu-at">at</span>
         <div className={`mu-team ${homeWon ? "winner" : ""}`}>
           <span className="mu-name-row">
-            <strong>{teamName(m.home.team_id)}</strong>
+            <strong><TeamLink id={m.home.team_id}>{teamName(m.home.team_id)}</TeamLink></strong>
             {isChampionship && decided && homeWon && <span className="mu-crown" aria-hidden="true">👑</span>}
           </span>
           <span className="num mu-total">{pts(m.home.total)}</span>
@@ -304,6 +306,7 @@ export default function MatchupsPage() {
   const teamInfo = new Map<number, TeamInfo>(
     (standings.data?.rows ?? []).map((r) => [r.team_id, { record: r.record, streak: r.streak }]),
   );
+  const simTeams = new Map<number, SimTeam>((sim.data?.teams ?? []).map((t) => [t.team_id, t]));
   const weekAwards = (superlatives.data?.awards ?? []).filter((a) => a.week === week);
   const awardsByTeam = new Map<number, Award[]>();
   for (const a of weekAwards) {
@@ -335,11 +338,12 @@ export default function MatchupsPage() {
           {thisWeekIsRealPool && (
             <div className="headline-row">
               <HeadlineCard icon="🔥" label="Game of the Week" tone="gold">
-                {teamName(sim.data.this_week_matchups[0].away_id)} @ {teamName(sim.data.this_week_matchups[0].home_id)}
+                <TeamLink id={sim.data.this_week_matchups[0].away_id}>{teamName(sim.data.this_week_matchups[0].away_id)}</TeamLink>{" "}
+                @ <TeamLink id={sim.data.this_week_matchups[0].home_id}>{teamName(sim.data.this_week_matchups[0].home_id)}</TeamLink>
               </HeadlineCard>
               {underdog && (
                 <HeadlineCard icon="🐶" label="Biggest Underdog" tone="neutral">
-                  {teamName(underdog.team)} <span className="muted">{pct(underdog.winPct, 0)} to win</span>
+                  <TeamLink id={underdog.team}>{teamName(underdog.team)}</TeamLink> <span className="muted">{pct(underdog.winPct, 0)} to win</span>
                 </HeadlineCard>
               )}
             </div>
@@ -348,6 +352,7 @@ export default function MatchupsPage() {
             matchups={sim.data.this_week_matchups}
             teamInfo={teamInfo}
             h2hPairs={h2h.data?.pairs ?? []}
+            simTeams={simTeams}
           />
         </section>
       )}
@@ -377,15 +382,15 @@ export default function MatchupsPage() {
                     label={superlatives.data?.awards_meta[a.key]?.label ?? a.key}
                     tone={superlatives.data?.awards_meta[a.key]?.tone ?? "neutral"}>
                     {a.player_name ? (
-                      <>{a.player_name} <span className="muted">({teamName(a.team_id)}) {headlineValue(a)}</span></>
+                      <>{a.player_name} <span className="muted">(<TeamLink id={a.team_id}>{teamName(a.team_id)}</TeamLink>) {headlineValue(a)}</span></>
                     ) : (
-                      <>{teamName(a.team_id)} <span className="muted">{headlineValue(a)}</span></>
+                      <><TeamLink id={a.team_id}>{teamName(a.team_id)}</TeamLink> <span className="muted">{headlineValue(a)}</span></>
                     )}
                   </HeadlineCard>
                 ))}
                 {weekWorstLoss && (
                   <HeadlineCard icon="😱" label="Worst Loss" tone="negative">
-                    {weekWorstLoss.team} <span className="muted">favored by {pts(weekWorstLoss.margin)}, lost anyway</span>
+                    <TeamLink id={weekWorstLoss.teamId}>{weekWorstLoss.team}</TeamLink> <span className="muted">favored by {pts(weekWorstLoss.margin)}, lost anyway</span>
                   </HeadlineCard>
                 )}
               </div>

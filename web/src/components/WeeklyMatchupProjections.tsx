@@ -4,7 +4,8 @@ import { h2hLookup } from "../lib/h2h";
 import { displayOrderIndices } from "../lib/lineupOrder";
 import MobileLineupList from "./MobileLineupList";
 import PlayerHeadshot from "./PlayerHeadshot";
-import type { H2HPair, SimMatchup, WeekLineupPlayer } from "../types/data";
+import TeamLink from "./TeamLink";
+import type { AwardTone, H2HPair, SimMatchup, SimTeam, WeekLineupPlayer } from "../types/data";
 
 export interface TeamInfo {
   record: string;
@@ -20,7 +21,69 @@ function impactLabel(score: number): { text: string; tone: "" | "pos" } {
   return { text: "Low stakes", tone: "" };
 }
 
+const ELIMINATION_THRESHOLD = 0.05;
+const CLINCH_THRESHOLD = 0.97;
+const UPSET_THRESHOLD = 0.35;
+
+interface MatchupFlag {
+  key: string;
+  teamId: number | null;
+  label: string;
+  tone: AwardTone;
+}
+
+/** Elimination/clinch read off the SAME playoff_pct_if_win_next/
+ * playoff_pct_if_lose_next fields the Playoff Probability bars already use
+ * — a team "faces elimination" only if a loss THIS week would actually be
+ * what does it (current playoff_pct still real, not already ~0), and only
+ * "can clinch" if a win THIS week would actually be what does it (not
+ * already effectively in). Scoped to the regular season — a real playoff
+ * bracket game is already sudden-death by construction, and these fields
+ * mean something different there. Upset alert is playoff_pct-independent
+ * (pure this-game win probability) so it's shown for playoff games too. */
+function matchupFlags(m: SimMatchup, simTeams: Map<number, SimTeam>, teamName: (id: number) => string): MatchupFlag[] {
+  const flags: MatchupFlag[] = [];
+  if (!m.is_playoff) {
+    for (const id of [m.away_id, m.home_id]) {
+      const s = simTeams.get(id);
+      if (!s) continue;
+      if (s.playoff_pct_if_lose_next !== null && s.playoff_pct_if_lose_next < ELIMINATION_THRESHOLD
+          && s.playoff_pct >= ELIMINATION_THRESHOLD) {
+        flags.push({ key: `elim-${id}`, teamId: id, label: `${teamName(id)}: must win`, tone: "negative" });
+      }
+      if (s.playoff_pct_if_win_next !== null && s.playoff_pct_if_win_next >= CLINCH_THRESHOLD
+          && s.playoff_pct < CLINCH_THRESHOLD) {
+        flags.push({ key: `clinch-${id}`, teamId: id, label: `${teamName(id)}: clinches with a win`, tone: "positive" });
+      }
+    }
+  }
+  const awayPct = 1 - m.home_win_pct;
+  const underdogPct = Math.min(m.home_win_pct, awayPct);
+  if (underdogPct >= UPSET_THRESHOLD && underdogPct < 0.5) {
+    const underdogId = m.home_win_pct < awayPct ? m.home_id : m.away_id;
+    flags.push({
+      key: "upset", teamId: underdogId,
+      label: `Upset alert: ${teamName(underdogId)} has a real shot (${pct(underdogPct, 0)})`, tone: "gold",
+    });
+  }
+  return flags;
+}
+
+function MatchupFlags({ flags }: { flags: MatchupFlag[] }) {
+  if (flags.length === 0) return null;
+  return (
+    <div className="mu-ribbons" style={{ marginBottom: "0.6rem" }}>
+      {flags.map((f) => (
+        <span key={f.key} className="badge-chip mu-ribbon" data-tone={f.tone}>
+          {f.teamId !== null ? <TeamLink id={f.teamId} className="team-link">{f.label}</TeamLink> : f.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function TeamScore({
+  teamId,
   name,
   info,
   current,
@@ -30,6 +93,7 @@ function TeamScore({
   started,
   align,
 }: {
+  teamId: number;
   name: string;
   info: TeamInfo | undefined;
   current: number | null;
@@ -47,18 +111,19 @@ function TeamScore({
       {info.record}{hasStreak ? ` · ${info.streak}` : ""}
     </span>
   );
+  const nameBits = <strong><TeamLink id={teamId}>{name}</TeamLink></strong>;
   return (
     <div className="mu-team">
       <span className="mu-name-row">
         {align === "left" ? (
           <>
-            <strong>{name}</strong>
+            {nameBits}
             {recordBits}
           </>
         ) : (
           <>
             {recordBits}
-            <strong>{name}</strong>
+            {nameBits}
           </>
         )}
       </span>
@@ -109,10 +174,12 @@ export default function WeeklyMatchupProjections({
   matchups,
   teamInfo,
   h2hPairs,
+  simTeams,
 }: {
   matchups: SimMatchup[];
   teamInfo: Map<number, TeamInfo>;
   h2hPairs: H2HPair[];
+  simTeams: Map<number, SimTeam>;
 }) {
   const { teamName, myTeamId } = useApp();
 
@@ -125,6 +192,7 @@ export default function WeeklyMatchupProjections({
         const mine = m.home_id === myTeamId || m.away_id === myTeamId;
         const h2h = h2hLookup(h2hPairs, m.away_id, m.home_id);
         const rows = Math.max(m.away_lineup.length, m.home_lineup.length);
+        const flags = matchupFlags(m, simTeams, teamName);
         // Both sides share the identical real slot order index-for-index,
         // so one permutation (computed off either side) reorders both.
         const order = displayOrderIndices(m.away_lineup.map((p) => p.slot));
@@ -141,10 +209,13 @@ export default function WeeklyMatchupProjections({
               )}
             </div>
 
+            <MatchupFlags flags={flags} />
+
             {/* Away on the left, home on the right — same convention as the
                real box-score cards, so "who's home" reads the same everywhere. */}
             <div className="mu-head">
               <TeamScore
+                teamId={m.away_id}
                 name={teamName(m.away_id)}
                 info={teamInfo.get(m.away_id)}
                 current={m.away_current}
@@ -163,6 +234,7 @@ export default function WeeklyMatchupProjections({
                 )}
               </span>
               <TeamScore
+                teamId={m.home_id}
                 name={teamName(m.home_id)}
                 info={teamInfo.get(m.home_id)}
                 current={m.home_current}

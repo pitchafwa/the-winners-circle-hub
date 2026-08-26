@@ -1,6 +1,7 @@
 import { useApp } from "../state/AppContext";
 import { pts } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
+import TeamLink from "./TeamLink";
 import type { Spectrum, SpectrumLabel } from "../types/data";
 
 const LABEL_TONE: Record<SpectrumLabel, "pos" | "neg" | ""> = {
@@ -61,7 +62,7 @@ export default function ContendRebuildTable({ spectrum }: { spectrum: Spectrum }
         <tbody>
           {rows.map((r) => (
             <tr key={r.team_id}>
-              <td><strong>{teamName(r.team_id)}</strong></td>
+              <td><TeamLink id={r.team_id}><strong>{teamName(r.team_id)}</strong></TeamLink></td>
               <td className="num">{pts(r.contending_value, 0)}</td>
               <td className="num muted">{pts(r.dynasty_roster_value, 0)}</td>
               <td className="num muted">{pts(r.future_pick_capital, 0)}</td>

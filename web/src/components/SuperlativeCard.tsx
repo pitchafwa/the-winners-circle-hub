@@ -1,5 +1,6 @@
 import { useApp } from "../state/AppContext";
 import { pts, pct } from "../lib/format";
+import TeamLink from "./TeamLink";
 import type { Award, AwardMeta } from "../types/data";
 
 function formatValue(award: Award, meta: AwardMeta | undefined): string {
@@ -28,7 +29,7 @@ export default function SuperlativeCard({
     >
       <div className={`award-name ${tone}`}>{meta?.label ?? award.key}</div>
       <div className="award-rule" />
-      <div className="award-team">{teamName(award.team_id)}</div>
+      <div className="award-team"><TeamLink id={award.team_id}>{teamName(award.team_id)}</TeamLink></div>
       <div className="award-value">{formatValue(award, meta)}</div>
       <div className="award-detail">{award.detail}</div>
     </article>

@@ -494,13 +494,15 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
         # those keep accumulating every week a real game exists, playoffs
         # included — the WINNERS_BRACKET-only filter above already scopes
         # them to just the teams still playing for something real. Best
-        # coach sits in between: normally the same "whole league" problem
-        # as highest/lowest score, EXCEPT the championship week specifically
-        # — by then it really is just the two finalists, so "who out-coached
-        # the other" is a fair, meaningful head-to-head again.
+        # coach is different from the other "whole league" awards: it's
+        # excluded ONLY for the championship week specifically (Tommy's
+        # call — down to just the two finalists, "who out-coached the
+        # other" stops being an interesting comparison), but stays ON for
+        # every OTHER playoff week/round, where there's still a real pool
+        # of contending teams to compare across.
         reg_season_only = week <= league.reg_season_weeks
         is_championship_week = week == config.FINAL_COUNTED_WEEK
-        best_coach_eligible = reg_season_only or is_championship_week
+        best_coach_eligible = not is_championship_week
         team_weeks: list[TeamWeek] = []
         margins: list[tuple[float, TeamWeek, TeamWeek]] = []  # (margin, winner, loser)
         winners: list[TeamWeek] = []
@@ -535,13 +537,15 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
 
         if best_coach_eligible:
             # Best coach — highest rating, tiebreak fewer bench points lost.
-            # Regular season compares the whole field; championship week
-            # compares just the two finalists (still meaningful — see the
-            # comment above `best_coach_eligible`).
+            # `matchups` is already WINNERS_BRACKET-only during any playoff
+            # week (top of the loop), so restricting the candidate pool to
+            # teams actually present there is a no-op in the regular season
+            # (everyone's in some matchup) but correctly excludes
+            # consolation-ladder teams during the playoffs.
+            playing_now = {m.home.team_id for m in matchups} | {m.away.team_id for m in matchups if m.away}
             rated = [(tid, coach[tid]["weeks"][week]) for tid in coach
-                     if week in coach[tid]["weeks"] and coach[tid]["weeks"][week]["rating"] is not None
-                     and (reg_season_only or any(tid == m.home.team_id or (m.away and tid == m.away.team_id)
-                                                  for m in matchups))]
+                     if tid in playing_now
+                     and week in coach[tid]["weeks"] and coach[tid]["weeks"][week]["rating"] is not None]
             if rated:
                 tid, cw = max(rated, key=lambda kv: (kv[1]["rating"], -kv[1]["bench_lost"]))
                 awards.append(Award(week, "best_coach", tid, round(cw["rating"] * 100, 1),

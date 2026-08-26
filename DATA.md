@@ -31,14 +31,16 @@ General rules:
   mistakes or scores, not "best week across the whole league" wins, so the
   "playoff teams play strictly more real games, don't let them pad their
   trophy count" fairness problem doesn't apply to them. `best_coach` is a
-  partial exception: excluded for a normal playoff week (same "whole league
-  pool" problem as highest/lowest score) but back in specifically for the
-  **championship week**, since by then it really is a fair 2-team
-  comparison. All of these — during any playoff week, including the
-  championship — are additionally scoped to just the `WINNERS_BRACKET` game(s)
-  that week, never a consolation-ladder game. Same `reg_season_weeks` rule
-  for `record_high_week`/`record_low_week` badges — a playoff week can't set
-  the all-time single-week record. See `metrics.compute_superlatives`'s
+  partial exception in the other direction: it stays ON for every playoff
+  round EXCEPT the championship week specifically — down to just the two
+  finalists, "who out-coached the other" stops being an interesting
+  comparison (Tommy's call), but every earlier playoff round still has a
+  real pool of contending teams to compare across. All of these — during
+  any playoff week, championship included — are additionally scoped to just
+  the `WINNERS_BRACKET` team(s) that week, never a consolation-ladder team.
+  Same `reg_season_weeks` rule for `record_high_week`/`record_low_week`
+  badges — a playoff week can't set the all-time single-week record. See
+  `metrics.compute_superlatives`'s
   `reg_season_only`/`best_coach_eligible` flags and the matching filter in
   `build.py`'s `build_badges`.
 

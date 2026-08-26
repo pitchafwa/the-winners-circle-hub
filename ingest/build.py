@@ -206,10 +206,24 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         })
 
     # ---- matchups/week-N.json --------------------------------------------
-    def side_json(tw, week, on_fire_by_pid):
+    pro_abbrev = {tid: info["abbrev"] for tid, info in parse.pro_team_schedule(season).items()}
+
+    def side_json(tw, week, recent_by_pid):
         if tw is None:
             return None
         c = coach[tw.team_id]["weeks"][week]
+
+        def _player_json(p):
+            on_fire, on_ice = parse.hot_cold_status(
+                p.position, p.played, p.actual if p.played else None, p.projected,
+                recent_by_pid.get(p.player_id, []),
+            )
+            return {"player_id": p.player_id, "name": p.name, "position": p.position,
+                    "pro_team": pro_abbrev.get(p.pro_team_id, ""),
+                    "slot": p.slot_name, "started": p.started, "actual": p.actual,
+                    "projected": p.projected, "played": p.played,
+                    "on_fire": on_fire, "on_ice": on_ice}
+
         return {
             "team_id": tw.team_id,
             "total": tw.total,
@@ -222,10 +236,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             "bench_points_lost": c["bench_lost"],
             "optimal_lineup": c["optimal_assignment"],
             "lineup": [
-                {"player_id": p.player_id, "name": p.name, "position": p.position,
-                 "slot": p.slot_name, "started": p.started, "actual": p.actual,
-                 "projected": p.projected, "played": p.played,
-                 "on_fire": on_fire_by_pid.get(p.player_id, False)}
+                _player_json(p)
                 for p in sorted(tw.lineup, key=lambda x: (not x.started, x.slot_id))
             ],
         }
@@ -247,18 +258,20 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     for week in completed:
         # "As of week W," not "as of right now" — see recent_player_performance's
         # own docstring for why a rewritten-every-build historical box score
-        # can't just reuse a single global on-fire snapshot.
-        on_fire_by_pid = {
-            pid: parse.is_on_fire(r)
-            for pid, r in parse.recent_player_performance(league, upto_week=week).items()
-        }
+        # can't just reuse a single global on-fire/on-ice snapshot. Feeds
+        # the PRE_GAME (hasn't-played-yet) side of hot_cold_status only —
+        # a player who HAS played that week is judged on that week's own
+        # actual/projected instead, so this lookup only matters for a
+        # still-in-progress "week" (bye entries just fail the len<3 check
+        # harmlessly).
+        recent_by_pid = parse.recent_player_performance(league, upto_week=week)
         _write(out_dir / "matchups" / f"week-{week}.json", {
             "generated_at": generated_at,
             "week": week,
             "matchups": [
                 {"matchup_period": m.matchup_period, "winner": m.winner,
                  "is_playoff": m.is_playoff, "playoff_tier": m.playoff_tier,
-                 "home": side_json(m.home, week, on_fire_by_pid), "away": side_json(m.away, week, on_fire_by_pid)}
+                 "home": side_json(m.home, week, recent_by_pid), "away": side_json(m.away, week, recent_by_pid)}
                 for m in league.weeks[week]
             ],
             "late_swings": metrics.compute_late_swings(league, week, parse.pro_game_dates(season, week)),

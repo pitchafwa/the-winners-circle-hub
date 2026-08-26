@@ -61,11 +61,16 @@ def build_roster_cards(season: int, league: parse.LeagueData) -> dict[int, dict]
 
             player_recent = recent.get(pid, [])
             diffs = [r["points"] - r["projected"] for r in player_recent if r["projected"] is not None]
+            position = parse.POSITION_NAMES.get(player.get("defaultPositionId", 0), "?")
+            played_this_week = week_actual is not None
+            on_fire, on_ice = parse.hot_cold_status(
+                position, played_this_week, week_actual, week_projection, player_recent,
+            )
 
             card = {
                 "player_id": pid,
                 "name": player.get("fullName", ""),
-                "position": parse.POSITION_NAMES.get(player.get("defaultPositionId", 0), "?"),
+                "position": position,
                 "pro_team": pro_info.get("abbrev", ""),
                 "slot": parse.SLOT_NAMES.get(slot_id, str(slot_id)),
                 "injury_status": player.get("injuryStatus"),
@@ -74,7 +79,8 @@ def build_roster_cards(season: int, league: parse.LeagueData) -> dict[int, dict]
                 "week_projection": week_projection,
                 "recent": player_recent,
                 "recent_avg_diff": round(sum(diffs) / len(diffs), 1) if diffs else None,
-                "on_fire": parse.is_on_fire(player_recent),
+                "on_fire": on_fire,
+                "on_ice": on_ice,
                 "suggested": False,
                 # kept off the final card — only needed for the bench-fill
                 # valuation pass below, stripped before this dict is used
@@ -124,7 +130,7 @@ def build_roster_cards(season: int, league: parse.LeagueData) -> dict[int, dict]
                     "pro_team": None, "slot": parse.SLOT_NAMES.get(slot_id, str(slot_id)),
                     "injury_status": None, "on_bye": False, "next_game": None,
                     "week_projection": None, "recent": [], "recent_avg_diff": None,
-                    "on_fire": False, "suggested": False,
+                    "on_fire": False, "on_ice": False, "suggested": False,
                 }
 
         for group in (starters, bench, ir):

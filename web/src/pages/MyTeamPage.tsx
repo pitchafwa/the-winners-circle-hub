@@ -109,8 +109,9 @@ export default function MyTeamPage() {
             <RosterTable roster={myRoster} />
             <p className="muted" style={{ fontSize: "0.72rem", marginTop: "0.5rem", fontStyle: "italic" }}>
               Last = points in the most recent game. Last3 = average points over the last 3 games. Diff = average
-              of actual minus projected points per game over the last 3 games — our own signal for who's running
-              hot or cold lately, not something ESPN shows.
+              of actual minus projected points per game over the last 3 games. 🔥/🧊 = well ahead of/behind
+              projection — a single big week once that player's game has started, or 3 straight games before it
+              has. None of this is something ESPN shows.
             </p>
           </section>
         );

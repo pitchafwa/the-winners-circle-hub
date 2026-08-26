@@ -91,11 +91,12 @@ function LineupRow({ p }: { p: WeekLineupPlayer | undefined }) {
   return (
     <div className="mu-player">
       <span className="mu-name-group">
-        <PlayerHeadshot playerId={p.player_id} className="mu-headshot" />
+        <PlayerHeadshot playerId={p.player_id} position={p.position} proTeam={p.pro_team} className="mu-headshot" />
         <span className="mu-name">
           {p.name}
           {showPosition && <span className="muted mu-pos"> {p.position}</span>}
-          {p.on_fire && <span className="on-fire-flame" title="On fire — beat projection by 5+ points in each of the last 3 games">🔥</span>}
+          {p.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}
+          {p.on_ice && <span className="on-fire-flame" title="Ice cold — well behind projection">🧊</span>}
         </span>
       </span>
       <span className="num mu-pts">

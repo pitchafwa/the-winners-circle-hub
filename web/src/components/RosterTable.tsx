@@ -47,10 +47,11 @@ function PlayerRow({ card }: { card: RosterPlayerCard }) {
           <span className="muted">Empty</span>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <PlayerHeadshot playerId={card.player_id} />
+            <PlayerHeadshot playerId={card.player_id} position={card.position} proTeam={card.pro_team} />
             <span>
               <strong style={card.suggested ? { fontStyle: "italic" } : undefined}>{card.name}</strong>{" "}
-              {card.on_fire && <span className="on-fire-flame" title="On fire — beat projection by 5+ points in each of the last 3 games">🔥</span>}
+              {card.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}
+              {card.on_ice && <span className="on-fire-flame" title="Ice cold — well behind projection">🧊</span>}
               <span className="muted" style={{ fontSize: "0.78rem" }}>
                 {card.position} · {card.pro_team}
               </span>

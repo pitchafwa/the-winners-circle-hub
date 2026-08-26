@@ -37,7 +37,7 @@ from metrics import current_records, redraft_lineup_value
 from parse import (
     LeagueData,
     current_roster_players,
-    is_on_fire,
+    hot_cold_status,
     optimal_week_projection,
     recent_player_performance,
     values_by_pid,
@@ -373,13 +373,26 @@ def run(league: LeagueData, history: LeagueData | None = None,
     this_week_matchups = []
     if this_week_period is not None:
         week_proj = optimal_week_projection(league.season, this_week_period, league.starting_slots)
-        # on_fire (parse.is_on_fire — beat projection by a real margin in
-        # each of the last 3 games) computed once here, same as roster.json,
-        # and merged into each lineup entry below rather than threading it
-        # through optimal_week_projection() itself — that function has one
-        # other caller-independent shape to keep stable, and this is purely
-        # additive at the call site.
-        on_fire_by_pid = {pid: is_on_fire(r) for pid, r in recent_player_performance(league).items()}
+        # on_fire/on_ice (parse.hot_cold_status) computed once here, same
+        # as roster.json, and merged into each lineup entry below rather
+        # than threading it through optimal_week_projection() itself —
+        # that function has one other caller-independent shape to keep
+        # stable, and this is purely additive at the call site. Current-
+        # moment recent-performance lookup is correct here (not a
+        # per-week upto_week scope) since this is always THE live/current
+        # week, never a past one.
+        recent_by_pid = recent_player_performance(league)
+
+        def _with_hot_cold(lineup):
+            out_lineup = []
+            for p in lineup:
+                on_fire, on_ice = hot_cold_status(
+                    p["position"], p["played"],
+                    p["actual"] if p["played"] else None, p["projected"],
+                    recent_by_pid.get(p["player_id"], []),
+                )
+                out_lineup.append({**p, "on_fire": on_fire, "on_ice": on_ice})
+            return out_lineup
         for i, e in enumerate(remaining):
             if e.matchup_period != this_week_period:
                 continue
@@ -396,8 +409,8 @@ def run(league: LeagueData, history: LeagueData | None = None,
                 home_win_pct = round(_normal_cdf((home_projected - away_projected) / WIN_PROB_SIGMA), 4)
                 started = home_week["started"] or away_week["started"]
                 projection_source = "espn"
-                home_lineup = [{**p, "on_fire": on_fire_by_pid.get(p["player_id"], False)} for p in home_week["lineup"]]
-                away_lineup = [{**p, "on_fire": on_fire_by_pid.get(p["player_id"], False)} for p in away_week["lineup"]]
+                home_lineup = _with_hot_cold(home_week["lineup"])
+                away_lineup = _with_hot_cold(away_week["lineup"])
                 home_remaining, away_remaining = home_week["remaining"], away_week["remaining"]
                 home_total_starters, away_total_starters = home_week["total_starters"], away_week["total_starters"]
             else:

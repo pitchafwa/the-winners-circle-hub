@@ -385,28 +385,61 @@ def roster_player_names(season: int | None = None) -> dict[int, str]:
     return names
 
 
-# Points a player must beat their OWN pre-game projection by, in EACH of
-# their last 3 real games, to earn the "on fire" flame. Hand-calibrated:
-# high enough that it's a real hot streak (not just "happened to edge
-# projection by a point three times"), low enough that it's not
-# vanishingly rare — beating projection by 5+ in a single game is a
-# genuinely good week for most starters, so three straight is a real
-# signal without requiring three literal boom weeks in a row.
-ON_FIRE_MARGIN = 5.0
+# Points a player must beat (fire) or miss (ice) their OWN projection by
+# to earn a hot/cold icon — position-adjusted, not flat, since a QB is
+# routinely projected for meaningfully more than a TE/D/ST/K, so a flat
+# threshold would make QBs earn the flame far more/less often than other
+# positions for the same relative performance. Two regimes:
+#
+# - IN_GAME_MARGIN: that player's game for the relevant week has started
+#   or finished — judged on THAT SINGLE week's real actual-minus-
+#   projected margin. Single-game variance is naturally larger, so this
+#   is the higher of the two thresholds (Tommy's own suggestion: 8 for
+#   RB/WR, scaled by position from there).
+# - PRE_GAME_MARGIN: that player's game hasn't started yet — judged on
+#   whether EACH of their last 3 real games beat/missed projection by
+#   this margin (a genuine streak, not an average). Sustaining a margin
+#   across 3 straight games is much harder than hitting it once, so this
+#   is deliberately lower — scaled down from IN_GAME_MARGIN by the same
+#   ~0.625 ratio as the original flat calibration (5.0 pre-game / 8.0
+#   in-game), which happened to reproduce that original 5.0 for RB/WR
+#   exactly once positions were split out.
+IN_GAME_MARGIN = {"QB": 9.0, "RB": 8.0, "WR": 8.0, "TE": 5.0, "D/ST": 5.0, "K": 5.0}
+PRE_GAME_MARGIN = {"QB": 5.5, "RB": 5.0, "WR": 5.0, "TE": 3.0, "D/ST": 3.0, "K": 3.0}
+_DEFAULT_IN_GAME_MARGIN = 7.0
+_DEFAULT_PRE_GAME_MARGIN = 4.5
 
 
-def is_on_fire(recent: list[dict]) -> bool:
-    """True if EACH of a player's last 3 real games (parse.
-    recent_player_performance()'s shape — newest first) beat that game's
-    own projection by at least ON_FIRE_MARGIN. Deliberately per-game, not
-    an average — a huge week 1 game propping up two mediocre ones
-    shouldn't read the same as three genuinely strong games in a row."""
+def hot_cold_status(
+    position: str, played: bool, week_actual: float | None,
+    week_projected: float | None, recent: list[dict],
+) -> tuple[bool, bool]:
+    """(on_fire, on_ice) for one player in one specific week's context.
+
+    `played=True` (that week's game has started or finished): single-game
+    `week_actual - week_projected` vs IN_GAME_MARGIN[position].
+
+    `played=False` (hasn't played that week yet): EACH of the last 3 real
+    games in `recent` (parse.recent_player_performance()'s shape, newest
+    first) beat/missed ITS OWN projection by PRE_GAME_MARGIN[position].
+
+    Never both True — a fire margin and an ice margin can't both be met
+    (they're opposite signs of the same comparison)."""
+    if played:
+        if week_actual is None or week_projected is None:
+            return False, False
+        margin = IN_GAME_MARGIN.get(position, _DEFAULT_IN_GAME_MARGIN)
+        diff = week_actual - week_projected
+        return diff >= margin, diff <= -margin
+    margin = PRE_GAME_MARGIN.get(position, _DEFAULT_PRE_GAME_MARGIN)
     if len(recent) < 3:
-        return False
-    return all(
-        r["projected"] is not None and (r["points"] - r["projected"]) >= ON_FIRE_MARGIN
-        for r in recent[:3]
-    )
+        return False, False
+    diffs = []
+    for r in recent[:3]:
+        if r["projected"] is None:
+            return False, False
+        diffs.append(r["points"] - r["projected"])
+    return all(d >= margin for d in diffs), all(d <= -margin for d in diffs)
 
 
 def current_fantasy_week(league: "LeagueData") -> int:
@@ -561,6 +594,7 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
         return {}
     from metrics import best_lineup  # local import: metrics imports from parse, so this has to be deferred to call time to dodge a circular import at module load
 
+    pro = pro_team_schedule(season)
     out: dict[int, dict] = {}
     for m in box.get("schedule", []):
         for side in (m.get("home"), m.get("away")):
@@ -587,6 +621,7 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
                     "player_id": pid, "eligible": eligible,
                     "name": player.get("fullName", ""),
                     "position": POSITION_NAMES.get(player.get("defaultPositionId", 0), ""),
+                    "pro_team": pro.get(player.get("proTeamId", 0), {}).get("abbrev", ""),
                     "actual": actual, "projected": projected, "played": actual is not None,
                 }
                 lineup_slot = e.get("lineupSlotId", BENCH_SLOT)
@@ -633,13 +668,14 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
             lineup = [
                 {
                     "player_id": entry["player_id"], "name": entry["name"], "position": entry["position"],
+                    "pro_team": entry["pro_team"],
                     "slot": SLOT_NAMES.get(slot_id, ""),
                     "actual": round(entry["actual"], 2) if entry["actual"] is not None else None,
                     "projected": round(entry["projected"], 2),
                     "played": entry["played"],
                 }
                 if (entry := lineup_by_index[i]) else
-                {"player_id": None, "name": None, "position": None,
+                {"player_id": None, "name": None, "position": None, "pro_team": None,
                  "slot": SLOT_NAMES.get(slot_id, ""), "actual": None, "projected": None, "played": False}
                 for i, slot_id in enumerate(starting_slots)
             ]

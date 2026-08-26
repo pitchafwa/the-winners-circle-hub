@@ -137,12 +137,14 @@ export interface LineupPlayer {
   player_id: number;
   name: string;
   position: string;
+  pro_team: string | null;
   slot: string;
   started: boolean;
   actual: number;
   projected: number | null;
   played: boolean;
   on_fire: boolean;
+  on_ice: boolean;
 }
 
 export interface OptimalSlot {
@@ -354,11 +356,13 @@ export interface WeekLineupPlayer {
   player_id: number | null;
   name: string | null;
   position: string | null;
+  pro_team: string | null;
   slot: string;
   actual: number | null;
   projected: number | null;
   played: boolean;
   on_fire: boolean;
+  on_ice: boolean;
 }
 
 export interface SimMatchup {
@@ -678,6 +682,7 @@ export interface RosterPlayerCard {
   recent: RosterRecentWeek[];
   recent_avg_diff: number | null;
   on_fire: boolean;
+  on_ice: boolean;
   suggested: boolean;
 }
 

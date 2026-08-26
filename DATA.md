@@ -113,22 +113,58 @@ One file per completed week. `matchups[]`:
 Side: `{team_id, total, lineup_points, home_bonus, adjustment, is_home,
 optimal_points, coach_rating, bench_points_lost,
 optimal_lineup[] {slot, player_id, player, points},
-lineup[] {player_id, name, position, slot, started, actual, projected, played,
-on_fire}}`. Lineup is sorted starters-first.
+lineup[] {player_id, name, position, pro_team, slot, started, actual,
+projected, played, on_fire, on_ice}}`. Lineup is sorted starters-first.
+`pro_team` is the player's real NFL team abbreviation (`""` for a genuinely
+empty placeholder slot) — mainly so the frontend can show a D/ST's team
+logo instead of a generic silhouette (ESPN has no "player" photo for a
+defense).
 
-`on_fire` (also on `sim.json`'s `home_lineup`/`away_lineup` and
-`roster.json`'s player cards — same field, same rule, computed once in
-`parse.is_on_fire()`): true when EACH of a player's last 3 real games beat
-that game's own projection by `ON_FIRE_MARGIN` (5.0) points — per-game, not
-an average, so one huge week propping up two mediocre ones doesn't count.
-For a completed week's box score specifically, this is computed "as of
-that week" (`recent_player_performance(..., upto_week=week)`), not "as of
-right now" — `matchups/week-N.json` is rewritten every build for every
+`on_fire`/`on_ice` (also on `sim.json`'s `home_lineup`/`away_lineup` and
+`roster.json`'s player cards — same fields, same rule, computed once in
+`parse.hot_cold_status()`): whether a player is running meaningfully hot
+or cold relative to projection, in one of two regimes depending on
+`played`:
+- **`played: true`** (that week's game has started or finished): that
+  single week's real `actual − projected` vs `IN_GAME_MARGIN[position]`.
+- **`played: false`** (hasn't played that week yet): EACH of the player's
+  last 3 real games (`recent_player_performance()`, newest first) beat/
+  missed ITS OWN projection by `PRE_GAME_MARGIN[position]` — a genuine
+  streak, not an average, so one huge week propping up two mediocre ones
+  doesn't count.
+
+Both margin tables are position-adjusted, not flat — a QB is routinely
+projected for meaningfully more than a TE/D/ST/K, so a flat point
+threshold would make QBs earn the icon far more/less often than other
+positions for the same relative performance:
+```
+IN_GAME_MARGIN  = {QB: 9.0, RB: 8.0, WR: 8.0, TE: 5.0, D/ST: 5.0, K: 5.0}
+PRE_GAME_MARGIN = {QB: 5.5, RB: 5.0, WR: 5.0, TE: 3.0, D/ST: 3.0, K: 3.0}
+```
+`IN_GAME_MARGIN` is Tommy's own figures (RB/WR anchor of 8, scaled by
+position from there). `PRE_GAME_MARGIN` is lower across the board — by
+design, sustaining a margin across 3 straight games is much harder than
+hitting it once — scaled down by the same ~0.625 ratio the original
+flat single-number calibration used (5.0 pre-game / 8.0 in-game),
+which happened to land exactly on that original 5.0 for RB/WR once
+positions were split out. Checked against real 2025 season data:
+~387 fire + ~377 ice instances across ~3,200 player-weeks for the
+in-game regime — a big share of completed weeks getting tagged is
+expected there (a single boom/bust game is genuinely common in real
+NFL scoring variance), not a calibration problem — the pre-game
+streak regime is the one meant to be rare.
+
+For a completed week's box score specifically, the pre-game (not-yet-
+played) side of this is computed "as of that week"
+(`recent_player_performance(..., upto_week=week)`), not "as of right
+now" — `matchups/week-N.json` is rewritten every build for every
 completed week, so a global current-moment snapshot would incorrectly
-retroactively badge old weeks using games that hadn't happened yet at the
-time. `sim.json`/`roster.json` are both inherently "right now" already
-(never built for a past/finished season), so they use the plain
-current-moment lookup.
+retroactively badge old weeks using games that hadn't happened yet at
+the time. A player who HAS played that week is judged on that week's
+own real actual/projected regardless, so this only matters for a
+still-in-progress week's not-yet-played entries. `sim.json`/`roster.json`
+are both inherently "right now" already (never built for a past/finished
+season), so they use the plain current-moment lookup throughout.
 
 `late_swings[]`: matchups where the leader flipped once the week's final wave
 of games (in practice almost always Monday Night Football — computed from
@@ -312,8 +348,9 @@ the normal-CDF calc.
 
 `home_lineup`/`away_lineup` are `optimal_week_projection()`'s real-first
 lineup, in the league's real slot order: `{player_id, name, position,
-slot, actual, projected, played, on_fire}` (`on_fire` merged in at the
-`simulate.py` call site — see `matchups/week-N.json`'s section above for
+pro_team, slot, actual, projected, played, on_fire, on_ice}` (`on_fire`/
+`on_ice` merged in at the `simulate.py` call site — see
+`matchups/week-N.json`'s section above for
 the full rule). Each slot holds the manager's real
 ESPN-entered player when one exists; only a genuinely blank slot gets the
 best available bench player instead. ALWAYS one entry per real starting
@@ -377,7 +414,7 @@ slot-count-limited the same way starters are).
 
 Each player card: `{player_id, name, position, pro_team, slot,
 injury_status, on_bye, next_game, week_projection, recent[],
-recent_avg_diff, on_fire, suggested}`.
+recent_avg_diff, on_fire, on_ice, suggested}`.
 - `pro_team`: NFL team abbreviation (`parse.pro_team_schedule()`, sourced
   from the same cached `proschedule.json` the refresh-schedule generator
   uses for its own cron windows).
@@ -399,15 +436,12 @@ recent_avg_diff, on_fire, suggested}`.
   entries with a real projection count). `null` with fewer than one
   qualifying entry. The frontend's own read of "who's running hot or cold
   lately."
-- `on_fire`: `parse.is_on_fire()` — `true` when EACH of the last 3 real
-  games individually beat that game's projection by `ON_FIRE_MARGIN` (5.0)
-  points, not just the average. Renders as a 🔥 next to the name on both
-  this table and the matchup cards. Calibrated by hand against real
-  2025 data (checked league-wide across the full season): ~15 total
-  on-fire instances across ~3,200 player-weeks (~0.5%), spread across most
-  weeks with 1-3 players each — a real, meaningful-but-not-common signal,
-  not something that lights up half a roster or something that only ever
-  fires for a handful of players all season.
+- `on_fire`/`on_ice`: `parse.hot_cold_status()` — position-adjusted,
+  played-vs-not-yet-played dual regime, full explanation in
+  `matchups/week-N.json`'s section above (same fields, same rule).
+  `played` for this purpose is `week_actual is not None` (that
+  scoring-period's real `statSourceId: 0` stat line exists). Renders as
+  🔥/🧊 next to the name on both this table and the matchup cards.
 
 ## `{season}/schedule_swap.json` (absent preseason)
 

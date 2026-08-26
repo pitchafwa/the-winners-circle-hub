@@ -1,4 +1,5 @@
 import { pts, signed, gameTime } from "../lib/format";
+import { displayOrderIndices } from "../lib/lineupOrder";
 import type { RosterPlayerCard, TeamRoster } from "../types/data";
 
 // ESPN's own short injury-designation letters — anything not in here (or
@@ -40,13 +41,18 @@ function PlayerRow({ card }: { card: RosterPlayerCard }) {
           <span className="muted">Empty</span>
         ) : (
           <>
-            <strong>{card.name}</strong>{" "}
+            <strong style={card.suggested ? { fontStyle: "italic" } : undefined}>{card.name}</strong>{" "}
             <span className="muted" style={{ fontSize: "0.78rem" }}>
               {card.position} · {card.pro_team}
             </span>
             {injury && (
               <span className="neg" style={{ fontSize: "0.72rem", marginLeft: "0.35rem" }}>
                 {injury}
+              </span>
+            )}
+            {card.suggested && (
+              <span className="muted" style={{ fontSize: "0.72rem", marginLeft: "0.35rem" }} title="This slot is empty on ESPN — showing the best available bench player instead of leaving it blank">
+                (suggested)
               </span>
             )}
           </>
@@ -77,6 +83,13 @@ function RosterSection({ title, cards }: { title: string; cards: RosterPlayerCar
 }
 
 export default function RosterTable({ roster }: { roster: TeamRoster }) {
+  // Display order only — roster.json's own starting-slot order (real ESPN
+  // ascending slot-id order) is untouched; RB/WR and FLEX render grouped
+  // right after the WRs instead of split across the two ends of the list,
+  // same reorder MatchupsPage's lineup grid already uses.
+  const slotLabels = roster.starters.map((s) => s.slot);
+  const orderedStarters = displayOrderIndices(slotLabels).map((i) => roster.starters[i]);
+
   return (
     <div className="table-wrap">
       <table className="stat roster-table">
@@ -94,7 +107,7 @@ export default function RosterTable({ roster }: { roster: TeamRoster }) {
           </tr>
         </thead>
         <tbody>
-          <RosterSection title="Starters" cards={roster.starters} />
+          <RosterSection title="Starters" cards={orderedStarters} />
           <RosterSection title="Bench" cards={roster.bench} />
           <RosterSection title="IR" cards={roster.ir} />
         </tbody>

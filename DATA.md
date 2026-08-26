@@ -343,17 +343,25 @@ while `current_matchup_period` is already the real answer).
 `teams`: `{"<team_id>": {starters[], bench[], ir[]}}`. `starters[]` is
 ALWAYS one entry per real starting slot (`league.starting_slots`, with
 multiplicity — e.g. two RB slots means two entries), in the league's real
-slot order — a slot nobody's currently in gets a `player_id: null`
-placeholder rather than being dropped, matching how ESPN's own roster page
-never hides an unfilled starting slot. `bench[]`/`ir[]` are whatever's
-actually in those slots, no placeholders (they're not slot-count-limited the
-same way). Deliberately WYSIWYG, unlike `sim.json`'s lineup above: no
-best-lineup auto-fill for an empty starting slot — this is a roster display,
-not a lineup optimizer, so an empty slot shows empty.
+slot order. A slot the manager HAS set shows exactly that player, never
+second-guessed. A slot left genuinely BLANK gets auto-filled with the best
+available bench player for that slot (`metrics.best_lineup()`, the same
+matching `parse.optimal_week_projection()` already uses for the identical
+situation, valued on that player's current-week actual if already played
+else their projection) rather than showing empty — Tommy's explicit ask,
+unlike `sim.json`'s lineup above which was deliberately WYSIWYG. Only when
+NO bench player at all is eligible for a slot (e.g. no rostered kicker)
+does it fall back to a real `player_id: null` placeholder. A bench-filled
+starter is removed from `bench[]` (shown once, as the suggested starter,
+not twice) and flagged `suggested: true` so the frontend can render it
+visibly different from a real, manager-set starter — never silently
+presented as if it were actually set on ESPN. `bench[]`/`ir[]` otherwise
+hold whatever's actually in those slots, no placeholders (they're not
+slot-count-limited the same way starters are).
 
 Each player card: `{player_id, name, position, pro_team, slot,
 injury_status, on_bye, next_game, week_projection, recent[],
-recent_avg_diff}`.
+recent_avg_diff, suggested}`.
 - `pro_team`: NFL team abbreviation (`parse.pro_team_schedule()`, sourced
   from the same cached `proschedule.json` the refresh-schedule generator
   uses for its own cron windows).

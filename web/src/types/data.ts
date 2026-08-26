@@ -675,6 +675,7 @@ export interface RosterPlayerCard {
   week_projection: number | null;
   recent: RosterRecentWeek[];
   recent_avg_diff: number | null;
+  suggested: boolean;
 }
 
 export interface TeamRoster {

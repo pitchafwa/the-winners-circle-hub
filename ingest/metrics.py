@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
+import config
 from parse import IR_SLOT, LeagueData, PlayerWeek, TeamWeek, SLOT_NAMES
 
 # ---------------------------------------------------------------------------
@@ -474,15 +475,32 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
         # games don't earn (or suffer) awards
         if any(m.is_playoff for m in matchups):
             matchups = [m for m in matchups if m.playoff_tier == "WINNERS_BRACKET"]
-        # Regular-season-only past this point, with three exceptions: playoff
-        # teams play strictly fewer real opponents than the field did all
-        # year, so letting them keep racking up highest-score/blowout/etc.
-        # trophies in the playoffs would unfairly pad their trophy count vs.
-        # teams whose season ended in week reg_season_weeks. Worst benching,
-        # the bust, and the projection buster are single-decision/single-player
-        # mistakes rather than "did you have the best week" wins, so those
-        # keep accumulating every week, playoffs included.
+        # Regular-season-only past this point, with a few exceptions.
+        # Two different reasons feed into that:
+        #  1. Playoff teams play strictly fewer real opponents than the
+        #     field did all year, so letting them keep racking up
+        #     highest-score/blowout/etc. trophies in the playoffs would
+        #     unfairly pad their trophy count vs. teams whose season ended
+        #     in week reg_season_weeks.
+        #  2. These awards are only meaningful when compared across the
+        #     WHOLE league's real games that week — highest/lowest score,
+        #     blowout/nail-biter margins, luckiest/unluckiest-vs-median all
+        #     implicitly assume "the whole pool played for real this week,"
+        #     which stops being true the moment most of the league is
+        #     playing out a consolation ladder instead.
+        # Worst benching, the bust, the projection buster, and waiver hero
+        # are single-decision/single-player mistakes or scores rather than
+        # "did you have the best week across the whole league" wins, so
+        # those keep accumulating every week a real game exists, playoffs
+        # included — the WINNERS_BRACKET-only filter above already scopes
+        # them to just the teams still playing for something real. Best
+        # coach sits in between: normally the same "whole league" problem
+        # as highest/lowest score, EXCEPT the championship week specifically
+        # — by then it really is just the two finalists, so "who out-coached
+        # the other" is a fair, meaningful head-to-head again.
         reg_season_only = week <= league.reg_season_weeks
+        is_championship_week = week == config.FINAL_COUNTED_WEEK
+        best_coach_eligible = reg_season_only or is_championship_week
         team_weeks: list[TeamWeek] = []
         margins: list[tuple[float, TeamWeek, TeamWeek]] = []  # (margin, winner, loser)
         winners: list[TeamWeek] = []
@@ -515,9 +533,15 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
             awards.append(Award(week, "lowest_score", lo.team_id, lo.total,
                                 f"{tname[lo.team_id]} managed just {_fmt(lo.total)}"))
 
-            # Best coach — highest rating, tiebreak fewer bench points lost
+        if best_coach_eligible:
+            # Best coach — highest rating, tiebreak fewer bench points lost.
+            # Regular season compares the whole field; championship week
+            # compares just the two finalists (still meaningful — see the
+            # comment above `best_coach_eligible`).
             rated = [(tid, coach[tid]["weeks"][week]) for tid in coach
-                     if week in coach[tid]["weeks"] and coach[tid]["weeks"][week]["rating"] is not None]
+                     if week in coach[tid]["weeks"] and coach[tid]["weeks"][week]["rating"] is not None
+                     and (reg_season_only or any(tid == m.home.team_id or (m.away and tid == m.away.team_id)
+                                                  for m in matchups))]
             if rated:
                 tid, cw = max(rated, key=lambda kv: (kv[1]["rating"], -kv[1]["bench_lost"]))
                 awards.append(Award(week, "best_coach", tid, round(cw["rating"] * 100, 1),
@@ -595,9 +619,12 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
                                         f"but scored {_fmt(p.actual)} for {tname[tid]}",
                                         player_id=p.player_id, player_name=p.name))
 
-        # Waiver hero — best starter added via waivers/FA in the last 14 days
+        # Waiver hero — best starter added via waivers/FA in the last 14 days.
+        # Single-player, not a whole-league comparison, so this stays live
+        # every week a real game exists, playoffs included (same reasoning
+        # as worst_benching/bust/projection_buster above).
         week_end = league.week_end_dates.get(week)
-        if reg_season_only and week_end and league.adds:
+        if week_end and league.adds:
             heroes = []
             for tw in team_weeks:
                 for p in tw.starters():

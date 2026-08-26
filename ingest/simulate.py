@@ -430,6 +430,7 @@ def run(league: LeagueData, history: LeagueData | None = None,
                     impact += abs(r["playoff_pct_if_win_next"] - r["playoff_pct_if_lose_next"])
             this_week_matchups.append({
                 "matchup_period": e.matchup_period,
+                "is_playoff": e.is_playoff, "playoff_tier": e.playoff_tier,
                 "home_id": e.home_id, "away_id": e.away_id,
                 "home_current": home_current,
                 "away_current": away_current,

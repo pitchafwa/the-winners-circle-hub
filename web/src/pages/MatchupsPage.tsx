@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
-import { MISSING, pct, pts } from "../lib/format";
+import { MISSING, pct, pts, signed } from "../lib/format";
 import EmptyState from "../components/EmptyState";
 import PlayerHeadshot from "../components/PlayerHeadshot";
 import WeeklyMatchupProjections from "../components/WeeklyMatchupProjections";
@@ -31,6 +31,11 @@ const AWARD_ICON: Record<string, string> = {
 
 function headlineValue(award: Award): string {
   if (award.key === "best_coach") return pct(award.value / 100, 1);
+  // projection_buster's value is always positive by construction (only
+  // awarded when actual > projected) — signed() adds the "+" that makes
+  // "beat projection by this much" read clearly at a glance. bust's value
+  // is always negative, so plain pts() already renders its own "-".
+  if (award.key === "projection_buster") return signed(award.value);
   return pts(award.value);
 }
 
@@ -44,8 +49,8 @@ function headlineValue(award: Award): string {
  * through the win-probability model) and call whichever side projected
  * higher the pre-game favorite. Works for any real completed week,
  * current or years-old, with no new backend field. */
-function worstLoss(matchups: Matchup[], teamName: (id: number) => string): { team: string; opponent: string; margin: number } | null {
-  let worst: { team: string; opponent: string; margin: number } | null = null;
+function worstLoss(matchups: Matchup[], teamName: (id: number) => string): { team: string; margin: number } | null {
+  let worst: { team: string; margin: number } | null = null;
   for (const m of matchups) {
     if (!m.away || m.winner === "UNDECIDED" || m.winner === "TIE") continue;
     const homeProj = m.home.lineup.filter((p) => p.started).reduce((s, p) => s + (p.projected ?? 0), 0);
@@ -55,11 +60,7 @@ function worstLoss(matchups: Matchup[], teamName: (id: number) => string): { tea
     if (favoriteWon) continue;
     const margin = Math.abs(homeProj - awayProj);
     if (!worst || margin > worst.margin) {
-      worst = {
-        team: teamName(homeFavored ? m.home.team_id : m.away.team_id),
-        opponent: teamName(homeFavored ? m.away.team_id : m.home.team_id),
-        margin,
-      };
+      worst = { team: teamName(homeFavored ? m.home.team_id : m.away.team_id), margin };
     }
   }
   return worst;
@@ -300,8 +301,18 @@ export default function MatchupsPage() {
     list.push(a);
     awardsByTeam.set(a.team_id, list);
   }
-  const underdog = sim.data?.this_week_matchups?.length ? biggestUnderdog(sim.data.this_week_matchups) : null;
-  const weekWorstLoss = data.data ? worstLoss(data.data.matchups, teamName) : null;
+  // "Only 1-2 games actually count" weeks (essentially the playoffs, once
+  // most of the field is playing out a consolation ladder instead) —
+  // whole-league-pool storylines (Game of the Week, Biggest Underdog,
+  // Worst Loss, and the equivalent backend awards like luckiest/highest
+  // score) stop being meaningful once most of "the pool" isn't playing
+  // for anything real that week, so these get skipped entirely rather
+  // than partially filtered.
+  const thisWeekIsRealPool = !(sim.data?.this_week_matchups?.some((m) => m.is_playoff) ?? false);
+  const selectedWeekIsRegSeason = week !== null && week <= meta.reg_season_weeks;
+  const underdog = thisWeekIsRealPool && sim.data?.this_week_matchups?.length
+    ? biggestUnderdog(sim.data.this_week_matchups) : null;
+  const weekWorstLoss = selectedWeekIsRegSeason && data.data ? worstLoss(data.data.matchups, teamName) : null;
 
   return (
     <>
@@ -311,16 +322,18 @@ export default function MatchupsPage() {
             <h2 id="weekly-h">This Week's Games</h2>
             <span className="label">projected score · win probability · playoff stakes</span>
           </div>
-          <div className="headline-row">
-            <HeadlineCard icon="🔥" label="Game of the Week" tone="gold">
-              {teamName(sim.data.this_week_matchups[0].away_id)} @ {teamName(sim.data.this_week_matchups[0].home_id)}
-            </HeadlineCard>
-            {underdog && (
-              <HeadlineCard icon="🐶" label="Biggest Underdog" tone="neutral">
-                {teamName(underdog.team)} <span className="muted">{pct(underdog.winPct, 0)} to win</span>
+          {thisWeekIsRealPool && (
+            <div className="headline-row">
+              <HeadlineCard icon="🔥" label="Game of the Week" tone="gold">
+                {teamName(sim.data.this_week_matchups[0].away_id)} @ {teamName(sim.data.this_week_matchups[0].home_id)}
               </HeadlineCard>
-            )}
-          </div>
+              {underdog && (
+                <HeadlineCard icon="🐶" label="Biggest Underdog" tone="neutral">
+                  {teamName(underdog.team)} <span className="muted">{pct(underdog.winPct, 0)} to win</span>
+                </HeadlineCard>
+              )}
+            </div>
+          )}
           <WeeklyMatchupProjections
             matchups={sim.data.this_week_matchups}
             teamInfo={teamInfo}
@@ -362,7 +375,7 @@ export default function MatchupsPage() {
                 ))}
                 {weekWorstLoss && (
                   <HeadlineCard icon="😱" label="Worst Loss" tone="negative">
-                    {weekWorstLoss.team} <span className="muted">favored by {pts(weekWorstLoss.margin)}, lost to {weekWorstLoss.opponent}</span>
+                    {weekWorstLoss.team} <span className="muted">favored by {pts(weekWorstLoss.margin)}, lost anyway</span>
                   </HeadlineCard>
                 )}
               </div>

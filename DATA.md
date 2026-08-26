@@ -25,17 +25,22 @@ General rules:
   only `WINNERS_BRACKET` games feed stats/superlatives/records — consolation-ladder
   games involve teams that aren't really competing and are excluded everywhere
   except the matchups page (which still shows them, clearly tagged).
-- Weekly superlatives/trophies are **regular-season only**, with three named
-  exceptions (`worst_benching`, `bust`, `projection_buster`) that keep firing
-  in the playoffs too — playoff teams play strictly more real games than
-  everyone else, so letting every award type keep accumulating for them would
-  unfairly pad their trophy count relative to a team whose season ended in
-  week `reg_season_weeks`. The three exceptions are single-decision/single-
-  player mistakes, not "best week" wins, so that imbalance doesn't apply the
-  same way. Same rule for `record_high_week`/`record_low_week` badges — a
-  playoff week can't set the all-time single-week record. See
-  `metrics.compute_superlatives`'s `reg_season_only` flag and the matching
-  filter in `build.py`'s `build_badges`.
+- Weekly superlatives/trophies are **regular-season only**, with named
+  exceptions that keep firing in the playoffs too: `worst_benching`, `bust`,
+  `projection_buster`, and `waiver_hero` are single-decision/single-player
+  mistakes or scores, not "best week across the whole league" wins, so the
+  "playoff teams play strictly more real games, don't let them pad their
+  trophy count" fairness problem doesn't apply to them. `best_coach` is a
+  partial exception: excluded for a normal playoff week (same "whole league
+  pool" problem as highest/lowest score) but back in specifically for the
+  **championship week**, since by then it really is a fair 2-team
+  comparison. All of these — during any playoff week, including the
+  championship — are additionally scoped to just the `WINNERS_BRACKET` game(s)
+  that week, never a consolation-ladder game. Same `reg_season_weeks` rule
+  for `record_high_week`/`record_low_week` badges — a playoff week can't set
+  the all-time single-week record. See `metrics.compute_superlatives`'s
+  `reg_season_only`/`best_coach_eligible` flags and the matching filter in
+  `build.py`'s `build_badges`.
 
 ## `seasons.json`
 
@@ -309,12 +314,17 @@ on the scale. `ROSTER_STRENGTH_WEIGHT` itself is z-score-based, so the same
 around 35-40%) holds regardless of exactly how the underlying roster value
 is computed.
 
-**`this_week_matchups[]`**: `{matchup_period, home_id, away_id,
-home_current, away_current, home_projected, away_projected, home_win_pct,
-started, home_lineup, away_lineup, home_remaining, away_remaining,
-home_total_starters, away_total_starters, projection_source,
-playoff_impact_score}` — one entry per matchup in the earliest remaining
-`matchup_period` (i.e. the next games to be played).
+**`this_week_matchups[]`**: `{matchup_period, is_playoff, playoff_tier,
+home_id, away_id, home_current, away_current, home_projected,
+away_projected, home_win_pct, started, home_lineup, away_lineup,
+home_remaining, away_remaining, home_total_starters, away_total_starters,
+projection_source, playoff_impact_score}` — one entry per matchup in the
+earliest remaining `matchup_period` (i.e. the next games to be played).
+`is_playoff`/`playoff_tier` are straight off the underlying
+`ScheduleEntry` — the frontend uses them to skip the "Game of the
+Week"/"Biggest Underdog" headline cards entirely once any game that week
+is playoff (same "not meaningful once most of the field isn't playing for
+real" reasoning as the backend awards above).
 
 `home_projected`/`away_projected` (the projected FINAL score) and
 `home_win_pct` prefer the real week projection (`parse.

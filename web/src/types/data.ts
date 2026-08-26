@@ -380,6 +380,8 @@ export interface WeekLineupPlayer {
 
 export interface SimMatchup {
   matchup_period: number;
+  is_playoff: boolean;
+  playoff_tier: string;
   home_id: number;
   away_id: number;
   home_current: number | null;

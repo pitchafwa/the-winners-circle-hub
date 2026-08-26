@@ -1108,6 +1108,14 @@ select.control {
   text-align: center;
 }
 
+/* Fixed width, not just padding — "RB/WR"/"WR/TE"/"D/ST" run noticeably
+   wider than "QB"/"WR"/"BE", and a content-sized badge shifted every
+   headshot/name after it out of line with the rows above and below.
+   Widest label (RB/WR, WR/TE) sets the width; shorter ones center inside
+   it. Scoped to the mobile stacked row only — the desktop .mu-slot badge
+   already aligns via its own single-width column, not the badge itself. */
+.c-row .c-badge { width: 2.9rem; }
+
 .c-name-wrap {
   flex: 1 1 auto;
   min-width: 0;
@@ -1118,7 +1126,7 @@ select.control {
 }
 
 .c-name {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: 0.85rem;
   overflow: hidden;

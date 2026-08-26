@@ -337,11 +337,24 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         })
 
     # ---- activity.json ------------------------------------------------------
-    # `events` comes from the same per-week transaction cache as the
-    # matchups/superlatives box-score data — same cache-cold hazard, same
-    # guard: don't erase a season's real transaction history just because
-    # this run couldn't refetch it.
-    if completed or not (out_dir / "activity.json").exists():
+    # `events` comes from `transactions-week*.json` (`fetch_transactions_raw`)
+    # — a genuinely independent fetch from the box-score cache that gates
+    # `completed`/matchups/superlatives. Gating this write on `completed`
+    # (real GAME weeks finished) was copied from that guard but doesn't fit:
+    # waiver adds/drops/trades happen all preseason, well before any game
+    # week completes, so during preseason `completed` is permanently empty
+    # and this guard silently froze the whole activity feed at whatever it
+    # was the moment the file first got created — a real bug found
+    # 2026-08-26 (9 days of real preseason transactions missing, because a
+    # rebuild had run once with `completed` empty and every run since just
+    # skipped the write). `league.activity` itself is the right signal: a
+    # live fetch (cache-cold or not) always returns this season's real
+    # to-date transactions since that call doesn't depend on any box-score
+    # cache, so a non-empty result here is trustworthy even preseason — the
+    # only case this should still preserve the existing file is a truly
+    # empty local cache (e.g. an `--offline` run before any live fetch has
+    # ever populated `.cache`), which also yields empty `league.activity`.
+    if league.activity or completed or not (out_dir / "activity.json").exists():
         _write(out_dir / "activity.json", {
             "generated_at": generated_at,
             "events": [

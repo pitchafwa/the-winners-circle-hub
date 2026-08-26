@@ -200,7 +200,8 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             "awards_meta": metrics.AWARD_META,
             "awards": [
                 {"week": a.week, "key": a.award_key, "team_id": a.team_id,
-                 "value": a.value, "detail": a.detail}
+                 "value": a.value, "detail": a.detail,
+                 "player_id": a.player_id, "player_name": a.player_name}
                 for a in awards
             ],
         })
@@ -302,12 +303,18 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
                 "lineup_points": tw.lineup_points,
                 "opponent_id": opp.team_id if opp else None,
                 "opponent_points": opp.total if opp else None,
+                "is_home": is_home,
                 "result": "T" if m.winner == "TIE" else ("W" if won else "L"),
                 "is_playoff": m.is_playoff,
                 "optimal_points": c["optimal"],
                 "coach_rating": c["rating"],
                 "bench_points_lost": c["bench_lost"],
                 "all_play": all_play[tid]["weeks"].get(w),
+                "top_scorers": [
+                    {"player_id": p.player_id, "name": p.name, "position": p.position,
+                     "pro_team": pro_abbrev.get(p.pro_team_id, ""), "points": p.actual}
+                    for p in sorted(tw.starters(), key=lambda p: -p.actual)[:3]
+                ],
             })
 
         # starter actual-vs-projected, aggregated per player
@@ -321,6 +328,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
                     continue
                 a = agg.setdefault(p.player_id, {
                     "player_id": p.player_id, "name": p.name, "position": p.position,
+                    "pro_team": pro_abbrev.get(p.pro_team_id, ""),
                     "starts": 0, "actual": 0.0, "projected": 0.0})
                 a["starts"] += 1
                 a["actual"] = round(a["actual"] + p.actual, 2)

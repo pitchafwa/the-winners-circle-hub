@@ -125,6 +125,8 @@ export interface Award {
   team_id: number;
   value: number;
   detail: string;
+  player_id: number | null;
+  player_name: string | null;
 }
 
 export interface Superlatives {
@@ -202,24 +204,35 @@ export interface AllPlayWeek {
   result: "W" | "L" | "T" | null;
 }
 
+export interface TopScorer {
+  player_id: number;
+  name: string;
+  position: string;
+  pro_team: string;
+  points: number;
+}
+
 export interface TeamWeekRow {
   week: number;
   points: number;
   lineup_points: number;
   opponent_id: number | null;
   opponent_points: number | null;
+  is_home: boolean;
   result: "W" | "L" | "T";
   is_playoff: boolean;
   optimal_points: number | null;
   coach_rating: number | null;
   bench_points_lost: number | null;
   all_play: AllPlayWeek | null;
+  top_scorers: TopScorer[];
 }
 
 export interface ProjectionReportRow {
   player_id: number;
   name: string;
   position: string;
+  pro_team: string;
   starts: number;
   actual: number;
   projected: number;
@@ -510,6 +523,7 @@ export interface OwnershipStint {
   player_id: number;
   name: string;
   position: string;
+  pro_team: string;
   team_id: number;
   acquired_via: AcquiredVia;
   start_season: number;

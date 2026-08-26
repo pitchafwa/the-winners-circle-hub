@@ -143,6 +143,7 @@ def build_ownership(seasons: list[int]) -> dict:
                     if st is None:
                         st = {
                             "player_id": pid, "name": pw.name, "position": pw.position,
+                            "pro_team_id": pw.pro_team_id,
                             "team_id": team_id,
                             "acquired_via": _acquired_via(week, team_id, pid, is_first_season,
                                                           draft_map, trade_moves, activity_by_pair),
@@ -176,9 +177,17 @@ def build_ownership(seasons: list[int]) -> dict:
 
     stints.extend(open_stints.values())  # still on the roster today
 
+    # Real NFL team abbreviation per stint — a snapshot from whenever the
+    # stint started (same convention as name/position above, which are
+    # equally frozen at that point), resolved against the CURRENT season's
+    # team list since abbreviations essentially never change year to year
+    # (a real franchise relocation/rebrand would be the rare exception,
+    # not worth per-season precision here).
+    pro_abbrev = {tid: info["abbrev"] for tid, info in parse.pro_team_schedule().items()}
     for st in stints:
         st["start_rate"] = (round(st["weeks_started"] / st["weeks_rostered"], 3)
                             if st["weeks_rostered"] else 0.0)
+        st["pro_team"] = pro_abbrev.get(st.pop("pro_team_id", 0), "")
 
     leaders = {
         "value": _top_per_team(stints, key=lambda s: s["points_started"]),

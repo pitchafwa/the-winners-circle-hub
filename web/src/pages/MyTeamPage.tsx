@@ -9,7 +9,18 @@ import EmptyState from "../components/EmptyState";
 import PlayerHeadshot from "../components/PlayerHeadshot";
 import RosterTable from "../components/RosterTable";
 import { BenchChart, CoachChart, ScoringChart } from "../components/TeamCharts";
-import type { Badges, ProjectionReportRow, Roster, Sim, Teams } from "../types/data";
+import type { Badges, ProjectionReportRow, Roster, Sim, Teams, TopScorer } from "../types/data";
+
+interface ScheduleRow {
+  week: number;
+  opponentId: number | null;
+  isHome: boolean;
+  played: boolean;
+  result?: "W" | "L" | "T";
+  points?: number;
+  opponentPoints?: number | null;
+  topScorers?: TopScorer[];
+}
 
 const PROJ_COLS: { key: keyof ProjectionReportRow | "player"; label: string; numeric: boolean }[] = [
   { key: "player", label: "Player", numeric: false },
@@ -43,6 +54,18 @@ export default function MyTeamPage() {
     key === "player" ? r.name : (r[key as keyof ProjectionReportRow] as number | string),
   );
   const projRows = useSorted(my?.projection_report ?? [], projSort);
+  const scheduleRows: ScheduleRow[] = useMemo(() => {
+    if (!my) return [];
+    const played: ScheduleRow[] = my.weekly.map((w) => ({
+      week: w.week, opponentId: w.opponent_id, isHome: w.is_home, played: true,
+      result: w.result, points: w.points, opponentPoints: w.opponent_points,
+      topScorers: w.top_scorers,
+    }));
+    const upcoming: ScheduleRow[] = my.upcoming.map((u) => ({
+      week: u.matchup_period, opponentId: u.opponent_id, isHome: u.is_home, played: false,
+    }));
+    return [...played, ...upcoming].sort((a, b) => a.week - b.week);
+  }, [my]);
   const avgByWeek = useMemo(() => {
     const m = new Map<number, number | null>();
     teams.data?.league_weekly_avg.forEach((w) => m.set(w.week, w.avg));
@@ -222,7 +245,7 @@ export default function MyTeamPage() {
                         <tr key={p.player_id}>
                           <td>
                             <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                              <PlayerHeadshot playerId={p.player_id} position={p.position} />
+                              <PlayerHeadshot playerId={p.player_id} position={p.position} proTeam={p.pro_team} />
                               <strong>{p.name}</strong>
                             </span>
                           </td>
@@ -243,18 +266,53 @@ export default function MyTeamPage() {
       )}
 
       <section className="section">
-        <div className="section-head"><h2>Upcoming schedule</h2></div>
-        {my && my.upcoming.length > 0 ? (
-          <ul className="feed">
-            {my.upcoming.map((u) => (
-              <li key={u.matchup_period} className="feed-row">
-                <span className="muted num feed-date">wk {u.matchup_period}</span>
-                <span>{u.is_home ? "vs" : "at"} <strong>{teamName(u.opponent_id)}</strong></span>
-              </li>
-            ))}
-          </ul>
+        <div className="section-head"><h2>Schedule</h2></div>
+        {scheduleRows.length > 0 ? (
+          <div className="table-wrap">
+            <table className="stat">
+              <thead>
+                <tr>
+                  <th scope="col" className="num">Week</th>
+                  <th scope="col">Opponent</th>
+                  <th scope="col" className="num">Result</th>
+                  <th scope="col">Top scorers</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scheduleRows.map((r) => (
+                  <tr key={r.week}>
+                    <td className="num muted">{r.week}</td>
+                    <td>
+                      {r.opponentId === null ? (
+                        <span className="muted">bye</span>
+                      ) : (
+                        <>{r.isHome ? "vs" : "at"} <strong>{teamName(r.opponentId)}</strong></>
+                      )}
+                    </td>
+                    <td className="num">
+                      {r.played && r.result ? (
+                        <span className={r.result === "W" ? "pos" : r.result === "L" ? "neg" : ""}>
+                          {r.result} {pts(r.points, 0)}-{pts(r.opponentPoints, 0)}
+                        </span>
+                      ) : (
+                        <span className="muted">{MISSING}</span>
+                      )}
+                    </td>
+                    <td>
+                      {r.topScorers?.map((p) => (
+                        <span key={p.player_id} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", marginRight: "0.7rem" }}>
+                          <PlayerHeadshot playerId={p.player_id} position={p.position} proTeam={p.pro_team} className="leaderboard-headshot" />
+                          {p.name} <span className="muted num">{pts(p.points)}</span>
+                        </span>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
-          <EmptyState>No remaining games{meta.season_over ? " — season's done" : " on the schedule yet"}.</EmptyState>
+          <EmptyState>No schedule on file{meta.season_over ? "" : " yet"}.</EmptyState>
         )}
       </section>
 

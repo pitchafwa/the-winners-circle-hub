@@ -103,8 +103,15 @@ components {all_play, points_for, trend, roster}}`.
 ## `{season}/superlatives.json`
 
 `awards_meta{key: {label, points, tone}}` — trophy-case point values.
-`awards[]`: `{week, key, team_id, value, detail}` — full season history, one entry
-per award per completed week (absent if no qualifying candidate that week).
+`awards[]`: `{week, key, team_id, value, detail, player_id, player_name}` —
+full season history, one entry per award per completed week (absent if no
+qualifying candidate that week). `player_id`/`player_name` are only set for
+the player-specific award types (`projection_buster`, `bust`,
+`worst_benching`, `waiver_hero`) — `null` on the team-level ones
+(`highest_score`, `lowest_score`, `best_coach`, `blowout`, `nail_biter`,
+`luckiest`, `unluckiest`), which have no individual player to name. Lets the
+frontend show "Player Name (Team)" instead of just a team name on cards
+where the real story is about one player's game, not the team's.
 
 ## `{season}/matchups/week-N.json`
 
@@ -182,11 +189,16 @@ guessed).
 ## `{season}/teams.json`
 
 `league_weekly_avg[] {week, avg}` and `teams[]`:
-- `weekly[]`: `{week, points, lineup_points, opponent_id, opponent_points, result,
-  is_playoff, optimal_points, coach_rating, bench_points_lost,
-  all_play {wins, losses, ties, expected_wins, result}}`
+- `weekly[]`: `{week, points, lineup_points, opponent_id, opponent_points,
+  is_home, result, is_playoff, optimal_points, coach_rating,
+  bench_points_lost, all_play {wins, losses, ties, expected_wins, result},
+  top_scorers[]}`. `top_scorers[]` (up to 3, highest actual first):
+  `{player_id, name, position, pro_team, points}` — that team's own top
+  starters that specific week, for the My Team page's Schedule table
+  (real per-player points, not the team total).
 - `projection_report[]`: per started player season aggregate
-  `{player_id, name, position, starts, actual, projected, diff}` sorted worst-first.
+  `{player_id, name, position, pro_team, starts, actual, projected, diff}`
+  sorted worst-first.
 - `upcoming[]`: `{matchup_period, opponent_id, is_home}` for unplayed matchups.
 - `season`: `{coach {actual, optimal, rating, bench_lost}, all_play {wins, losses,
   ties, pct, expected_wins, luck}}`.
@@ -558,7 +570,7 @@ A stint ends the moment a player stops appearing in that team's weekly
 lineup (a real departure — never a bye; byes still leave the player in the
 lineup with `played: false`).
 
-`stints[]`: `{player_id, name, position, team_id, acquired_via
+`stints[]`: `{player_id, name, position, pro_team, team_id, acquired_via
 ("draft"|"trade"|"waiver"|"fa"|"preexisting"|"unknown"), start_season,
 start_week, departed_via ("trade"|"dropped"|null), end_season, end_week
 (both null = still on this roster today), weeks_rostered, weeks_started,
@@ -577,6 +589,13 @@ consolation-bracket week is skipped entirely, same as a week the team has
 no matchup data for — most managers don't set a real lineup once they're
 out of championship contention, so those weeks shouldn't pad anyone's
 tenure or point totals.
+
+`pro_team` (real NFL team abbreviation, for the frontend's D/ST-logo-instead-
+of-silhouette treatment) is a snapshot from whenever the stint started — same
+convention as `name`/`position`, which are equally frozen at that point —
+resolved against the CURRENT season's team list rather than per-stint-season,
+since abbreviations essentially never change year to year (a real franchise
+relocation/rebrand would be the rare exception, not worth chasing here).
 
 `weeks_projected`/`points_started_projected_weeks` exist because 2017 has
 no ESPN projection data at all — `points_projected_started` only ever sums

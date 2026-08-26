@@ -908,7 +908,6 @@ select.control {
    0.8em against ~0.85rem body text, so ~0.68rem effective) — sits above
    the champion's team name once the championship game is decided. */
 .mu-crown {
-  display: block;
   font-size: 2rem;
   line-height: 1;
 }

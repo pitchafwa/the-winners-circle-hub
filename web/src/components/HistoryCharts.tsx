@@ -224,6 +224,7 @@ interface CareerStint {
   player_id: number;
   name: string;
   position: string;
+  pro_team: string;
   weeks_rostered: number;
   weeks_started: number;
   weeks_benched: number;
@@ -250,6 +251,7 @@ function careerStints(stints: OwnershipStint[]): CareerStint[] {
     const key = `${s.team_id}-${s.player_id}`;
     const c = byKey.get(key) ?? {
       team_id: s.team_id, player_id: s.player_id, name: s.name, position: s.position,
+      pro_team: s.pro_team,
       weeks_rostered: 0, weeks_started: 0, weeks_benched: 0, weeks_projected: 0,
       points_started: 0, points_projected_started: 0, points_started_projected_weeks: 0, points_benched: 0,
       start_season: s.start_season, start_week: s.start_week,
@@ -288,6 +290,7 @@ interface LeaderboardRow {
   value: string;
   playerId?: number | null;
   position?: string | null;
+  proTeam?: string | null;
 }
 
 const LEADERBOARD_SHORT = 5;
@@ -319,7 +322,7 @@ function Leaderboard({ title, subtitle, rows }: {
             <li key={r.key} className="leaderboard-row">
               <span className="leaderboard-rank num">{i + 1}</span>
               {r.playerId != null && (
-                <PlayerHeadshot playerId={r.playerId} position={r.position} className="leaderboard-headshot" />
+                <PlayerHeadshot playerId={r.playerId} position={r.position} proTeam={r.proTeam} className="leaderboard-headshot" />
               )}
               <span className="leaderboard-main">
                 <strong>{r.primary}</strong>
@@ -380,7 +383,7 @@ export function FranchiseLeaders({ ownership, meta }: { ownership: Ownership | n
               <td>
                 {scorer && (
                   <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                    <PlayerHeadshot playerId={scorer.player_id} position={scorer.position} />
+                    <PlayerHeadshot playerId={scorer.player_id} position={scorer.position} proTeam={scorer.pro_team} />
                     {scorer.name} {scorer.position}
                   </span>
                 )}
@@ -390,7 +393,7 @@ export function FranchiseLeaders({ ownership, meta }: { ownership: Ownership | n
               <td>
                 {starter && (
                   <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                    <PlayerHeadshot playerId={starter.player_id} position={starter.position} />
+                    <PlayerHeadshot playerId={starter.player_id} position={starter.position} proTeam={starter.pro_team} />
                     {starter.name} {starter.position}
                   </span>
                 )}
@@ -452,6 +455,7 @@ export function CareerLeaderboards({ ownership, teamId, teamName }: {
         value: value(c),
         playerId: c.player_id,
         position: c.position,
+        proTeam: c.pro_team,
       }));
 
     return {

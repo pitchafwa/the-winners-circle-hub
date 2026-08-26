@@ -452,6 +452,12 @@ class Award:
     team_id: int
     value: float
     detail: str
+    # Only set for the player-specific award types (projection_buster, bust,
+    # worst_benching, waiver_hero) — team-level awards (highest_score,
+    # best_coach, blowout, nail_biter, luckiest, unluckiest, lowest_score)
+    # leave these None, nothing to name.
+    player_id: int | None = None
+    player_name: str | None = None
 
 
 def _fmt(x: float) -> str:
@@ -535,7 +541,8 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
             _, _, tid, s, b = best_bench
             awards.append(Award(week, "worst_benching", tid, b.actual,
                                 f"{tname[tid]} started {s.name} for {_fmt(s.actual)} "
-                                f"and sat {b.name} for {_fmt(b.actual)}"))
+                                f"and sat {b.name} for {_fmt(b.actual)}",
+                                player_id=b.player_id, player_name=b.name))
 
         if reg_season_only:
             # Blowout / nail-biter
@@ -576,7 +583,8 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
             if diff > 0:
                 awards.append(Award(week, "projection_buster", tid, diff,
                                     f"{p.name} scored {_fmt(p.actual)} against a "
-                                    f"{_fmt(p.projected)} projection for {tname[tid]}"))
+                                    f"{_fmt(p.projected)} projection for {tname[tid]}",
+                                    player_id=p.player_id, player_name=p.name))
             busts = [(tid_, p_) for tid_, p_ in projected if p_.projected >= 10]
             if busts:
                 tid, p = min(busts, key=lambda kv: kv[1].actual - kv[1].projected)
@@ -584,7 +592,8 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
                 if diff < 0:
                     awards.append(Award(week, "bust", tid, diff,
                                         f"{p.name} was projected {_fmt(p.projected)} "
-                                        f"but scored {_fmt(p.actual)} for {tname[tid]}"))
+                                        f"but scored {_fmt(p.actual)} for {tname[tid]}",
+                                        player_id=p.player_id, player_name=p.name))
 
         # Waiver hero — best starter added via waivers/FA in the last 14 days
         week_end = league.week_end_dates.get(week)
@@ -599,7 +608,8 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
                 tid, p = max(heroes, key=lambda kv: kv[1].actual)
                 awards.append(Award(week, "waiver_hero", tid, p.actual,
                                     f"{p.name}, a fresh pickup for {tname[tid]}, "
-                                    f"scored {_fmt(p.actual)}"))
+                                    f"scored {_fmt(p.actual)}",
+                                    player_id=p.player_id, player_name=p.name))
 
     return awards
 

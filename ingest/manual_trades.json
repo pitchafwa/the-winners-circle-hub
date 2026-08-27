@@ -837,6 +837,130 @@
         }
       ],
       "valuation_snapshot_at": "2026-08-15T16:29:29.191433+00:00"
+    },
+    {
+      "id": "1cc34f05",
+      "season": 2026,
+      "date": "2026-08-26",
+      "week": 0,
+      "teams": [
+        4,
+        10
+      ],
+      "assets": [
+        {
+          "pick": "2026 1st",
+          "from": 10,
+          "to": 4,
+          "value": 5322.5
+        },
+        {
+          "player": "Jayden Reed",
+          "from": 10,
+          "to": 4,
+          "value": 4194
+        },
+        {
+          "player": "Parker Washington",
+          "from": 4,
+          "to": 10,
+          "value": 5158
+        },
+        {
+          "pick": "2027 2nd",
+          "from": 4,
+          "to": 10,
+          "value": 4144.0
+        }
+      ],
+      "valuation_snapshot_at": "2026-08-26T14:53:32.693084+00:00"
+    },
+    {
+      "id": "344db5d0",
+      "season": 2026,
+      "date": "2026-08-26",
+      "week": 0,
+      "teams": [
+        1,
+        8
+      ],
+      "assets": [
+        {
+          "pick": "2026 3rd",
+          "from": 1,
+          "to": 8,
+          "value": 2683.8
+        },
+        {
+          "pick": "2026 3rd",
+          "from": 1,
+          "to": 8,
+          "value": 2683.8
+        },
+        {
+          "pick": "2027 3rd",
+          "from": 8,
+          "to": 1,
+          "value": 2887.0
+        }
+      ],
+      "valuation_snapshot_at": "2026-08-26T14:53:32.693084+00:00"
+    },
+    {
+      "id": "8b5bcdcc",
+      "season": 2026,
+      "date": "2026-08-26",
+      "week": 0,
+      "teams": [
+        4,
+        7
+      ],
+      "assets": [
+        {
+          "pick": "2026 1st",
+          "from": 7,
+          "to": 4,
+          "value": 5322.5
+        },
+        {
+          "player": "Sam LaPorta",
+          "from": 4,
+          "to": 7,
+          "value": 5051
+        }
+      ],
+      "valuation_snapshot_at": "2026-08-26T14:53:32.693084+00:00"
+    },
+    {
+      "id": "0992b901",
+      "season": 2026,
+      "date": "2026-08-26",
+      "week": 0,
+      "teams": [
+        3,
+        10
+      ],
+      "assets": [
+        {
+          "player": "Michael Wilson",
+          "from": 10,
+          "to": 3,
+          "value": 4579
+        },
+        {
+          "pick": "2026 3rd",
+          "from": 10,
+          "to": 3,
+          "value": 2683.8
+        },
+        {
+          "pick": "2026 2nd",
+          "from": 3,
+          "to": 10,
+          "value": 3756.8
+        }
+      ],
+      "valuation_snapshot_at": "2026-08-26T14:53:32.693084+00:00"
     }
   ],
   "pick_ownership": [
@@ -860,17 +984,17 @@
       "season": 2027,
       "round": 2,
       "original_team_id": 9,
-      "owned_by_team_id": 4,
-      "via": "traded 2026-08-08",
-      "trade_id": "4bcb83e5"
+      "owned_by_team_id": 10,
+      "via": "traded 2026-08-26",
+      "trade_id": "1cc34f05"
     },
     {
       "season": 2026,
       "round": 1,
       "original_team_id": 4,
-      "owned_by_team_id": 10,
-      "via": "traded 2026-08-17",
-      "trade_id": "222fc4ef"
+      "owned_by_team_id": 4,
+      "via": "traded 2026-08-26",
+      "trade_id": "1cc34f05"
     },
     {
       "season": 2026,
@@ -999,9 +1123,9 @@
       "season": 2026,
       "round": 3,
       "original_team_id": 3,
-      "owned_by_team_id": 10,
-      "via": "traded 2025-08-16",
-      "trade_id": "660d1989"
+      "owned_by_team_id": 3,
+      "via": "traded 2026-08-26",
+      "trade_id": "0992b901"
     },
     {
       "season": 2027,
@@ -1015,8 +1139,9 @@
       "season": 2026,
       "round": 2,
       "original_team_id": 8,
-      "owned_by_team_id": 3,
-      "via": "manually reassigned"
+      "owned_by_team_id": 10,
+      "via": "traded 2026-08-26",
+      "trade_id": "0992b901"
     },
     {
       "season": 2026,
@@ -1029,8 +1154,9 @@
       "season": 2026,
       "round": 3,
       "original_team_id": 2,
-      "owned_by_team_id": 1,
-      "via": "manually reassigned"
+      "owned_by_team_id": 8,
+      "via": "traded 2026-08-26",
+      "trade_id": "344db5d0"
     },
     {
       "season": 2026,
@@ -1085,9 +1211,9 @@
       "season": 2026,
       "round": 1,
       "original_team_id": 10,
-      "owned_by_team_id": 7,
-      "via": "traded 2026-08-17",
-      "trade_id": "222fc4ef"
+      "owned_by_team_id": 4,
+      "via": "traded 2026-08-26",
+      "trade_id": "8b5bcdcc"
     },
     {
       "season": 2026,
@@ -1104,6 +1230,22 @@
       "owned_by_team_id": 6,
       "via": "traded 2026-08-17",
       "trade_id": "2bb907f2"
+    },
+    {
+      "season": 2026,
+      "round": 3,
+      "original_team_id": 1,
+      "owned_by_team_id": 8,
+      "via": "traded 2026-08-26",
+      "trade_id": "344db5d0"
+    },
+    {
+      "season": 2027,
+      "round": 3,
+      "original_team_id": 8,
+      "owned_by_team_id": 1,
+      "via": "traded 2026-08-26",
+      "trade_id": "344db5d0"
     }
   ]
 }

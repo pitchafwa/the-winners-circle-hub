@@ -204,3 +204,20 @@ def redraft_values_by_name(offline: bool = False) -> tuple[dict[str, int], str |
     players, fetched_at = _get_players(REDRAFT, offline)
     values = {_normalize_name(p["playerName"]): p["oneQBValues"]["value"] for p in players}
     return values, fetched_at
+
+
+def ages_by_name(offline: bool = False) -> tuple[dict[str, float], str | None]:
+    """normalized_name -> real age (fractional years, e.g. 24.4), from the
+    SAME dynasty-rankings fetch values_by_name() already makes — no extra
+    request needed, KTC's playersArray carries `age` right alongside value.
+    Age is a "right now" fact, not season-scoped or historical, same
+    reasoning as player_card's live ESPN fetch. Players outside KTC's
+    ranked universe (D/ST, deep dart-throws) simply have no entry."""
+    from parse import _normalize_name  # local import: avoid a circular import at module load
+
+    players, fetched_at = _get_players(DYNASTY, offline)
+    ages = {
+        _normalize_name(p["playerName"]): p["age"]
+        for p in players if p.get("age") is not None
+    }
+    return ages, fetched_at

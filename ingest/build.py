@@ -750,6 +750,12 @@ def main():
     if not pick_curves:
         print("  no live pick-value curve available — falling back to the static pick_values.json curve", file=sys.stderr)
 
+    # Same dynasty-rankings fetch again — KTC's playersArray carries `age`
+    # right alongside value, so this is also free.
+    player_ages, ages_updated_at = valuation.ages_by_name(offline=args.offline)
+    if not player_ages:
+        print("  no player age data available — player cards will show no age", file=sys.stderr)
+
     for season in seasons:
         print(f"Building {season}...")
         build_season(season, dynasty_values, valuation_updated_at, redraft_values, pick_curves)
@@ -765,6 +771,13 @@ def main():
     _write(config.DATA_DIR / "ownership.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         **ownership_data,
+    })
+
+    print("Building player ages...")
+    _write(config.DATA_DIR / "player_ages.json", {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": ages_updated_at,
+        "ages": parse.ages_by_pid(player_ages),
     })
 
     print("Building trade grades...")

@@ -699,12 +699,26 @@ player_name, via}` — same resolution states as `activity.json`'s
 `pick_ownership` (`ingest/pick_tracking.py:resolve`); untraded picks
 default `current_owner_id` to `original_team_id`.
 
+## `player_ages.json` (top level, cross-season)
+
+`{generated_at, updated_at, ages: {player_id: age}}` — real age (fractional
+years, e.g. `24.4`) for every player KeepTradeCut's dynasty-rankings page
+ranks, resolved by name against the NFL-wide player cache
+(`parse.global_player_names()`) via `parse.ages_by_pid()`. Backs the
+player card's age stat. Global, not season-scoped — age is a "right now"
+fact. Same source/fetch as `trades.json`/`draft.json`'s dynasty
+valuation (`valuation.ages_by_name()`, zero extra requests — KTC's
+`playersArray` carries `age` right alongside `oneQBValues.value`), so
+`updated_at` tracks the same 12h-refetch cadence. A player outside KTC's
+ranked universe (D/ST, deep dart-throws) simply has no entry — never
+fabricated.
+
 ## `spectrum.json` (top level, cross-season)
 
-Contend/rebuild signal per team. No player-age data exists anywhere in
-this league's cache (checked the raw ESPN player JSON directly — not
-exposed), so instead of roster age this compares two different value
-lenses:
+Contend/rebuild signal per team. No player-age data exists in ESPN's own
+roster JSON (checked directly — not exposed there), which is why this
+predates `player_ages.json` above (a different source, KTC) and still
+compares two different value lenses instead of roster age:
 
 - **Contending value** — `metrics.redraft_lineup_value()`: each team's
   BEST POSSIBLE STARTING LINEUP value (dominant signal) plus a 10% share

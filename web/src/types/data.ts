@@ -655,6 +655,12 @@ export interface PickFutures {
   board: PickFuturesEntry[];
 }
 
+export interface PlayerAges {
+  generated_at: string;
+  updated_at: string | null;
+  ages: Record<string, number>;
+}
+
 export type SpectrumLabel = "Contending" | "Balanced" | "Rebuilding";
 
 export interface SpectrumTeam {

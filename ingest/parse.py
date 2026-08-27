@@ -547,6 +547,22 @@ def values_by_pid(season: int, market_values: dict[str, int]) -> dict[int, float
     return {pid: market_values.get(_normalize_name(name), 0) for pid, name in names.items()}
 
 
+def ages_by_pid(market_ages: dict[str, float]) -> dict[int, float]:
+    """player_id -> real age, resolved by name against KTC's dynasty-
+    rankings fetch (`valuation.ages_by_name`). Global, not season-scoped —
+    age is a "right now" fact, so this only needs `global_player_names()`
+    (the full NFL-wide id->name cache), unlike `values_by_pid` which also
+    layers in one season's roster names. Missing entirely (not 0) for any
+    player KTC doesn't rank — a fabricated age is worse than none."""
+    names = global_player_names()
+    result: dict[int, float] = {}
+    for pid, name in names.items():
+        age = market_ages.get(_normalize_name(name))
+        if age is not None:
+            result[pid] = age
+    return result
+
+
 def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -> dict[int, dict]:
     """team_id -> {current, projected_final, started, remaining,
     total_starters, lineup} for a week that hasn't been played yet, or is

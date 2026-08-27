@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "league-hub",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["pnpm", "--dir", "web", "dev"],
+      "port": 8888
+    }
+  ]
+}

@@ -76,7 +76,14 @@ export async function fetchPlayerSeasonData(
       for (const p of side.lineup) {
         const posMap = positionTotals.get(p.position) ?? new Map();
         if (!posMap.has(p.player_id)) posMap.set(p.player_id, { points: 0, games: 0 });
-        if (p.played) {
+        // `played: true` alone isn't reliable — a player who was actually
+        // inactive/out that week can still show played:true with a real
+        // stat line of all zeros (confirmed live: a real 2025 injury week,
+        // actual 0 AND projected 0). A genuine projection of exactly 0 is
+        // ESPN's own signal that the player wasn't expected to play, so
+        // that's the real "didn't play" check for PPG purposes, not the
+        // played flag on its own.
+        if (p.played && p.projected !== 0) {
           const entry = posMap.get(p.player_id)!;
           entry.points += p.actual;
           entry.games += 1;

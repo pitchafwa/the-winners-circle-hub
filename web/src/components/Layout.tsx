@@ -4,6 +4,7 @@ import { useJson } from "../lib/data";
 import { dateTime } from "../lib/format";
 import { PlayerCardProvider } from "../state/PlayerCardContext";
 import NavDropdown from "./NavDropdown";
+import type { DropdownEntry } from "./NavDropdown";
 import type { Meta, Spectrum, TradeGrades } from "../types/data";
 
 const NAV = [
@@ -34,6 +35,25 @@ const NAV_TAIL = [
   { to: "/trophies", label: "Superlatives" },
 ];
 
+// Only shown once adminUnlocked is true (any one password-gated tool
+// unlocks all of them, same session-wide flag). The three draft-adjacent
+// tools live under their own nested group — opens as a flyout to the
+// right of this row instead of stacking a 4th/5th/6th item into one long
+// list, per Tommy's ask.
+const LM_TOOLS_ITEMS: DropdownEntry[] = [
+  { to: "/admin/trades", label: "Trades" },
+  {
+    label: "Draft Tools",
+    children: [
+      { to: "/admin/drafts", label: "Draft Entry" },
+      { to: "/admin/picks", label: "Pick Reassignment" },
+      { to: "/admin/draft-order", label: "Draft Order" },
+    ],
+  },
+  { to: "/admin/weekly-summary", label: "Weekly Summary" },
+  { to: "/admin/data", label: "Backup / Restore" },
+];
+
 /** WEEK N · LIVE / LATE EDITION once that week's games are all in, or
  * OFFSEASON outside the season — computed from fields already in the
  * data contract, no ingest change needed. */
@@ -45,7 +65,7 @@ function mastheadDate(meta: Meta | null): string {
 }
 
 export default function Layout() {
-  const { seasonsIndex, season, setSeason, meta, metaError, myTeamId, setMyTeamId } = useApp();
+  const { seasonsIndex, season, setSeason, meta, metaError, myTeamId, setMyTeamId, adminUnlocked } = useApp();
   const franchiseItems = (meta?.teams ?? []).map((t) => ({
     to: `/franchise/${t.id}`,
     label: t.nickname ?? t.name,
@@ -131,6 +151,7 @@ export default function Layout() {
               {n.label}
             </NavLink>
           ))}
+          {adminUnlocked && <NavDropdown label="LM Tools" items={LM_TOOLS_ITEMS} />}
         </nav>
       </header>
 
@@ -152,17 +173,7 @@ export default function Layout() {
           </span>
         )}
         {" · "}
-        <NavLink to="/admin/trades" className="muted" style={{ fontSize: "0.7rem" }}>trades</NavLink>
-        {" · "}
-        <NavLink to="/admin/drafts" className="muted" style={{ fontSize: "0.7rem" }}>drafts</NavLink>
-        {" · "}
-        <NavLink to="/admin/picks" className="muted" style={{ fontSize: "0.7rem" }}>picks</NavLink>
-        {" · "}
-        <NavLink to="/admin/draft-order" className="muted" style={{ fontSize: "0.7rem" }}>draft order</NavLink>
-        {" · "}
-        <NavLink to="/admin/weekly-summary" className="muted" style={{ fontSize: "0.7rem" }}>weekly summary</NavLink>
-        {" · "}
-        <NavLink to="/admin/data" className="muted" style={{ fontSize: "0.7rem" }}>backup/restore</NavLink>
+        <NavLink to="/admin" className="muted" style={{ fontSize: "0.7rem" }}>LM Tools</NavLink>
       </footer>
     </div>
     </PlayerCardProvider>

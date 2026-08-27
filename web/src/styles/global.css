@@ -277,6 +277,21 @@ hr,
   color: var(--accent-2);
 }
 
+/* A DropdownGroup row — same look as a plain .nav-dropdown-item, just a
+   <button> (opens its own flyout instead of navigating) so it needs its
+   own reset for the native button chrome, plus a flex row to push the ▸
+   to the right edge regardless of the label's own width. */
+.nav-dropdown-group-trigger {
+  background: none;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .footer {
   margin-top: 4rem;
   padding-top: 1rem;

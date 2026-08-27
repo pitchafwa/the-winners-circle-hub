@@ -1,21 +1,20 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
+import { useApp } from "../state/AppContext";
 
 const PASSWORD = "password123";
-const SESSION_KEY = "league-hub:v1:trade-admin-unlocked";
 
 export default function PasswordGate({ children }: { children: ReactNode }) {
-  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem(SESSION_KEY) === "1");
+  const { adminUnlocked, setAdminUnlocked } = useApp();
   const [input, setInput] = useState("");
   const [error, setError] = useState(false);
 
-  if (unlocked) return <>{children}</>;
+  if (adminUnlocked) return <>{children}</>;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (input === PASSWORD) {
-      sessionStorage.setItem(SESSION_KEY, "1");
-      setUnlocked(true);
+      setAdminUnlocked(true);
     } else {
       setError(true);
     }

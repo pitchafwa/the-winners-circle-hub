@@ -5,6 +5,7 @@ import type { Meta, SeasonsIndex, TeamRef } from "../types/data";
 
 const SEASON_KEY = "league-hub:v1:season";
 const MY_TEAM_KEY = "league-hub:v1:my-team";
+const ADMIN_UNLOCKED_KEY = "league-hub:v1:admin-unlocked";
 
 interface AppState {
   seasonsIndex: SeasonsIndex | null;
@@ -24,6 +25,11 @@ interface AppState {
   currentTeamName: (id: number | null | undefined) => string;
   myTeamId: number | null;
   setMyTeamId: (id: number | null) => void;
+  /** Session-wide (not persisted past the tab closing) — unlocking any one
+   * admin tool's PasswordGate unlocks all of them, and reveals the "LM
+   * Tools" nav dropdown immediately, since both read this same value. */
+  adminUnlocked: boolean;
+  setAdminUnlocked: (v: boolean) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -40,6 +46,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const stored = localStorage.getItem(MY_TEAM_KEY);
     return stored ? Number(stored) : null;
   });
+  const [adminUnlocked, setAdminUnlockedState] = useState<boolean>(
+    () => sessionStorage.getItem(ADMIN_UNLOCKED_KEY) === "1",
+  );
 
   const season = useMemo(() => {
     if (!seasonsIndex) return null;
@@ -61,6 +70,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (id === null) localStorage.removeItem(MY_TEAM_KEY);
     else localStorage.setItem(MY_TEAM_KEY, String(id));
     setMyTeamState(id);
+  };
+
+  const setAdminUnlocked = (v: boolean) => {
+    if (v) sessionStorage.setItem(ADMIN_UNLOCKED_KEY, "1");
+    else sessionStorage.removeItem(ADMIN_UNLOCKED_KEY);
+    setAdminUnlockedState(v);
   };
 
   const teamsById = useMemo(() => {
@@ -89,6 +104,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       id === null || id === undefined ? "—" : currentTeamsById.get(id)?.name ?? `Team ${id}`,
     myTeamId,
     setMyTeamId,
+    adminUnlocked,
+    setAdminUnlocked,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

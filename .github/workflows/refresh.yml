@@ -28,6 +28,27 @@ name: Refresh league data
 # any gap in the generated block (a TBD game whose window wasn't known yet,
 # a schedule change, this file going stale) without needing 15-min-everywhere
 # coverage the rest of the time.
+#
+# 2026-08-27 incident: this workflow ran fine 4 times (2026-08-25T23:01
+# through 2026-08-26T14:27 UTC, all "success" per the Actions API), then
+# GitHub's scheduler stopped invoking it entirely — confirmed via the API
+# (workflow `state: "active"`, zero run attempts recorded, not even
+# failures, for 24+ hours afterward despite the every-6-hours fallback
+# above). File content was unchanged across that gap, cron syntax in every
+# entry checked valid (all 5 fields), repo isn't archived/disabled, and
+# being public it has unlimited Actions minutes (no billing cutoff). This
+# matches a known-but-undocumented GitHub Actions failure mode: a
+# previously-working `schedule` trigger can silently stop firing with no
+# visible error anywhere. The community-reported fix is exactly this — a
+# fresh push touching the workflow file forces GitHub to re-register its
+# schedule. If this recurs, check (a) Settings -> Actions -> General
+# permissions haven't been restricted, since that's the one thing GitHub's
+# public API won't reveal without repo-scoped auth, and (b) consider an
+# external watchdog (something outside GitHub Actions itself, since the
+# scheduler failing to invoke THIS workflow means a self-check step
+# inside it can't detect its own non-invocation) that polls
+# api.github.com/repos/.../actions/workflows/refresh.yml/runs and alerts
+# if the latest run is older than a few hours during the season.
 
 on:
   workflow_dispatch: {}

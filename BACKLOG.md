@@ -3,6 +3,34 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Trade analyzer + buy-low targets (2026-08-27) — built, Tommy-only
+
+Two new LM Tools, password-gated like the rest, local-dev-only (need the
+admin-api dev middleware) — see `ingest/trade_analyzer_tool.py`'s
+docstring and the code review above for the full design.
+
+- **Trade Analyzer** (`/admin/trade-analyzer`) — pick two teams, check
+  players/picks off each roster to give up, get a before/after comparison:
+  contending value, dynasty roster value, future pick capital, rebuilding
+  value, and a per-position starter-tier/depth split, for both teams. Pure
+  what-if — nothing written to disk.
+- **Buy-Low Targets** (`/admin/buy-low`) — every other team's player with
+  real dynasty value above a floor whose last-3-games PPG has dropped hard
+  below their own season average.
+- Found and fixed a real, previously-latent bug at the shared source
+  (`parse.py:recent_player_performance()`) while building this: a player
+  genuinely inactive/IR one week can still show `played:True` with a real
+  all-zero stat line, which was silently dragging down every consumer of
+  that function's "recent form" data (roster_card.py's on_fire/on_ice/
+  recent_avg_diff, not just the new buy-low tool) — same fix already
+  applied to the player card's PPG calc, now shared.
+- Also found and fixed, during live verification, a real duplicate-pick
+  bug (not just a console warning): a team can legitimately hold two picks
+  of the same season/round (its own natural pick plus one acquired via
+  trade — confirmed live, team 10 holds five different 2027 2nds), and the
+  original `${season}-${round}` selection key collapsed them into one
+  checkbox.
+
 ## Full-app page review (2026-08-26)
 
 Requested: a page-by-page pass with small/medium/large ideas across the

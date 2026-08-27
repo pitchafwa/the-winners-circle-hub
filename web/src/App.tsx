@@ -13,6 +13,8 @@ import TradesPage from "./pages/TradesPage";
 import FranchisePage from "./pages/FranchisePage";
 import TrophyCasePage from "./pages/TrophyCasePage";
 import AdminGatePage from "./pages/AdminGatePage";
+import TradeAnalyzerPage from "./pages/TradeAnalyzerPage";
+import BuyLowPage from "./pages/BuyLowPage";
 import TradeAdminPage from "./pages/TradeAdminPage";
 import DraftAdminPage from "./pages/DraftAdminPage";
 import PickAdminPage from "./pages/PickAdminPage";
@@ -37,6 +39,8 @@ export default function App() {
           <Route path="franchise/:teamId" element={<FranchisePage />} />
           <Route path="trophies" element={<TrophyCasePage />} />
           <Route path="admin" element={<AdminGatePage />} />
+          <Route path="admin/trade-analyzer" element={<TradeAnalyzerPage />} />
+          <Route path="admin/buy-low" element={<BuyLowPage />} />
           <Route path="admin/trades" element={<TradeAdminPage />} />
           <Route path="admin/drafts" element={<DraftAdminPage />} />
           <Route path="admin/picks" element={<PickAdminPage />} />

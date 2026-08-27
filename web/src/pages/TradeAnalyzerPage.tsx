@@ -37,7 +37,13 @@ interface PickChoice {
   key: string;
   season: number;
   round: number;
-  originalTeamId?: number; // only set (and shown) when this pick was acquired via trade, not the team's own natural pick — a team can hold two picks of the same season/round this way, which is exactly why the key needs to disambiguate on original owner too
+  // Always the pick's real original team, current holder or not — shown
+  // on every pick (not just ones acquired via trade) so "whose pick is
+  // this" reads the same way for every row, and a team's own natural pick
+  // isn't the odd one out. Also why the key has to include this: a team
+  // can legitimately hold two picks of the same season/round at once (its
+  // own natural pick plus one acquired via trade).
+  originalTeamId: number;
 }
 
 function AssetPicker({
@@ -50,6 +56,8 @@ function AssetPicker({
   onToggleplayer: (id: number) => void;
   onTogglePick: (key: string) => void;
 }) {
+  const { currentTeamsById, currentTeamName } = useApp();
+  const ownerLabel = (id: number) => currentTeamsById.get(id)?.nickname || currentTeamName(id);
   const players = rosterPlayers(roster);
   return (
     <div>
@@ -71,9 +79,9 @@ function AssetPicker({
               <label key={pk.key} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.2rem 0", cursor: "pointer" }}>
                 <input type="checkbox" checked={selection.picks.has(pk.key)} onChange={() => onTogglePick(pk.key)} />
                 <span>{pk.season} Round {pk.round}</span>
-                {pk.originalTeamId !== undefined && (
-                  <span className="muted" style={{ fontSize: "0.72rem" }}>(via <TeamLink id={pk.originalTeamId}>original owner</TeamLink>)</span>
-                )}
+                <span className="muted" style={{ fontSize: "0.72rem" }}>
+                  (<TeamLink id={pk.originalTeamId}>{ownerLabel(pk.originalTeamId)}</TeamLink>'s pick)
+                </span>
               </label>
             ))}
           </>
@@ -181,7 +189,7 @@ export default function TradeAnalyzerPage() {
         key: `${p.season}-${p.round}-${p.original_team_id}`,
         season: p.season,
         round: p.round,
-        originalTeamId: p.original_team_id !== teamId ? p.original_team_id : undefined,
+        originalTeamId: p.original_team_id,
       }));
 
   const toggle = (set: (v: AssetSelection) => void, current: AssetSelection, kind: "players" | "picks", key: number | string) => {

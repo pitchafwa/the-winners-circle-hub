@@ -31,6 +31,25 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Trade analyzer follow-ups + positional strength tool (2026-08-27) — built, Tommy-only
+
+- **Pick picker now names the real original team** on every pick, not just
+  acquired ones (`(Tyus's pick)`, `(Marquel's pick)`, etc.) — previously
+  showed the literal placeholder text "original owner" as link text, a real
+  display bug.
+- **Positional Strength** (`/admin/positions`) — new LM Tool, quick-glance
+  table of every team's per-position starter-tier/depth dynasty value at
+  once (same `_position_ratings()` computation the Trade Analyzer already
+  does for two teams, run for all ten), sortable by any position column.
+  New `league_positions` subcommand on `trade_analyzer_tool.py`.
+- Found and fixed a real Rules-of-Hooks bug while building this: the
+  table's rendering function called `useApp()`/`useSorted()` but was
+  invoked as a plain conditional function call inside the page's render
+  body rather than as its own JSX component — React saw a different hook
+  count between the loading and loaded render, crashing with "Rendered
+  more hooks than during the previous render." Fixed by making it a real
+  component (`RatingsTable`) rendered via JSX.
+
 ## Full-app page review (2026-08-26)
 
 Requested: a page-by-page pass with small/medium/large ideas across the

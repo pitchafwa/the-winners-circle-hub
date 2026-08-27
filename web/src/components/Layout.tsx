@@ -52,6 +52,7 @@ const LM_TOOLS_ITEMS: DropdownEntry[] = [
   },
   { to: "/admin/trade-analyzer", label: "Trade Analyzer" },
   { to: "/admin/buy-low", label: "Buy-Low Targets" },
+  { to: "/admin/positions", label: "Positional Strength" },
   { to: "/admin/weekly-summary", label: "Weekly Summary" },
   { to: "/admin/data", label: "Backup / Restore" },
 ];

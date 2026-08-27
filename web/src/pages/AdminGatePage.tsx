@@ -8,6 +8,7 @@ const TOOLS = [
   { to: "/admin/draft-order", label: "Draft Order", desc: "Override next year's projected draft order" },
   { to: "/admin/trade-analyzer", label: "Trade Analyzer", desc: "What-if a trade against contending/rebuilding value and positional strength" },
   { to: "/admin/buy-low", label: "Buy-Low Targets", desc: "Strong dynasty value, recent production down hard" },
+  { to: "/admin/positions", label: "Positional Strength", desc: "Every team's starter-tier and depth value by position, side by side" },
   { to: "/admin/weekly-summary", label: "Weekly Summary", desc: "Generate the weekly recap" },
   { to: "/admin/data", label: "Backup / Restore", desc: "Export or restore hand-entered data" },
 ];

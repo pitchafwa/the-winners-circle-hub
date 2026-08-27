@@ -13,6 +13,10 @@ only ever runs against `pnpm dev`, never the deployed site.
                         3-games scoring has fallen well below their own
                         season average — a "the market still respects them,
                         recent results don't" signal for buy-low targets.
+    league_positions — every team's per-position starter-tier/depth rating
+                        at once, current rosters — a quick-glance league-
+                        wide comparison instead of running simulate_trade
+                        team by team.
 """
 from __future__ import annotations
 
@@ -229,9 +233,29 @@ def cmd_buy_low_targets(payload: dict) -> dict:
     return {"season": season, "candidates": candidates}
 
 
+def cmd_league_positions(payload: dict) -> dict:
+    """Every team's per-position starter-tier/depth rating, current
+    rosters, dynasty value — the same computation `simulate_trade` already
+    does for two teams at once, run for all of them, so "who's actually
+    strong at RB right now" is a single glance instead of running the
+    trade analyzer team-by-team."""
+    season = payload.get("season") or config.SEASON
+    league = parse.load_league(season)
+    dynasty_values, _ = _values()
+    dynasty_by_pid = parse.values_by_pid(season, dynasty_values)
+    rosters = parse.current_roster_players_with_position(season)
+
+    teams = {
+        team_id: _position_ratings(roster, dynasty_by_pid, league.starting_slots)
+        for team_id, roster in rosters.items()
+    }
+    return {"season": season, "teams": teams}
+
+
 COMMANDS = {
     "simulate_trade": cmd_simulate_trade,
     "buy_low_targets": cmd_buy_low_targets,
+    "league_positions": cmd_league_positions,
 }
 
 

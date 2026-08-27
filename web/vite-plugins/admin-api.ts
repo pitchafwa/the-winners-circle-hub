@@ -15,7 +15,7 @@ const TOOLS: Record<string, { script: string; subcommands: string[] }> = {
   draft: { script: "draft_tool.py", subcommands: ["parse", "submit"] },
   draftorder: { script: "draft_order_tool.py", subcommands: ["get", "set", "clear"] },
   data: { script: "data_tool.py", subcommands: ["export", "import"] },
-  analyzer: { script: "trade_analyzer_tool.py", subcommands: ["simulate_trade", "buy_low_targets"] },
+  analyzer: { script: "trade_analyzer_tool.py", subcommands: ["simulate_trade", "buy_low_targets", "league_positions"] },
 };
 
 function readBody(req: IncomingMessage): Promise<string> {

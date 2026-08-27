@@ -290,6 +290,47 @@ explicitly NOT Franchise pages or Record Book.
   horizontal overflow at 375px width. `tsc --noEmit` and `pnpm build` both
   clean, no console errors.
 
+### Refined (2026-08-27)
+
+- **Replaced ESPN's position/draft rank/ownership% stat block** with the
+  player's real PPG, position rank in PPG, and age — all sourced from our
+  own data instead of ESPN's generic-scoring stats. PPG/rank come from a
+  new full-season scan (`lib/playerGameLog.ts:fetchPlayerSeasonData`) of
+  the same `matchups/week-N.json` files the game log itself reads — while
+  scanning for the target player it tallies every other player at the
+  same position too, so a season-wide points-per-game rank falls out for
+  free. Age comes from a genuinely new backend output, **`player_ages.json`**
+  (`valuation.ages_by_name()` + `parse.ages_by_pid()`) — KTC's dynasty-
+  rankings `playersArray` carries a real `age` field right alongside
+  `oneQBValues.value`, confirmed live (e.g. `24.4`), so this piggybacks on
+  the exact same already-scheduled 12h KTC fetch, zero extra requests.
+  KTC itself can't be fetched client-side (no CORS headers, confirmed —
+  unlike the ESPN endpoint the rest of the card uses), which is why this
+  needed a real backend addition instead of another live browser fetch.
+- **Injury status investigated, disregarded** — checked both this app's
+  own weekly box scores (no per-week injury field ever recorded) and the
+  ESPN overview endpoint's full raw response (only generic "team injuries
+  page" links, no per-game designation) — genuinely not available from
+  either source on file, so this was dropped per the explicit fallback
+  instruction rather than faked.
+- **Game log**: now week 1 first (was most-recent-first), always shows
+  all 17 weeks even with no data ("Data not available", not just a
+  missing row), and includes which franchise held the player that week
+  (linked to its Franchise page). Moved to the bottom of the card, below
+  the ESPN content — season selector moved up next to the new PPG/rank/
+  age block and now drives BOTH sections together (one shared season,
+  not two that could drift out of sync).
+- Verified live: real PPG/rank/age for an active 2025 player (e.g. a real
+  WR1 season correctly ranked #1 of ~78 at the position); switching the
+  season selector to a year before a player's career updates BOTH the
+  stat block (PPG/rank show "—", age stays — it's not season-scoped) AND
+  the game log (all 17 weeks "Data not available") together; real
+  franchise names/links render per week; no horizontal overflow at 375px
+  (the 5-column game log table scrolls in its own `.table-wrap`, not the
+  page). `tsc --noEmit` and `pnpm build` clean, no console errors. Ingest
+  rebuild (`--offline`) confirmed timestamp-only diff across every
+  existing file plus the one new `player_ages.json`.
+
 - Dynasty Power Rankings variant
 - League-wide positional trends over time (multi-week chart on top of the
   existing single-snapshot heatmap) — parked, Tommy's not sold it's needed.

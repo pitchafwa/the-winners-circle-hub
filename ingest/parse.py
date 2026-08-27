@@ -503,7 +503,17 @@ def recent_player_performance(
                 if not side:
                     continue
                 for p in side.lineup:
-                    if not p.played:
+                    # `played: True` alone isn't reliable — a player who was
+                    # genuinely inactive/IR that week (confirmed real, e.g.
+                    # late-season injuries) can still carry played:True with
+                    # a real stat line of all zeros. A genuine ESPN
+                    # projection of exactly 0 is the real "didn't actually
+                    # play" signal (same fix as the player card's PPG
+                    # calculation, web/src/lib/playerGameLog.ts) — without
+                    # it, a real end-of-season injury run reads as a string
+                    # of real 0-point games and drags every average that
+                    # uses this data down hard.
+                    if not p.played or p.projected == 0:
                         continue
                     entries = out.setdefault(p.player_id, [])
                     if len(entries) < limit:
@@ -532,6 +542,32 @@ def current_roster_players(season: int | None = None) -> dict[int, list[tuple[in
             player = (e.get("playerPoolEntry") or {}).get("player") or {}
             if "id" in player:
                 players.append((player["id"], frozenset(player.get("eligibleSlots", []))))
+        rosters[t["id"]] = players
+    return rosters
+
+
+def current_roster_players_with_position(season: int | None = None) -> dict[int, list[tuple[int, frozenset[int], str]]]:
+    """Same shape as `current_roster_players()`, plus each player's real
+    primary position (POSITION_NAMES, resolved from `defaultPositionId` —
+    same source `roster_card.py` already uses) — needed for grouping a
+    roster BY position (trade_analyzer_tool.py's starter/depth ratings),
+    where "which slots could this player fill" (eligible_slots) isn't the
+    same question as "what position is this player, for grouping." A
+    parallel function rather than adding a flag to the existing one, since
+    `current_roster_players()` already has real callers (simulate.py,
+    spectrum.py) that only need the 2-tuple shape."""
+    season = season or config.SEASON
+    raw = _load(season, "league")
+    rosters: dict[int, list[tuple[int, frozenset[int], str]]] = {}
+    if not raw:
+        return rosters
+    for t in raw.get("teams", []):
+        players = []
+        for e in t.get("roster", {}).get("entries", []):
+            player = (e.get("playerPoolEntry") or {}).get("player") or {}
+            if "id" in player:
+                position = POSITION_NAMES.get(player.get("defaultPositionId", 0), "?")
+                players.append((player["id"], frozenset(player.get("eligibleSlots", [])), position))
         rosters[t["id"]] = players
     return rosters
 

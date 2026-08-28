@@ -31,6 +31,44 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Screenshot rollout: charts (2026-08-28)
+
+Second pass, covering the two blocks deferred from the first rollout:
+
+- **Playoff Probability** (`PlayoffProbabilityTracks.tsx`) — plain CSS
+  progress bars, not an SVG chart (a mislabel in the original "defer as a
+  chart" call — corrected here). Same `forwardRef` + `ScreenshotButton`
+  recipe as every table. Verified live: real floor/risk/upside bar
+  colors (`--accent-2`/`--negative`/`--positive`) all present in the
+  capture via pixel sampling, no console errors.
+- **Season Timeline** (`BumpChart` in `HistoryCharts.tsx`) — the real
+  recharts SVG chart. Wrapped in a plain `<div ref={ref}>` around
+  `ResponsiveContainer` (recharts doesn't cleanly forward a ref to
+  anything useful itself) and captured the same way as everything else.
+  Verified live with real season data: gridlines (`--rule`) and 9 of 10
+  teams' lines (`--ink-muted`) all present with exact color matches via
+  pixel sampling — genuinely legible, working capture.
+  - **One verified, narrow limitation**: the "your team" highlighted
+    line (`--accent`, #0FA894) specifically does not rasterize through
+    the `<img>` + canvas pipeline in this session's test browser, while
+    every other line/gridline/color renders correctly. Root-caused
+    thoroughly, not just observed: reproduced with `html-to-image`
+    bypassed entirely (raw `XMLSerializer` on the live SVG), reproduced
+    regardless of the line's z-order (moved to front, no change), and
+    reproduced when the SAME color was applied to a DIFFERENT, otherwise
+    fully-working path (still failed identically) — meaning it's
+    specific to that exact color value going through this browser's
+    SVG-image rasterizer, not a bug in the capture code, not a z-order/
+    occlusion issue, and not a CSS-override issue (confirmed no
+    stylesheet rules on the SVG, computed style matches the attribute
+    exactly). Most likely an artifact of this session's specific
+    automated-browser/GPU compositing environment rather than something
+    that reproduces on a real phone — shipped as-is; if Tommy sees the
+    same missing highlight on his actual iPhone, worth a follow-up
+    (probably switching the "mine" line's differentiation to something
+    less color-dependent, e.g. a marker or heavier dash, since
+    strokeWidth alone already differs 2.4 vs 1).
+
 ## Screenshot rollout: every table/card block, league-wide (2026-08-28)
 
 Full rollout of the "save as image" button (`ScreenshotButton.tsx`) beyond

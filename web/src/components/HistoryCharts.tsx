@@ -58,7 +58,9 @@ function BumpTooltip({
 }
 
 /** Standings-by-week bump chart for the selected season. */
-export function BumpChart({ schedule, meta }: { schedule: Schedule; meta: Meta }) {
+export const BumpChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: Meta }>(function BumpChart(
+  { schedule, meta }, ref,
+) {
   const { myTeamId, teamName } = useApp();
   const { data, teamIds } = useMemo(() => {
     const decided = schedule.entries.filter(
@@ -95,26 +97,28 @@ export function BumpChart({ schedule, meta }: { schedule: Schedule; meta: Meta }
   if (data.length === 0) return <EmptyState>No completed weeks to chart.</EmptyState>;
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -22 }}>
-        <CartesianGrid stroke={RULE} vertical={false} strokeWidth={0.5} />
-        <XAxis dataKey="week" tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }}
-          tickLine={false} axisLine={{ stroke: RULE }} />
-        <YAxis reversed domain={[1, teamIds.length]} tickCount={teamIds.length}
-          tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }} tickLine={false} axisLine={false} />
-        <Tooltip content={<BumpTooltip teamName={teamName} myTeamId={myTeamId} />} />
-        {teamIds.map((id) => {
-          const mine = id === myTeamId;
-          return (
-            <Line key={id} type="monotone" dataKey={`t${id}`}
-              stroke={mine ? ACCENT : INK_MUTED} strokeWidth={mine ? 2.4 : 1}
-              strokeOpacity={mine ? 1 : 0.45} dot={false} />
-          );
-        })}
-      </LineChart>
-    </ResponsiveContainer>
+    <div ref={ref}>
+      <ResponsiveContainer width="100%" height={280}>
+        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -22 }}>
+          <CartesianGrid stroke={RULE} vertical={false} strokeWidth={0.5} />
+          <XAxis dataKey="week" tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }}
+            tickLine={false} axisLine={{ stroke: RULE }} />
+          <YAxis reversed domain={[1, teamIds.length]} tickCount={teamIds.length}
+            tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }} tickLine={false} axisLine={false} />
+          <Tooltip content={<BumpTooltip teamName={teamName} myTeamId={myTeamId} />} />
+          {teamIds.map((id) => {
+            const mine = id === myTeamId;
+            return (
+              <Line key={id} type="monotone" dataKey={`t${id}`}
+                stroke={mine ? ACCENT : INK_MUTED} strokeWidth={mine ? 2.4 : 1}
+                strokeOpacity={mine ? 1 : 0.45} dot={false} />
+            );
+          })}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
-}
+});
 
 export function SwapMatrix({ swap, meta }: { swap: ScheduleSwap; meta: Meta }) {
   const teams = meta.teams;

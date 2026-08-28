@@ -21,6 +21,8 @@ export default function LeaguePage() {
   const contendRebuildRef = useRef<HTMLTableElement>(null);
   const positionHeatmapRef = useRef<HTMLTableElement>(null);
   const superlativesGridRef = useRef<HTMLDivElement>(null);
+  const playoffTracksRef = useRef<HTMLDivElement>(null);
+  const bumpChartRef = useRef<HTMLDivElement>(null);
   const base = season !== null ? `${season}` : null;
   const standings = useJson<Standings>(base ? `${base}/standings.json` : null);
   const superlatives = useJson<Superlatives>(base ? `${base}/superlatives.json` : null);
@@ -75,11 +77,14 @@ export default function LeaguePage() {
       <section className="section" aria-labelledby="odds-h">
         <div className="section-head">
           <h2 id="odds-h">Playoff Probability</h2>
-          <span className="label">current odds · red = if you lose this week · green = if you win</span>
+          <span className="label">
+            current odds · red = if you lose this week · green = if you win
+            {sim.data && <ScreenshotButton targetRef={playoffTracksRef} filename="playoff-probability" />}
+          </span>
         </div>
         {sim.data ? (
           <>
-            <PlayoffProbabilityTracks teams={sim.data.teams} />
+            <PlayoffProbabilityTracks ref={playoffTracksRef} teams={sim.data.teams} />
             <p className="muted" style={{ fontSize: "0.72rem", marginTop: "0.9rem", fontStyle: "italic" }}>
               {sim.data.n_sims.toLocaleString()} simulations, {sim.data.remaining_matchups} games left. {sim.data.model}.
             </p>
@@ -98,10 +103,13 @@ export default function LeaguePage() {
       <section className="section" aria-labelledby="arc-h">
         <div className="section-head">
           <h2 id="arc-h">Season timeline</h2>
-          <span className="label">{meta.season} standings by week — your team in green</span>
+          <span className="label">
+            {meta.season} standings by week — your team in green
+            {schedule.data && <ScreenshotButton targetRef={bumpChartRef} filename="season-timeline" />}
+          </span>
         </div>
         {schedule.data ? (
-          <BumpChart schedule={schedule.data} meta={meta} />
+          <BumpChart ref={bumpChartRef} schedule={schedule.data} meta={meta} />
         ) : (
           !schedule.loading && <EmptyState>No schedule data.</EmptyState>
         )}

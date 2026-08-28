@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useApp } from "../state/AppContext";
 import { pts, pct, signed, MISSING } from "../lib/format";
 import TeamLink from "./TeamLink";
+import TableScreenshotButton from "./TableScreenshotButton";
 import type { StandingsRow } from "../types/data";
 
 type Col = {
@@ -38,6 +39,7 @@ const COLS: Col[] = [
 export default function StandingsTable({ rows }: { rows: StandingsRow[] }) {
   const { teamsById } = useApp();
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "seed", dir: 1 });
+  const tableRef = useRef<HTMLTableElement>(null);
 
   const sorted = useMemo(() => {
     const col = COLS.find((c) => c.key === sort.key) ?? COLS[0];
@@ -63,8 +65,12 @@ export default function StandingsTable({ rows }: { rows: StandingsRow[] }) {
   };
 
   return (
-    <div className="table-wrap">
-      <table className="stat">
+    <div>
+      <div className="table-capture-bar">
+        <TableScreenshotButton targetRef={tableRef} filename="standings" />
+      </div>
+      <div className="table-wrap">
+      <table className="stat" ref={tableRef}>
         <thead>
           <tr>
             {COLS.map((c) => (
@@ -108,6 +114,7 @@ export default function StandingsTable({ rows }: { rows: StandingsRow[] }) {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

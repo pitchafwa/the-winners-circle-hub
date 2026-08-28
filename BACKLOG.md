@@ -31,6 +31,55 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Mobile "save table as image" — test run on Standings (2026-08-28)
+
+Tommy wanted a mobile-only button to screenshot a table's FULL contents
+(including columns currently scrolled off-screen) so he can send it to
+the group chat, without having to scroll-and-stitch multiple screenshots
+by hand. Test run on the Standings table only, per his ask — roll out to
+other tables once he's happy with it.
+
+- **The trick**: `html-to-image` renders straight from the DOM tree, so
+  it reads a target element's own natural width, not the viewport's
+  clipped visible area. A `<table>` inside `.table-wrap`'s
+  `overflow-x: auto` ancestor still lays out at its own full content
+  width — only the ANCESTOR clips/scrolls it — so pointing the capture
+  at the `<table>` itself (never at `.table-wrap`) gets the whole thing
+  in one shot, no scrolling or stitching. New `TableScreenshotButton.tsx`,
+  wired into `StandingsTable.tsx`; CSS-hidden above 640px (desktop
+  already shows the whole table).
+- Tries the Web Share API first (`navigator.share` with files) where
+  supported — opens the native share sheet directly, pick a group chat
+  or Save to Photos in one tap. Falls back to an in-page image preview
+  (long-press to save/share) everywhere else.
+- Found and fixed two real bugs during testing, not just environment
+  quirks:
+  1. The originally-planned `window.open()` fallback got silently
+     popup-blocked — calling it after an `await` loses the browser's
+     "this came from a real tap" flag on most mobile browsers. Replaced
+     with the in-page preview overlay above, which needs no popup at all.
+  2. html-to-image's own `toBlob()`/`toPng()` resolve the loaded capture
+     inside a `requestAnimationFrame` callback, which only fires while
+     the tab is actively compositing — normally invisible, but a real
+     way to hang forever if the tab loses visibility mid-capture (OS
+     share sheet stealing focus, backgrounding, etc). Rewrote the final
+     step to use the library's `toSvg()` (DOM→SVG serialization, the
+     part that actually needs the library) and then manually load+draw
+     to a canvas — same output, one fewer way to get stuck. Also passed
+     `skipFonts: true`: by default the library re-fetches every
+     `@font-face` on the ENTIRE page (all ~30 of this app's IBM Plex Mono
+     weight/subset files) to inline as base64, which is slow for no
+     benefit here — the table only needs its own text legible, not exact
+     kerning.
+  - Verified the fix caught a real hang, not a false alarm: confirmed
+    `requestAnimationFrame` genuinely never fires in a backgrounded/
+    non-compositing tab (a real, if edge-case, browser condition) before
+    rewriting around it.
+- Verified live: captured image is 1712×904px against a 375px mobile
+  viewport (pixel-ratio-2'd, so ~856px logical — over double the visible
+  width), confirmed via canvas pixel sampling that real table content
+  (not blank space) renders across the full width, no console errors.
+
 ## Redraft value source switched: KTC → FantasyPros ECR (2026-08-28)
 
 Tommy didn't buy the redraft/contending-value rankings KTC's own

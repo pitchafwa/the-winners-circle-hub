@@ -25,7 +25,11 @@ function TradeCard({ t }: { t: Trade }) {
   return (
     <div className="trade-card" ref={cardRef}>
       <div className="card-shot">
-        <ScreenshotButton targetRef={cardRef} filename={`trade-week${t.week}-${teamName(a)}-${teamName(b)}`.toLowerCase().replace(/[^a-z0-9]+/g, "-")} />
+        <ScreenshotButton
+          targetRef={cardRef}
+          filename={`trade-week${t.week}-${teamName(a)}-${teamName(b)}`.toLowerCase().replace(/[^a-z0-9]+/g, "-")}
+          title={`Trade — ${teamName(a)} / ${teamName(b)}`}
+        />
       </div>
       <div className="label">Trade · week {t.week}</div>
       <div className="trade-teams">

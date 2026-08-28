@@ -31,6 +31,52 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Screenshot capture: title + padding frame (2026-08-28)
+
+Tommy's feedback after the charts pass: tables and matchup cards looked
+great, but captures of things without their own visible border/header
+(Playoff Probability, Season Timeline) looked "cut off right when the
+content ends," with no title. Fixed once, at the source
+(`ScreenshotButton.tsx`), rather than reworking every page's own markup.
+
+- `capture()` now builds a small offscreen frame — a heading (the
+  block's title, defaulting to a title-cased version of `filename` when
+  no explicit `title` prop is given) plus real padding — around a CLONE
+  of the target, and captures that instead of the bare target. Explicit
+  nicer titles added at the two dynamic per-item sites where the
+  filename slug would've looked awkward (`MatchupCard`, `TradeCard` in
+  `ActivityFeed.tsx`); every other call site rides the auto-derived
+  default.
+- Found and fixed two real bugs building this, both confirmed live
+  before and after:
+  1. Positioning the offscreen frame with `left:-9999px` (the obvious
+     first approach) silently produced a fully TRANSPARENT capture —
+     html-to-image's coordinate math breaks on negative positions,
+     shifting the rendered content entirely outside the exported SVG's
+     viewBox. Fixed by nesting the frame (`top:0;left:0`, no negative
+     coordinates anywhere) inside a zero-size `overflow:hidden` stage
+     instead — invisible to the user the same way, without the negative
+     offset.
+  2. Reparenting the clone broke recharts' `ResponsiveContainer`
+     specifically: its `width:100%` resolves against whatever it's
+     actually mounted in, and the synthetic frame has no real width of
+     its own — the Season Timeline capture came out squashed to ~246px
+     instead of its real ~335px. Fixed by walking the original/clone
+     trees in parallel and freezing any percentage-width element to the
+     ORIGINAL element's real measured pixel width before capture. (Also
+     had to fix the fix: the first attempt checked
+     `getComputedStyle(original).width.endsWith("%")`, which is always
+     false — computed style always resolves to a pixel value, even for a
+     percentage source rule. Had to check the element's own inline
+     `style.width` instead, which does preserve the specified
+     `"100%"`.)
+- Verified live across all three capture patterns: Standings table,
+  Season Timeline chart (real title/gridline/line colors all present at
+  the correct positions via pixel sampling, correct ~383×367 CSS px
+  frame size), and a matchup card (title + full card content both
+  present, force-desktop layout unaffected) — all with an opaque
+  background frame (no transparency regression) and no console errors.
+
 ## Screenshot rollout: charts (2026-08-28)
 
 Second pass, covering the two blocks deferred from the first rollout:

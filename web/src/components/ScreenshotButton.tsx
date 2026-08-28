@@ -18,11 +18,21 @@ import type { RefObject } from "react";
 // html-to-image is dynamically imported so it only ever loads into the
 // bundle if someone actually taps the button — no cost to everyone else's
 // page weight for a mobile-only, occasionally-used feature.
+
+/** "contend-rebuild" -> "Contend Rebuild" — a decent default heading for
+ * any call site that doesn't bother passing an explicit `title`. */
+function titleCase(filename: string): string {
+  return filename.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function ScreenshotButton({
-  targetRef, filename, prepareCapture, cleanupCapture,
+  targetRef, filename, title, prepareCapture, cleanupCapture,
 }: {
   targetRef: RefObject<HTMLElement | null>;
   filename: string;
+  /** Heading baked into the captured image itself. Defaults to a
+   * title-cased version of `filename` when omitted. */
+  title?: string;
   /** Optional hook to mutate the DOM into a different visual state right
    * before capture — e.g. MatchupCard uses this to force its desktop
    * side-by-side layout instead of the mobile stacked one, regardless of
@@ -44,11 +54,71 @@ export default function ScreenshotButton({
     if (!targetRef.current || busy) return;
     setBusy(true);
     setError(null);
+    let stage: HTMLDivElement | null = null;
     try {
       prepareCapture?.();
       const node = targetRef.current;
+
+      // A bare table or chart cropped right at its own edge, with no
+      // label, reads as an accidental screen-clip, not something worth
+      // sending on. Build a frame — this block's title plus real
+      // padding — around a CLONE of the target (never touching the live
+      // page), and capture that instead.
+      //
+      // The frame has to stay invisible to the user without ever having
+      // a NEGATIVE position — confirmed live that `left:-9999px` breaks
+      // html-to-image's coordinate math and silently produces a fully
+      // transparent capture (the content gets positioned outside the
+      // exported SVG's viewBox instead of clipped into it). Nesting the
+      // real frame (`top:0;left:0`) inside a zero-size,
+      // `overflow:hidden` stage does the same "invisible to the user"
+      // job with no negative coordinates anywhere: the stage clips it
+      // to nothing on screen, while the frame itself still gets real
+      // layout (offsetWidth/Height) for html-to-image to read, same
+      // principle as `.table-wrap`'s own overflow-x clipping.
+      stage = document.createElement("div");
+      stage.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;overflow:hidden;";
+      const frame = document.createElement("div");
+      frame.style.cssText =
+        "position:absolute;top:0;left:0;display:inline-block;" +
+        "background:#FAF3E1;padding:1.25rem 1.5rem 1.5rem;";
+      const heading = document.createElement("div");
+      heading.textContent = title ?? titleCase(filename);
+      heading.style.cssText =
+        'font-family:"Trebuchet MS","Segoe UI",-apple-system,sans-serif;' +
+        "font-weight:800;font-size:1.15rem;color:#12213D;margin-bottom:0.9rem;";
+      frame.appendChild(heading);
+      const clone = node.cloneNode(true) as HTMLElement;
+      // Percentage-widthed descendants (recharts' ResponsiveContainer in
+      // particular, width:100%) resolve against whatever they're
+      // actually mounted in — reparenting the clone into this synthetic
+      // frame breaks that resolution, since the frame has no real width
+      // of its own to measure against (confirmed live: a chart capture
+      // came out squashed to ~246px instead of its real ~335px). Freeze
+      // every percentage-width element in the clone to the ORIGINAL
+      // element's real measured pixel width, walking both trees in
+      // parallel, so nothing in the capture depends on the new parent's
+      // layout.
+      const freezeWidths = (original: Element, cloned: Element) => {
+        // getComputedStyle().width is always a resolved PIXEL value, even
+        // when the source rule is a percentage — has to be the element's
+        // own inline/specified style (what recharts' ResponsiveContainer
+        // actually sets: style="width: 100%") to catch this at all.
+        if (original instanceof HTMLElement && cloned instanceof HTMLElement
+          && original.style.width.endsWith("%")) {
+          cloned.style.width = `${original.offsetWidth}px`;
+        }
+        for (let i = 0; i < original.children.length; i++) {
+          freezeWidths(original.children[i], cloned.children[i]);
+        }
+      };
+      freezeWidths(node, clone);
+      frame.appendChild(clone);
+      stage.appendChild(frame);
+      document.body.appendChild(stage);
+
       const { toSvg } = await import("html-to-image");
-      const svgDataUrl = await toSvg(node, {
+      const svgDataUrl = await toSvg(frame, {
         backgroundColor: "#FAF3E1", // --paper — canvas has no CSS var access of its own
         // html-to-image's default font-embedding step walks EVERY stylesheet
         // on the page (not just what the target subtree uses) and re-fetches
@@ -80,12 +150,12 @@ export default function ScreenshotButton({
 
       const pixelRatio = 2; // sharp enough to hold up once shared/re-compressed by a group chat app
       const canvas = document.createElement("canvas");
-      canvas.width = node.offsetWidth * pixelRatio;
-      canvas.height = node.offsetHeight * pixelRatio;
+      canvas.width = frame.offsetWidth * pixelRatio;
+      canvas.height = frame.offsetHeight * pixelRatio;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("no 2d canvas context");
       ctx.scale(pixelRatio, pixelRatio);
-      ctx.drawImage(img, 0, 0, node.offsetWidth, node.offsetHeight);
+      ctx.drawImage(img, 0, 0, frame.offsetWidth, frame.offsetHeight);
 
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("empty image");
@@ -115,6 +185,7 @@ export default function ScreenshotButton({
     } catch {
       setError("Couldn't create image — try again");
     } finally {
+      stage?.remove();
       cleanupCapture?.();
       setBusy(false);
     }

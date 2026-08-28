@@ -253,6 +253,7 @@ function MatchupCard({
         <ScreenshotButton
           targetRef={cardRef}
           filename={filename}
+          title={`${teamName(m.away.team_id)} at ${teamName(m.home.team_id)} — Week ${m.matchup_period}`}
           prepareCapture={prepareCapture}
           cleanupCapture={cleanupCapture}
         />

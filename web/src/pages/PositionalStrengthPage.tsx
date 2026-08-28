@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
 import { useApp } from "../state/AppContext";
+import { useJson } from "../lib/data";
 import { pts } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import EmptyState from "../components/EmptyState";
 import PasswordGate from "../components/PasswordGate";
 import TeamLink from "../components/TeamLink";
-import { fetchLeaguePositions } from "../lib/tradeAnalyzerApi";
-import type { PositionRating } from "../lib/tradeAnalyzerApi";
+import { allTeamRosters, positionRatings } from "../lib/teamValue";
+import type { PositionRating } from "../lib/teamValue";
+import type { PlayerValues, Roster } from "../types/data";
 
 const POSITIONS = ["QB", "RB", "WR", "TE", "D/ST", "K"];
 
@@ -65,25 +66,20 @@ function RatingsTable({ candidates, sort }: { candidates: Row[]; sort: ReturnTyp
 }
 
 export default function PositionalStrengthPage() {
-  const { seasonsIndex } = useApp();
-  const season = seasonsIndex?.default_season ?? null;
-  const [state, setState] = useState<{ rows: Row[] | null; loading: boolean; error: string | null }>({
-    rows: null, loading: true, error: null,
-  });
+  const { meta } = useApp();
+  const season = meta?.season ?? null;
+  const roster = useJson<Roster>(season !== null ? `${season}/roster.json` : null);
+  const playerValues = useJson<PlayerValues>("player_values.json");
 
-  useEffect(() => {
-    if (season === null) return;
-    let alive = true;
-    setState({ rows: null, loading: true, error: null });
-    fetchLeaguePositions(season)
-      .then((res) => {
-        if (!alive) return;
-        const rows = Object.entries(res.teams).map(([tid, values]) => ({ team_id: Number(tid), values }));
-        setState({ rows, loading: false, error: null });
-      })
-      .catch((err: Error) => { if (alive) setState({ rows: null, loading: false, error: err.message }); });
-    return () => { alive = false; };
-  }, [season]);
+  const loading = roster.loading || playerValues.loading;
+  const error = roster.error ?? playerValues.error;
+
+  const rows: Row[] | null = (roster.data && playerValues.data && meta)
+    ? Object.entries(allTeamRosters(roster.data, playerValues.data)).map(([tid, players]) => ({
+        team_id: Number(tid),
+        values: positionRatings(players, playerValues.data!.players, meta.starting_slots),
+      }))
+    : null;
 
   const sort = useSort<Row>("team", 1, (r, key) => {
     if (key === "team") return r.team_id;
@@ -97,10 +93,10 @@ export default function PositionalStrengthPage() {
           <h2>Positional strength — all teams</h2>
           <span className="label">dynasty value: starter tier (top N at the position) + depth (everyone else rostered there) · click a column to sort</span>
         </div>
-        {state.loading && <p className="muted" style={{ fontStyle: "italic" }}>Loading...</p>}
-        {state.error && <div className="error-state">{state.error}</div>}
-        {state.rows && state.rows.length === 0 && <EmptyState>No roster data on file yet.</EmptyState>}
-        {state.rows && state.rows.length > 0 && <RatingsTable candidates={state.rows} sort={sort} />}
+        {loading && <p className="muted" style={{ fontStyle: "italic" }}>Loading...</p>}
+        {error && <div className="error-state">{error}</div>}
+        {rows && rows.length === 0 && <EmptyState>No roster data on file yet.</EmptyState>}
+        {rows && rows.length > 0 && <RatingsTable candidates={rows} sort={sort} />}
       </section>
     </PasswordGate>
   );

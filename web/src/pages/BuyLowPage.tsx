@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useApp } from "../state/AppContext";
+import { useJson } from "../lib/data";
 import { pct, pts } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import EmptyState from "../components/EmptyState";
@@ -7,8 +8,9 @@ import PasswordGate from "../components/PasswordGate";
 import PlayerCardTrigger from "../components/PlayerCardTrigger";
 import PlayerHeadshot from "../components/PlayerHeadshot";
 import TeamLink from "../components/TeamLink";
-import { fetchBuyLowTargets } from "../lib/tradeAnalyzerApi";
-import type { BuyLowCandidate } from "../lib/tradeAnalyzerApi";
+import { computeBuyLowTargets } from "../lib/buyLow";
+import type { BuyLowCandidate } from "../lib/buyLow";
+import type { PlayerValues, Roster } from "../types/data";
 
 function BuyLowTable({ candidates }: { candidates: BuyLowCandidate[] }) {
   const { teamName } = useApp();
@@ -70,21 +72,26 @@ function BuyLowTable({ candidates }: { candidates: BuyLowCandidate[] }) {
 }
 
 export default function BuyLowPage() {
-  const { seasonsIndex, myTeamId } = useApp();
-  const season = seasonsIndex?.default_season ?? null;
+  const { meta, myTeamId } = useApp();
+  const season = meta?.season ?? null;
+  const roster = useJson<Roster>(season !== null ? `${season}/roster.json` : null);
+  const playerValues = useJson<PlayerValues>("player_values.json");
   const [state, setState] = useState<{ candidates: BuyLowCandidate[] | null; loading: boolean; error: string | null }>({
     candidates: null, loading: true, error: null,
   });
 
   useEffect(() => {
-    if (season === null) return;
+    if (season === null || !roster.data || !playerValues.data) return;
     let alive = true;
     setState({ candidates: null, loading: true, error: null });
-    fetchBuyLowTargets({ season, excludeTeamId: myTeamId })
-      .then((res) => { if (alive) setState({ candidates: res.candidates, loading: false, error: null }); })
+    computeBuyLowTargets({ season, values: playerValues.data, roster: roster.data, excludeTeamId: myTeamId })
+      .then((candidates) => { if (alive) setState({ candidates, loading: false, error: null }); })
       .catch((err: Error) => { if (alive) setState({ candidates: null, loading: false, error: err.message }); });
     return () => { alive = false; };
-  }, [season, myTeamId]);
+  }, [season, roster.data, playerValues.data, myTeamId]);
+
+  const loading = state.loading || roster.loading || playerValues.loading;
+  const error = state.error ?? roster.error ?? playerValues.error;
 
   return (
     <PasswordGate>
@@ -93,8 +100,8 @@ export default function BuyLowPage() {
           <h2>Buy-low targets</h2>
           <span className="label">strong dynasty value, production down hard the last 3 games — the market may not have caught up</span>
         </div>
-        {state.loading && <p className="muted" style={{ fontStyle: "italic" }}>Loading...</p>}
-        {state.error && <div className="error-state">{state.error}</div>}
+        {loading && <p className="muted" style={{ fontStyle: "italic" }}>Loading...</p>}
+        {error && <div className="error-state">{error}</div>}
         {state.candidates && state.candidates.length === 0 && (
           <EmptyState>No real dip candidates on file right now — check back once more of the season is in.</EmptyState>
         )}

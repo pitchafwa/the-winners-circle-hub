@@ -31,6 +31,53 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Trade Partners + LM Tools now work on the deployed site (2026-08-28) — built, Tommy-only
+
+Tommy asked why Positional Strength/Trade Analyzer/etc only worked on
+`pnpm dev` and not the real deployed site — the honest answer was that
+they called a local Python backend (a Vite dev-middleware bridge,
+`web/vite-plugins/admin-api.ts`, spawning `trade_analyzer_tool.py`) that
+simply doesn't exist once deployed (GitHub Pages is 100% static, no
+server at all). Four of the five LM Tools were read-only (no writes to
+disk), so all four moved to a pure client-side port:
+
+- **Trade Partners** (`/admin/trade-partners`) — new LM Tool: every other
+  team ranked by mutual positional fit — how much their positional
+  surplus overlaps this team's need, and vice versa. Value = starter tier
+  + depth per position (reusing Positional Strength's rating); need/
+  surplus expressed as a fraction of the league average so positions with
+  very different value scales (RB pool vs. TE pool) compare fairly. Fit
+  score sums (my need × their surplus) + (their need × my surplus) over
+  every position.
+- **Positional Strength, Buy-Low Targets, Trade Analyzer, and the new
+  Trade Partners all ported to TypeScript** (`web/src/lib/teamValue.ts`,
+  `buyLow.ts`, `leaguePerformance.ts`), reading two static files instead
+  of calling a backend: `player_values.json` (new — every rostered
+  player's dynasty/redraft value + real ESPN eligible slots, the one
+  piece of data nothing else already shipped) and `pick_futures.json`'s
+  new `value` field (each pick's real market value, computed once at
+  build time). Both regenerate on the normal scheduled refresh, same as
+  every other page's data.
+- The one non-trivial piece — Trade Analyzer's "best possible starting
+  lineup" (contending value) — needed porting the same bipartite-matching
+  logic `metrics.redraft_lineup_value()` uses server-side
+  (`scipy.optimize.linear_sum_assignment`). Ported as a greedy-with-
+  augmenting-paths algorithm (`teamValue.ts`'s `redraftLineupValue()`) —
+  provably exact for this case (a player's value is the same regardless
+  of which of their eligible slots they fill), not an approximation.
+  Verified live: ran the identical trade through both implementations,
+  every number matched exactly, including a real ~3-point rounding
+  discrepancy found and fixed in `pick_futures.json`'s `value` field
+  (was rounding each pick before summing; now sums first, matching
+  Python's round-once-at-the-end behavior).
+- `trade_analyzer_tool.py` kept in the repo as the reference
+  implementation the TS port was matched against (still runnable via
+  CLI), but nothing in `admin-api.ts` routes to it anymore.
+- Verified on the actual static production build (`vite build` + a plain
+  static file server, no dev server, no Python) — all four tools render
+  correctly with zero console errors, proving they'll work the same way
+  on the real deployed GitHub Pages site.
+
 ## Trade analyzer follow-ups + positional strength tool (2026-08-27) — built, Tommy-only
 
 - **Pick picker now names the real original team** on every pick, not just

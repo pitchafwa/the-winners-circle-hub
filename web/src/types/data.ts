@@ -648,11 +648,33 @@ export interface PickFuturesEntry {
   player_id: number | null;
   player_name: string | null;
   via: string;
+  value: number;
 }
 
 export interface PickFutures {
   generated_at: string;
   board: PickFuturesEntry[];
+}
+
+/** Per-player dynasty/redraft market value + real ESPN eligible slots
+ * (slot names, e.g. "RB/WR", "FLEX"), scoped to the latest season's
+ * current rosters. Powers every LM Tool that used to call a local Python
+ * backend (Positional Strength, Buy-Low Targets, Trade Analyzer, Trade
+ * Partners) — see web/src/lib/teamValue.ts for the shared computations
+ * built on top of this file. */
+export interface PlayerValueEntry {
+  dynasty: number;
+  redraft: number;
+  position: string;
+  eligible_slots: string[];
+}
+
+export interface PlayerValues {
+  generated_at: string;
+  season: number;
+  valuation_updated_at: string | null;
+  redraft_valuation_updated_at: string | null;
+  players: Record<string, PlayerValueEntry>;
 }
 
 export interface PlayerAges {

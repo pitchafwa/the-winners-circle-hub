@@ -1,7 +1,14 @@
-"""CLI bridge for two LOCAL-ONLY (Tommy-only, not shown anywhere on the
-public site) admin tools. Same JSON-in-on-stdin/JSON-out-on-stdout pattern
-as trade_tool.py/draft_tool.py — see that module's docstring for why this
-only ever runs against `pnpm dev`, never the deployed site.
+"""Historical CLI bridge for what were originally LOCAL-ONLY (Tommy-only,
+`pnpm dev`-only) admin tools. As of 2026-08-28 the frontend no longer calls
+any of these commands — Positional Strength, Buy-Low Targets, Trade
+Analyzer, and Trade Partners all moved to a pure client-side port
+(web/src/lib/teamValue.ts, buyLow.ts, leaguePerformance.ts) reading
+player_values.json + pick_futures.json's `value` field, both written by
+build.py, so those tools work on the real deployed site instead of only
+the dev server. This module is kept as the reference implementation the
+TS port was matched against, and stays runnable via the CLI (`python
+trade_analyzer_tool.py <command>`, JSON on stdin) for one-off debugging —
+but nothing in web/vite-plugins/admin-api.ts routes to it any more.
 
     simulate_trade   — a pure what-if: swap specific players/picks between
                         two teams (nothing written to disk, no ledger

@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../state/AppContext";
+import { useJson } from "../lib/data";
 import PasswordGate from "../components/PasswordGate";
 import EmptyState from "../components/EmptyState";
 import TeamLink from "../components/TeamLink";
-import { fetchTradePartners } from "../lib/tradeAnalyzerApi";
-import type { TradePartner, TradePartnerMatch } from "../lib/tradeAnalyzerApi";
+import { allTeamRosters, positionRatings, tradePartners } from "../lib/teamValue";
+import type { PositionRating, TradePartner, TradePartnerMatch } from "../lib/teamValue";
+import type { PlayerValues, Roster } from "../types/data";
 
 function matchLabel(m: TradePartnerMatch): string {
   return m.direction === "they_help_you"
@@ -52,24 +54,24 @@ function PartnerCard({ partner, rank }: { partner: TradePartner; rank: number })
 }
 
 export default function TradePartnersPage() {
-  const { seasonsIndex, meta, myTeamId, setMyTeamId } = useApp();
-  const season = seasonsIndex?.default_season ?? null;
-  const [state, setState] = useState<{ partners: TradePartner[] | null; loading: boolean; error: string | null }>({
-    partners: null, loading: false, error: null,
-  });
+  const { meta, myTeamId, setMyTeamId } = useApp();
+  const season = meta?.season ?? null;
+  const roster = useJson<Roster>(season !== null ? `${season}/roster.json` : null);
+  const playerValues = useJson<PlayerValues>("player_values.json");
 
-  useEffect(() => {
-    if (season === null || myTeamId === null) {
-      setState({ partners: null, loading: false, error: null });
-      return;
+  const loading = roster.loading || playerValues.loading;
+  const error = roster.error ?? playerValues.error;
+
+  const partners: TradePartner[] | null = useMemo(() => {
+    if (!roster.data || !playerValues.data || !meta || myTeamId === null) return null;
+    const rostersByTeam = allTeamRosters(roster.data, playerValues.data);
+    const ratingsByTeam: Record<number, Record<string, PositionRating>> = {};
+    for (const [teamId, players] of Object.entries(rostersByTeam)) {
+      ratingsByTeam[Number(teamId)] = positionRatings(players, playerValues.data.players, meta.starting_slots);
     }
-    let alive = true;
-    setState({ partners: null, loading: true, error: null });
-    fetchTradePartners({ season, myTeamId })
-      .then((res) => { if (alive) setState({ partners: res.partners, loading: false, error: null }); })
-      .catch((err: Error) => { if (alive) setState({ partners: null, loading: false, error: err.message }); });
-    return () => { alive = false; };
-  }, [season, myTeamId]);
+    if (!(myTeamId in ratingsByTeam)) return null;
+    return tradePartners(myTeamId, ratingsByTeam);
+  }, [roster.data, playerValues.data, meta, myTeamId]);
 
   return (
     <PasswordGate>
@@ -89,14 +91,14 @@ export default function TradePartnersPage() {
         </label>
 
         {myTeamId === null && <EmptyState>Pick your team above to see ranked trade partners.</EmptyState>}
-        {state.loading && <p className="muted" style={{ fontStyle: "italic" }}>Loading...</p>}
-        {state.error && <div className="error-state">{state.error}</div>}
-        {state.partners && state.partners.length === 0 && (
+        {loading && <p className="muted" style={{ fontStyle: "italic" }}>Loading...</p>}
+        {error && <div className="error-state">{error}</div>}
+        {partners && partners.length === 0 && (
           <EmptyState>No other teams on file right now.</EmptyState>
         )}
-        {state.partners && state.partners.length > 0 && (
+        {partners && partners.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.75rem" }}>
-            {state.partners.map((p, i) => <PartnerCard key={p.team_id} partner={p} rank={i + 1} />)}
+            {partners.map((p, i) => <PartnerCard key={p.team_id} partner={p} rank={i + 1} />)}
           </div>
         )}
       </section>

@@ -15,7 +15,12 @@ const TOOLS: Record<string, { script: string; subcommands: string[] }> = {
   draft: { script: "draft_tool.py", subcommands: ["parse", "submit"] },
   draftorder: { script: "draft_order_tool.py", subcommands: ["get", "set", "clear"] },
   data: { script: "data_tool.py", subcommands: ["export", "import"] },
-  analyzer: { script: "trade_analyzer_tool.py", subcommands: ["simulate_trade", "buy_low_targets", "league_positions", "trade_partners"] },
+  // No "analyzer" entry: Positional Strength, Buy-Low Targets, Trade
+  // Analyzer, and Trade Partners all moved to pure client-side computation
+  // (web/src/lib/teamValue.ts, buyLow.ts, leaguePerformance.ts) off static
+  // JSON (player_values.json + pick_futures.json's `value` field) so they
+  // work on the deployed site too, not just `pnpm dev` — see
+  // trade_analyzer_tool.py's docstring for why that script still exists.
 };
 
 function readBody(req: IncomingMessage): Promise<string> {

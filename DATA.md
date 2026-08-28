@@ -695,9 +695,39 @@ with the current (imminent, not-yet-drafted) season — not just picks that
 have been traded, unlike `activity.json`'s per-season `pick_ownership`.
 `board[]`: `{season, round, original_team_id, current_owner_id, status
 ("unresolved"|"projected"|"resolved"), overall_pick, player_id,
-player_name, via}` — same resolution states as `activity.json`'s
+player_name, via, value}` — same resolution states as `activity.json`'s
 `pick_ownership` (`ingest/pick_tracking.py:resolve`); untraded picks
-default `current_owner_id` to `original_team_id`.
+default `current_owner_id` to `original_team_id`. `value` is that pick's
+real market value (round-average of that draft season's KTC curve,
+`parse.pick_values_for_season()`), computed once at build time —
+deliberately left unrounded (a team's total pick capital sums many of
+these; rounding each one first would drift the total off by a few points
+versus rounding once, at the end) — so every LM Tool that needs "how much
+future draft capital does this team hold" (Trade Analyzer, Trade
+Partners) sums the same numbers off this file instead of re-deriving
+them, with no backend needed.
+
+## `player_values.json` (top level, current season only)
+
+`{generated_at, season, valuation_updated_at, redraft_valuation_updated_at,
+players: {player_id: {dynasty, redraft, position, eligible_slots}}}` —
+every player on a current roster's dynasty value, redraft value, primary
+position, and real ESPN eligible slots (slot names, e.g. `["RB","RB/WR",
+"FLEX","BE"]`), scoped to the latest season only (`config.SEASON`'s
+rosters). The one piece of per-player market data nothing else already
+shipped statically (roster.json has the roster shape, never a value) —
+added specifically so the LM Tools that used to call a local Python
+backend (Positional Strength, Buy-Low Targets, Trade Analyzer, Trade
+Partners) could move to pure client-side computation
+(`web/src/lib/teamValue.ts`, `buyLow.ts`) and work on the deployed site,
+not just `pnpm dev`. `eligible_slots` (not derived from `position`) is
+what lets the client-side port solve "best possible starting lineup" via
+bipartite matching the same way `metrics.redraft_lineup_value()` does
+server-side — see `teamValue.ts`'s `redraftLineupValue()` for why a
+greedy-with-augmenting-paths port gives the exact same answer as
+Python's `scipy.optimize.linear_sum_assignment` for this case (weight
+depends only on which player is chosen, not which of their eligible slots
+they fill).
 
 ## `player_ages.json` (top level, cross-season)
 

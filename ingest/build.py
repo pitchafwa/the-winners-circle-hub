@@ -793,9 +793,53 @@ def main():
     pick_board = pick_tracking.all_picks_board(
         config.SEASON, latest_teams, DRAFT_ROUNDS, all_pick_ownership,
         horizon_years=PICK_FUTURES_HORIZON_YEARS)
+    # Each pick's real market value (round-average of that draft season's KTC
+    # curve), computed once here rather than left for every consumer to
+    # re-derive — the deployed site's LM Tools (Trade Analyzer, Trade
+    # Partners) have no backend to call `trade_analyzer_tool.py`'s
+    # equivalent `_pick_value()` at request time, so it has to already be
+    # sitting in the static JSON they read. Left unrounded: a team's pick
+    # capital sums many of these, and rounding each pick first (rather than
+    # the sum) would drift the total off by a few points versus the Python
+    # reference implementation, which only ever rounds once, at the end.
+    for p in pick_board:
+        row = parse.pick_values_for_season(p["season"], pick_curves).get(str(p["round"]))
+        p["value"] = sum(row) / len(row) if row else 0.0
     _write(config.DATA_DIR / "pick_futures.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "board": pick_board,
+    })
+
+    # Per-player dynasty/redraft value + eligible slots, scoped to whoever's
+    # actually rostered in the latest season — the one piece of data the
+    # deployed site's LM Tools (Positional Strength, Buy-Low Targets, Trade
+    # Analyzer, Trade Partners) genuinely couldn't derive from anything else
+    # already shipped: roster.json carries the roster shape, but never a
+    # player's market value. Everything else those tools need (rosters,
+    # starting_slots, pick values above, this league's own weekly scoring
+    # for the buy-low dip check) was already static; this was the one real
+    # gap, so it's the one new file rather than four separate ones.
+    print("Building player values...")
+    latest_rosters = parse.current_roster_players_with_position(latest_league.season)
+    dynasty_by_pid = parse.values_by_pid(latest_league.season, dynasty_values)
+    redraft_by_pid = parse.values_by_pid(latest_league.season, redraft_values)
+    player_values: dict[str, dict] = {}
+    for roster in latest_rosters.values():
+        for pid, eligible_slots, position in roster:
+            if pid in player_values:
+                continue
+            player_values[str(pid)] = {
+                "dynasty": round(dynasty_by_pid.get(pid, 0.0), 0),
+                "redraft": round(redraft_by_pid.get(pid, 0.0), 0),
+                "position": position,
+                "eligible_slots": sorted({parse.SLOT_NAMES.get(s, str(s)) for s in eligible_slots}),
+            }
+    _write(config.DATA_DIR / "player_values.json", {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "season": latest_league.season,
+        "valuation_updated_at": valuation_updated_at,
+        "redraft_valuation_updated_at": redraft_updated_at,
+        "players": player_values,
     })
 
     print("Building contend/rebuild spectrum...")

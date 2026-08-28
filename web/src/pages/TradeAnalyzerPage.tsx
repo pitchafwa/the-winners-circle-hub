@@ -5,9 +5,9 @@ import { pts, signed } from "../lib/format";
 import PasswordGate from "../components/PasswordGate";
 import PlayerHeadshot from "../components/PlayerHeadshot";
 import TeamLink from "../components/TeamLink";
-import { simulateTrade } from "../lib/tradeAnalyzerApi";
-import type { PositionRating, SimulateTradeResponse, TeamSnapshot } from "../lib/tradeAnalyzerApi";
-import type { PickFutures, Roster, RosterPlayerCard, TeamRoster } from "../types/data";
+import { allTeamRosters, teamSnapshot } from "../lib/teamValue";
+import type { PositionRating, RosterPlayer, TeamSnapshot } from "../lib/teamValue";
+import type { PickFutures, PlayerValues, Roster, RosterPlayerCard, TeamRoster } from "../types/data";
 
 const POSITION_ORDER = ["QB", "RB", "WR", "TE", "D/ST", "K"];
 
@@ -17,7 +17,7 @@ function positionSort(a: string, b: string): number {
   return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
 }
 
-function rosterPlayers(roster: TeamRoster | undefined): RosterPlayerCard[] {
+function rosterCards(roster: TeamRoster | undefined): RosterPlayerCard[] {
   if (!roster) return [];
   return [...roster.starters, ...roster.bench, ...roster.ir].filter(
     (p): p is RosterPlayerCard & { player_id: number } => p.player_id !== null,
@@ -44,6 +44,7 @@ interface PickChoice {
   // can legitimately hold two picks of the same season/round at once (its
   // own natural pick plus one acquired via trade).
   originalTeamId: number;
+  value: number;
 }
 
 function AssetPicker({
@@ -58,7 +59,7 @@ function AssetPicker({
 }) {
   const { currentTeamsById, currentTeamName } = useApp();
   const ownerLabel = (id: number) => currentTeamsById.get(id)?.nickname || currentTeamName(id);
-  const players = rosterPlayers(roster);
+  const players = rosterCards(roster);
   return (
     <div>
       <div className="label" style={{ marginBottom: "0.4rem" }}>{title}</div>
@@ -162,20 +163,25 @@ function TeamResultCard({ teamId, snapshot }: { teamId: number; snapshot: { befo
   );
 }
 
+interface SimResult {
+  team_a: { team_id: number; before: TeamSnapshot; after: TeamSnapshot };
+  team_b: { team_id: number; before: TeamSnapshot; after: TeamSnapshot };
+}
+
 export default function TradeAnalyzerPage() {
   const { seasonsIndex, meta, myTeamId, teamName } = useApp();
   const season = seasonsIndex?.default_season ?? null;
 
   const roster = useJson<Roster>(season !== null ? `${season}/roster.json` : null);
   const pickFutures = useJson<PickFutures>("pick_futures.json");
+  const playerValues = useJson<PlayerValues>("player_values.json");
 
   const [teamA, setTeamA] = useState<number | null>(myTeamId);
   const [teamB, setTeamB] = useState<number | null>(null);
   const [aOut, setAOut] = useState<AssetSelection>(emptySelection());
   const [bOut, setBOut] = useState<AssetSelection>(emptySelection());
-  const [result, setResult] = useState<SimulateTradeResponse | null>(null);
+  const [result, setResult] = useState<SimResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   // Keyed on original_team_id too, not just season-round — a team can
   // legitimately hold two picks of the same season/round at once (its own
@@ -190,6 +196,7 @@ export default function TradeAnalyzerPage() {
         season: p.season,
         round: p.round,
         originalTeamId: p.original_team_id,
+        value: p.value,
       }));
 
   const toggle = (set: (v: AssetSelection) => void, current: AssetSelection, kind: "players" | "picks", key: number | string) => {
@@ -200,30 +207,65 @@ export default function TradeAnalyzerPage() {
     set(next);
   };
 
-  const analyze = async () => {
-    if (teamA === null || teamB === null || season === null) return;
-    setLoading(true);
+  const allRosters = useMemo(
+    () => (roster.data && playerValues.data) ? allTeamRosters(roster.data, playerValues.data) : null,
+    [roster.data, playerValues.data],
+  );
+
+  // Pick capital per team, straight off the board's own `value` field
+  // (round-average of that draft season's real market, computed once at
+  // build time) — every LM tool that needs "how much future draft capital
+  // does this team hold" sums the same numbers rather than re-deriving them.
+  const pickCapitalByTeam = useMemo(() => {
+    const out: Record<number, number> = {};
+    for (const p of pickFutures.data?.board ?? []) {
+      out[p.current_owner_id] = (out[p.current_owner_id] ?? 0) + p.value;
+    }
+    return out;
+  }, [pickFutures.data]);
+
+  const analyze = () => {
     setError(null);
     setResult(null);
+    if (teamA === null || teamB === null || !allRosters || !playerValues.data || !meta) return;
     try {
-      // Look the selected keys back up against the full choice list (not
-      // parsed from the key string) so a pick genuinely selected twice
-      // (two same-round picks from different original owners) really does
-      // send two {season, round} entries to the backend.
+      const rosterA = allRosters[teamA] ?? [];
+      const rosterB = allRosters[teamB] ?? [];
+      const byPidA = new Map(rosterA.map((p) => [p.player_id, p]));
+      const byPidB = new Map(rosterB.map((p) => [p.player_id, p]));
+
+      const missing = [...aOut.players].filter((pid) => !byPidA.has(pid))
+        .concat([...bOut.players].filter((pid) => !byPidB.has(pid)));
+      if (missing.length > 0) throw new Error(`Player(s) not found on the expected team's current roster: ${missing.join(", ")}`);
+
+      const bOutPlayers: RosterPlayer[] = [...bOut.players].map((pid) => byPidB.get(pid)!);
+      const aOutPlayers: RosterPlayer[] = [...aOut.players].map((pid) => byPidA.get(pid)!);
+      const rosterAAfter = rosterA.filter((p) => !aOut.players.has(p.player_id)).concat(bOutPlayers);
+      const rosterBAfter = rosterB.filter((p) => !bOut.players.has(p.player_id)).concat(aOutPlayers);
+
       const aChoices = picksFor(teamA);
       const bChoices = picksFor(teamB);
-      const parsePicks = (picks: Set<string>, choices: PickChoice[]): { season: number; round: number }[] =>
-        choices.filter((c) => picks.has(c.key)).map((c) => ({ season: c.season, round: c.round }));
-      const res = await simulateTrade({
-        season, teamA, teamB,
-        teamAOut: { players: [...aOut.players], picks: parsePicks(aOut.picks, aChoices) },
-        teamBOut: { players: [...bOut.players], picks: parsePicks(bOut.picks, bChoices) },
+      const aPicksOutValue = aChoices.filter((c) => aOut.picks.has(c.key)).reduce((s, c) => s + c.value, 0);
+      const bPicksOutValue = bChoices.filter((c) => bOut.picks.has(c.key)).reduce((s, c) => s + c.value, 0);
+      const pickCapitalAAfter = (pickCapitalByTeam[teamA] ?? 0) - aPicksOutValue + bPicksOutValue;
+      const pickCapitalBAfter = (pickCapitalByTeam[teamB] ?? 0) - bPicksOutValue + aPicksOutValue;
+
+      const values = playerValues.data.players;
+      const slots = meta.starting_slots;
+      setResult({
+        team_a: {
+          team_id: teamA,
+          before: teamSnapshot(rosterA, values, slots, pickCapitalByTeam[teamA] ?? 0),
+          after: teamSnapshot(rosterAAfter, values, slots, pickCapitalAAfter),
+        },
+        team_b: {
+          team_id: teamB,
+          before: teamSnapshot(rosterB, values, slots, pickCapitalByTeam[teamB] ?? 0),
+          after: teamSnapshot(rosterBAfter, values, slots, pickCapitalBAfter),
+        },
       });
-      setResult(res);
     } catch (e) {
       setError((e as Error).message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -278,9 +320,9 @@ export default function TradeAnalyzerPage() {
               />
             </div>
             <button type="button" className="control" style={{ cursor: "pointer", background: "var(--paper-2)" }}
-              disabled={loading || (aOut.players.size === 0 && aOut.picks.size === 0 && bOut.players.size === 0 && bOut.picks.size === 0)}
+              disabled={aOut.players.size === 0 && aOut.picks.size === 0 && bOut.players.size === 0 && bOut.picks.size === 0}
               onClick={analyze}>
-              {loading ? "Analyzing..." : "Analyze trade"}
+              Analyze trade
             </button>
           </>
         )}

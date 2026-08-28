@@ -49,6 +49,18 @@ docstring and the code review above for the full design.
   count between the loading and loaded render, crashing with "Rendered
   more hooks than during the previous render." Fixed by making it a real
   component (`RatingsTable`) rendered via JSX.
+- **Trade Partners** (`/admin/trade-partners`) — every other team ranked
+  by mutual positional fit: per position, value = starter + depth (from
+  the same rating used by Positional Strength); a team's need at a
+  position is how far below the league average it sits, surplus how far
+  above, both as a fraction of that average so positions with very
+  different value scales compare fairly. Fit score between two teams =
+  Σ over positions of (my need × their surplus) + (their need × my
+  surplus) — ranks teams by "where I'm thin and they're deep, and vice
+  versa," instead of guessing who might want to talk trade. New
+  `trade_partners` subcommand on `trade_analyzer_tool.py`; card-per-team
+  layout with readable "They can fill your X" / "You can fill their X"
+  chips and a jump link into the Trade Analyzer.
 
 ## Full-app page review (2026-08-26)
 

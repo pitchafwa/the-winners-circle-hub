@@ -17,6 +17,11 @@ only ever runs against `pnpm dev`, never the deployed site.
                         at once, current rosters — a quick-glance league-
                         wide comparison instead of running simulate_trade
                         team by team.
+    trade_partners    — for one team, every other team ranked by mutual
+                         positional fit: how much their positional surplus
+                         overlaps this team's need, and vice versa. Turns
+                         "who might actually want to talk trade" from
+                         guesswork into a ranked list.
 """
 from __future__ import annotations
 
@@ -252,10 +257,87 @@ def cmd_league_positions(payload: dict) -> dict:
     return {"season": season, "teams": teams}
 
 
+def cmd_trade_partners(payload: dict) -> dict:
+    """For `my_team_id`, every other team ranked by mutual positional fit.
+
+    Per position: value = starter + depth (total dynasty value rostered
+    there). A team's "need" at a position is how far below the league
+    average their value sits (as a fraction of that average); "surplus" is
+    how far above. Fit score between two teams sums, over every position,
+    (my need * their surplus) + (their need * my surplus) — high when each
+    side is strong exactly where the other is thin. Ratios rather than raw
+    value differences so positions with very different value scales (RB
+    pool vs. TE pool, K/D-ST carrying ~0 either way) compare on the same
+    footing without hardcoding a per-position weight."""
+    season = payload.get("season") or config.SEASON
+    my_team_id = int(payload["my_team_id"])
+    league = parse.load_league(season)
+    dynasty_values, _ = _values()
+    dynasty_by_pid = parse.values_by_pid(season, dynasty_values)
+    rosters = parse.current_roster_players_with_position(season)
+
+    if my_team_id not in rosters:
+        raise ValueError(f"Team {my_team_id} not found in current rosters")
+
+    ratings_by_team = {
+        team_id: _position_ratings(roster, dynasty_by_pid, league.starting_slots)
+        for team_id, roster in rosters.items()
+    }
+    positions = sorted({pos for ratings in ratings_by_team.values() for pos in ratings})
+    total_value = {
+        team_id: {
+            pos: ratings.get(pos, {}).get("starter", 0) + ratings.get(pos, {}).get("depth", 0)
+            for pos in positions
+        }
+        for team_id, ratings in ratings_by_team.items()
+    }
+    league_avg = {
+        pos: sum(total_value[tid][pos] for tid in total_value) / len(total_value)
+        for pos in positions
+    }
+
+    def need_surplus(team_id: int) -> tuple[dict[str, float], dict[str, float]]:
+        need, surplus = {}, {}
+        for pos in positions:
+            avg = league_avg[pos]
+            if avg <= 0:
+                need[pos] = surplus[pos] = 0.0
+                continue
+            diff = (total_value[team_id][pos] - avg) / avg
+            need[pos] = max(0.0, -diff)
+            surplus[pos] = max(0.0, diff)
+        return need, surplus
+
+    my_need, my_surplus = need_surplus(my_team_id)
+
+    partners = []
+    for team_id in total_value:
+        if team_id == my_team_id:
+            continue
+        their_need, their_surplus = need_surplus(team_id)
+        matches = []
+        fit_score = 0.0
+        for pos in positions:
+            they_help_you = my_need[pos] * their_surplus[pos]
+            you_help_them = their_need[pos] * my_surplus[pos]
+            if they_help_you > 0:
+                matches.append({"position": pos, "direction": "they_help_you", "contribution": round(they_help_you, 3)})
+                fit_score += they_help_you
+            if you_help_them > 0:
+                matches.append({"position": pos, "direction": "you_help_them", "contribution": round(you_help_them, 3)})
+                fit_score += you_help_them
+        matches.sort(key=lambda m: m["contribution"], reverse=True)
+        partners.append({"team_id": team_id, "fit_score": round(fit_score, 3), "matches": matches})
+
+    partners.sort(key=lambda p: p["fit_score"], reverse=True)
+    return {"season": season, "my_team_id": my_team_id, "partners": partners}
+
+
 COMMANDS = {
     "simulate_trade": cmd_simulate_trade,
     "buy_low_targets": cmd_buy_low_targets,
     "league_positions": cmd_league_positions,
+    "trade_partners": cmd_trade_partners,
 }
 
 

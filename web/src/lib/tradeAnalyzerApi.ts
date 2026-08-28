@@ -74,3 +74,41 @@ export function fetchBuyLowTargets(params: { season: number; excludeTeamId?: num
     exclude_team_id: params.excludeTeamId ?? null,
   });
 }
+
+export interface LeaguePositionsResponse {
+  season: number;
+  teams: Record<string, Record<string, PositionRating>>;
+}
+
+export function fetchLeaguePositions(season: number): Promise<LeaguePositionsResponse> {
+  return post<LeaguePositionsResponse>("/api/analyzer/league_positions", { season });
+}
+
+/** direction is from "my" team's point of view: "they_help_you" means their
+ * surplus at `position` offsets my need there; "you_help_them" is the
+ * reverse. `contribution` is that one position's share of the pair's total
+ * fit_score — always > 0, sorted descending. */
+export interface TradePartnerMatch {
+  position: string;
+  direction: "they_help_you" | "you_help_them";
+  contribution: number;
+}
+
+export interface TradePartner {
+  team_id: number;
+  fit_score: number;
+  matches: TradePartnerMatch[];
+}
+
+export interface TradePartnersResponse {
+  season: number;
+  my_team_id: number;
+  partners: TradePartner[];
+}
+
+export function fetchTradePartners(params: { season: number; myTeamId: number }): Promise<TradePartnersResponse> {
+  return post<TradePartnersResponse>("/api/analyzer/trade_partners", {
+    season: params.season,
+    my_team_id: params.myTeamId,
+  });
+}

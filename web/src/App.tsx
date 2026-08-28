@@ -16,6 +16,7 @@ import AdminGatePage from "./pages/AdminGatePage";
 import TradeAnalyzerPage from "./pages/TradeAnalyzerPage";
 import BuyLowPage from "./pages/BuyLowPage";
 import PositionalStrengthPage from "./pages/PositionalStrengthPage";
+import TradePartnersPage from "./pages/TradePartnersPage";
 import TradeAdminPage from "./pages/TradeAdminPage";
 import DraftAdminPage from "./pages/DraftAdminPage";
 import PickAdminPage from "./pages/PickAdminPage";
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="admin/trade-analyzer" element={<TradeAnalyzerPage />} />
           <Route path="admin/buy-low" element={<BuyLowPage />} />
           <Route path="admin/positions" element={<PositionalStrengthPage />} />
+          <Route path="admin/trade-partners" element={<TradePartnersPage />} />
           <Route path="admin/trades" element={<TradeAdminPage />} />
           <Route path="admin/drafts" element={<DraftAdminPage />} />
           <Route path="admin/picks" element={<PickAdminPage />} />

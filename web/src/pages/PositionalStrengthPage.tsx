@@ -4,21 +4,11 @@ import { pts } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import EmptyState from "../components/EmptyState";
 import PasswordGate from "../components/PasswordGate";
-import { post } from "../lib/adminApi";
 import TeamLink from "../components/TeamLink";
+import { fetchLeaguePositions } from "../lib/tradeAnalyzerApi";
+import type { PositionRating } from "../lib/tradeAnalyzerApi";
 
 const POSITIONS = ["QB", "RB", "WR", "TE", "D/ST", "K"];
-
-interface PositionRating {
-  starter: number;
-  depth: number;
-  count: number;
-}
-
-interface LeaguePositionsResponse {
-  season: number;
-  teams: Record<string, Record<string, PositionRating>>;
-}
 
 interface Row {
   team_id: number;
@@ -85,7 +75,7 @@ export default function PositionalStrengthPage() {
     if (season === null) return;
     let alive = true;
     setState({ rows: null, loading: true, error: null });
-    post<LeaguePositionsResponse>("/api/analyzer/league_positions", { season })
+    fetchLeaguePositions(season)
       .then((res) => {
         if (!alive) return;
         const rows = Object.entries(res.teams).map(([tid, values]) => ({ team_id: Number(tid), values }));

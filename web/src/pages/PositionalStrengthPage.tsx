@@ -9,16 +9,48 @@ import { allTeamRosters, positionRatings } from "../lib/teamValue";
 import type { PositionRating } from "../lib/teamValue";
 import type { PlayerValues, Roster } from "../types/data";
 
-const POSITIONS = ["QB", "RB", "WR", "TE", "D/ST", "K"];
+// D/ST and K carry no meaningful dynasty market value in this league (see
+// teamValue.ts's VALUATION_EXCLUDED_SLOTS) — every team reads ~0 for both,
+// so the columns add width without ever telling Tommy anything. The
+// League tab's own positional table (PositionHeatmap.tsx, real weekly
+// scoring rather than dynasty value) keeps them since actual points
+// scored there very much isn't zero.
+const POSITIONS = ["QB", "RB", "WR", "TE"];
 
 interface Row {
   team_id: number;
   values: Record<string, PositionRating>;
 }
 
+/** Cell tint scales with how far a team's starter-tier value sits from
+ * the league average AT THAT POSITION — green above, red below. Scaled
+ * per column (not one scale across all four), since raw dynasty value
+ * ranges are wildly different by position (RB starter tiers run ~3x a
+ * TE's) — a single shared scale would make TE always read pale and RB
+ * always read extreme regardless of real relative strength. Same
+ * rgba/alpha formula as PositionHeatmap.tsx's League-tab heatmap
+ * (--positive/--negative from global.css, alpha capped at 0.38) so the
+ * two heatmaps read the same way even though the underlying stat differs. */
+function cellStyle(diff: number, scale: number): React.CSSProperties {
+  const a = Math.min(Math.abs(diff) / scale, 1) * 0.38;
+  return {
+    background: diff >= 0 ? `rgba(30, 143, 92, ${a})` : `rgba(194, 59, 50, ${a})`,
+  };
+}
+
 function RatingsTable({ candidates, sort }: { candidates: Row[]; sort: ReturnType<typeof useSort<Row>> }) {
   const { teamName } = useApp();
   const rows = useSorted(candidates, sort);
+
+  const avgByPosition: Record<string, number> = {};
+  const scaleByPosition: Record<string, number> = {};
+  for (const pos of POSITIONS) {
+    const values = candidates.map((r) => r.values[pos]?.starter ?? 0);
+    const avg = values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : 0;
+    avgByPosition[pos] = avg;
+    scaleByPosition[pos] = Math.max(...values.map((v) => Math.abs(v - avg)), 1);
+  }
+
   return (
     <div className="table-wrap">
       <table className="stat">
@@ -30,7 +62,7 @@ function RatingsTable({ candidates, sort }: { candidates: Row[]; sort: ReturnTyp
             </th>
             {POSITIONS.map((pos) => (
               <th key={pos} scope="col" className="num sortable"
-                title={`Starter-tier value / depth value, dynasty scale`}
+                title={`Starter-tier value / depth value, dynasty scale — tinted vs the league's own average at ${pos} (${pts(avgByPosition[pos], 0)})`}
                 aria-sort={sort.ariaSort(pos)}
                 onClick={() => sort.toggle(pos)}>
                 {pos}{sort.marker(pos)}
@@ -45,7 +77,8 @@ function RatingsTable({ candidates, sort }: { candidates: Row[]; sort: ReturnTyp
               {POSITIONS.map((pos) => {
                 const v = r.values[pos];
                 return (
-                  <td key={pos} className="num">
+                  <td key={pos} className="num"
+                    style={v ? cellStyle(v.starter - avgByPosition[pos], scaleByPosition[pos]) : undefined}>
                     {v ? (
                       <>
                         {pts(v.starter, 0)}
@@ -61,6 +94,9 @@ function RatingsTable({ candidates, sort }: { candidates: Row[]; sort: ReturnTyp
           ))}
         </tbody>
       </table>
+      <p className="muted" style={{ fontSize: "0.72rem", marginTop: "0.5rem", fontStyle: "italic" }}>
+        Shading is each position's starter-tier value vs the league's own average there — darker green stronger, darker red weaker.
+      </p>
     </div>
   );
 }

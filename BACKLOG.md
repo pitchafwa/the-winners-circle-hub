@@ -31,6 +31,23 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Positional Strength: drop D/ST-K, add heat coloring (2026-08-28) — built, Tommy-only
+
+- Dropped the D/ST and K columns — both carry no meaningful dynasty
+  value in this league (`VALUATION_EXCLUDED_SLOTS`), so every team read
+  ~0 for both; pure width with no signal. The League tab's own
+  positional table (`PositionHeatmap.tsx`, real weekly scoring rather
+  than dynasty value) keeps them, since actual points scored there very
+  much isn't zero.
+- Added conditional formatting: each cell tints green (stronger) or red
+  (weaker) by how far that team's starter-tier value sits from the
+  league's own average AT THAT POSITION — scaled per column, not one
+  scale across all four, since raw dynasty value ranges differ hugely by
+  position (RB starter tiers run ~3x a TE's); a shared scale would've
+  made TE always read pale regardless of real relative strength. Same
+  rgba/alpha formula as the League tab's existing heatmap so the two
+  read the same way despite different underlying stats.
+
 ## Trade Partners + LM Tools now work on the deployed site (2026-08-28) — built, Tommy-only
 
 Tommy asked why Positional Strength/Trade Analyzer/etc only worked on

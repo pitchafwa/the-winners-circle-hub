@@ -815,6 +815,7 @@ table.stat tr.cutline td { border-bottom: 2px solid var(--ink); }
 }
 
 .trade-card {
+  position: relative; /* anchors .card-shot in a corner */
   background: var(--paper-2);
   border: 2px solid var(--ink);
   border-radius: 10px;
@@ -979,7 +980,7 @@ select.control {
 .mu-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.25rem 1.5rem; }
 
 .mu-card {
-  position: relative; /* anchors .mu-card-shot in a corner, see below */
+  position: relative; /* anchors .card-shot in a corner, see below */
   flex: 0 1 calc(50% - 0.75rem);
   background: var(--paper-2);
   border: 2px solid var(--ink);
@@ -987,10 +988,11 @@ select.control {
   padding: 1.1rem 1.25rem;
 }
 
-/* Mobile-only screenshot icon for one game card — corner overlay rather
- * than inline with a header, since each card in the list is its own
- * capture target with no shared subheader row to sit next to. */
-.mu-card-shot {
+/* Mobile-only screenshot icon for one card in a list (matchup cards, trade
+ * cards, ...) — corner overlay rather than inline with a header, since each
+ * card is its own capture target with no shared subheader row to sit next
+ * to. The card itself needs `position: relative` for this to anchor to. */
+.card-shot {
   position: absolute;
   top: 0.6rem;
   right: 0.6rem;
@@ -1014,7 +1016,7 @@ select.control {
 }
 .mu-card-force-desktop .mu-grid { display: grid !important; }
 .mu-card-force-desktop .mobile-lineup { display: none !important; }
-.mu-card-force-desktop .mu-card-shot { display: none !important; }
+.mu-card-force-desktop .card-shot { display: none !important; }
 
 /* Playoff games get a slightly heavier gold border instead of the plain
    ink one — a small visual cue this game matters more. The championship

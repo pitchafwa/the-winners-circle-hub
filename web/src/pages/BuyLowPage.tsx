@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { useApp } from "../state/AppContext";
 import { useJson } from "../lib/data";
 import { pct, pts } from "../lib/format";
@@ -7,12 +7,15 @@ import EmptyState from "../components/EmptyState";
 import PasswordGate from "../components/PasswordGate";
 import PlayerCardTrigger from "../components/PlayerCardTrigger";
 import PlayerHeadshot from "../components/PlayerHeadshot";
+import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import { computeBuyLowTargets } from "../lib/buyLow";
 import type { BuyLowCandidate } from "../lib/buyLow";
 import type { PlayerValues, Roster } from "../types/data";
 
-function BuyLowTable({ candidates }: { candidates: BuyLowCandidate[] }) {
+const BuyLowTable = forwardRef<HTMLTableElement, { candidates: BuyLowCandidate[] }>(function BuyLowTable(
+  { candidates }, ref,
+) {
   const { teamName } = useApp();
   const sort = useSort<BuyLowCandidate>("dip_pct", -1, (r, key) =>
     key === "name" ? r.name : key === "owner" ? teamName(r.owner_team_id) : (r[key as keyof BuyLowCandidate] as number),
@@ -31,7 +34,7 @@ function BuyLowTable({ candidates }: { candidates: BuyLowCandidate[] }) {
 
   return (
     <div className="table-wrap">
-      <table className="stat">
+      <table className="stat" ref={ref}>
         <thead>
           <tr>
             {COLS.map((c) => (
@@ -69,11 +72,12 @@ function BuyLowTable({ candidates }: { candidates: BuyLowCandidate[] }) {
       </table>
     </div>
   );
-}
+});
 
 export default function BuyLowPage() {
   const { meta, myTeamId } = useApp();
   const season = meta?.season ?? null;
+  const tableRef = useRef<HTMLTableElement>(null);
   const roster = useJson<Roster>(season !== null ? `${season}/roster.json` : null);
   const playerValues = useJson<PlayerValues>("player_values.json");
   const [state, setState] = useState<{ candidates: BuyLowCandidate[] | null; loading: boolean; error: string | null }>({
@@ -98,14 +102,17 @@ export default function BuyLowPage() {
       <section className="section" style={{ marginTop: 0 }}>
         <div className="section-head">
           <h2>Buy-low targets</h2>
-          <span className="label">strong dynasty value, production down hard the last 3 games — the market may not have caught up</span>
+          <span className="label">
+            strong dynasty value, production down hard the last 3 games — the market may not have caught up
+            <ScreenshotButton targetRef={tableRef} filename="buy-low-targets" />
+          </span>
         </div>
         {loading && <p className="muted" style={{ fontStyle: "italic" }}>Loading...</p>}
         {error && <div className="error-state">{error}</div>}
         {state.candidates && state.candidates.length === 0 && (
           <EmptyState>No real dip candidates on file right now — check back once more of the season is in.</EmptyState>
         )}
-        {state.candidates && state.candidates.length > 0 && <BuyLowTable candidates={state.candidates} />}
+        {state.candidates && state.candidates.length > 0 && <BuyLowTable ref={tableRef} candidates={state.candidates} />}
       </section>
     </PasswordGate>
   );

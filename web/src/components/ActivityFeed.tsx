@@ -1,9 +1,11 @@
+import { useRef } from "react";
 import { useApp } from "../state/AppContext";
 import { pts, shortDate, signed } from "../lib/format";
 import PlayerCardTrigger from "./PlayerCardTrigger";
 import PlayerHeadshot from "./PlayerHeadshot";
+import ScreenshotButton from "./ScreenshotButton";
 import TeamLink from "./TeamLink";
-import type { Activity } from "../types/data";
+import type { Activity, Trade } from "../types/data";
 
 const VERB: Record<string, string> = {
   FA_ADDED: "signed",
@@ -11,6 +13,45 @@ const VERB: Record<string, string> = {
   DROPPED: "dropped",
   TRADED: "traded",
 };
+
+function TradeCard({ t }: { t: Trade }) {
+  const { teamName } = useApp();
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [a, b] = t.team_ids;
+  const ga = t.started_points_gained[String(a)] ?? 0;
+  const gb = t.started_points_gained[String(b)] ?? 0;
+  const diff = ga - gb;
+  const leader = diff >= 0 ? a : b;
+  return (
+    <div className="trade-card" ref={cardRef}>
+      <div className="card-shot">
+        <ScreenshotButton targetRef={cardRef} filename={`trade-week${t.week}-${teamName(a)}-${teamName(b)}`.toLowerCase().replace(/[^a-z0-9]+/g, "-")} />
+      </div>
+      <div className="label">Trade · week {t.week}</div>
+      <div className="trade-teams">
+        <TeamLink id={a}>{teamName(a)}</TeamLink> <span className="muted">↔</span> <TeamLink id={b}>{teamName(b)}</TeamLink>
+      </div>
+      <ul className="trade-players muted">
+        {t.players.map((p) => (
+          <li key={p.player_id} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <PlayerHeadshot playerId={p.player_id} className="leaderboard-headshot" />
+            <PlayerCardTrigger playerId={p.player_id} name={p.name}>{p.name}</PlayerCardTrigger>{" "}
+            → <TeamLink id={p.to_team_id}>{teamName(p.to_team_id)}</TeamLink>{" "}
+            <span className="num">({pts(p.post_trade_started_points)} started pts)</span>
+          </li>
+        ))}
+        {t.picks.map((p, i) => (
+          <li key={`pick-${i}`}>
+            {p.pick} pick → <TeamLink id={p.to_team_id}>{teamName(p.to_team_id)}</TeamLink>
+          </li>
+        ))}
+      </ul>
+      <div className="trade-verdict num">
+        {diff === 0 ? "dead even so far" : <>{signed(Math.abs(diff))} for <TeamLink id={leader}>{teamName(leader)}</TeamLink> so far</>}
+      </div>
+    </div>
+  );
+}
 
 export default function ActivityFeed({ activity, limit = 12 }: { activity: Activity; limit?: number }) {
   const { teamName } = useApp();
@@ -25,39 +66,9 @@ export default function ActivityFeed({ activity, limit = 12 }: { activity: Activ
     <div className="activity">
       {trades.length > 0 && (
         <div className="trade-cards">
-          {trades.map((t) => {
-            const [a, b] = t.team_ids;
-            const ga = t.started_points_gained[String(a)] ?? 0;
-            const gb = t.started_points_gained[String(b)] ?? 0;
-            const diff = ga - gb;
-            const leader = diff >= 0 ? a : b;
-            return (
-              <div key={`${t.date}-${t.team_ids.join("-")}`} className="trade-card">
-                <div className="label">Trade · week {t.week}</div>
-                <div className="trade-teams">
-                  <TeamLink id={a}>{teamName(a)}</TeamLink> <span className="muted">↔</span> <TeamLink id={b}>{teamName(b)}</TeamLink>
-                </div>
-                <ul className="trade-players muted">
-                  {t.players.map((p) => (
-                    <li key={p.player_id} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <PlayerHeadshot playerId={p.player_id} className="leaderboard-headshot" />
-                      <PlayerCardTrigger playerId={p.player_id} name={p.name}>{p.name}</PlayerCardTrigger>{" "}
-                      → <TeamLink id={p.to_team_id}>{teamName(p.to_team_id)}</TeamLink>{" "}
-                      <span className="num">({pts(p.post_trade_started_points)} started pts)</span>
-                    </li>
-                  ))}
-                  {t.picks.map((p, i) => (
-                    <li key={`pick-${i}`}>
-                      {p.pick} pick → <TeamLink id={p.to_team_id}>{teamName(p.to_team_id)}</TeamLink>
-                    </li>
-                  ))}
-                </ul>
-                <div className="trade-verdict num">
-                  {diff === 0 ? "dead even so far" : <>{signed(Math.abs(diff))} for <TeamLink id={leader}>{teamName(leader)}</TeamLink> so far</>}
-                </div>
-              </div>
-            );
-          })}
+          {trades.map((t) => (
+            <TradeCard key={`${t.date}-${t.team_ids.join("-")}`} t={t} />
+          ))}
         </div>
       )}
 

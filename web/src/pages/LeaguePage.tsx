@@ -18,6 +18,9 @@ import type {
 export default function LeaguePage() {
   const { season, meta } = useApp();
   const standingsTableRef = useRef<HTMLTableElement>(null);
+  const contendRebuildRef = useRef<HTMLTableElement>(null);
+  const positionHeatmapRef = useRef<HTMLTableElement>(null);
+  const superlativesGridRef = useRef<HTMLDivElement>(null);
   const base = season !== null ? `${season}` : null;
   const standings = useJson<Standings>(base ? `${base}/standings.json` : null);
   const superlatives = useJson<Superlatives>(base ? `${base}/superlatives.json` : null);
@@ -50,6 +53,9 @@ export default function LeaguePage() {
       <section className="section" aria-labelledby="race-h">
         <div className="section-head">
           <h2 id="race-h">Division Race</h2>
+          {/* Each division owns its own screenshot button next to its own
+              label (DivisionStandings.tsx) — two separate tables, no single
+              shared block to capture here. */}
         </div>
         {standings.error && <div className="error-state">{standings.error}</div>}
         {standings.data && meta.divisions.length > 0 && (
@@ -117,9 +123,12 @@ export default function LeaguePage() {
         <section className="section" aria-labelledby="spectrum-h">
           <div className="section-head">
             <h2 id="spectrum-h">Contend / Rebuild</h2>
-            <span className="label">redraft roster value vs. dynasty + pick capital</span>
+            <span className="label">
+              redraft roster value vs. dynasty + pick capital
+              <ScreenshotButton targetRef={contendRebuildRef} filename="contend-rebuild" />
+            </span>
           </div>
-          <ContendRebuildTable spectrum={spectrum.data} />
+          <ContendRebuildTable ref={contendRebuildRef} spectrum={spectrum.data} />
         </section>
       )}
 
@@ -127,9 +136,12 @@ export default function LeaguePage() {
         <section className="section" aria-labelledby="pos-h">
           <div className="section-head">
             <h2 id="pos-h">Positional strength</h2>
-            <span className="label">who's carrying a hole at TE</span>
+            <span className="label">
+              who's carrying a hole at TE
+              <ScreenshotButton targetRef={positionHeatmapRef} filename="positional-strength" />
+            </span>
           </div>
-          <PositionHeatmap positions={positions.data} />
+          <PositionHeatmap ref={positionHeatmapRef} positions={positions.data} />
         </section>
       )}
 
@@ -137,9 +149,12 @@ export default function LeaguePage() {
         <section className="section" aria-labelledby="awards-h">
           <div className="section-head">
             <h2 id="awards-h">Week {latestWeek} Superlatives</h2>
-            <span className="label">the certificates</span>
+            <span className="label">
+              the certificates
+              <ScreenshotButton targetRef={superlativesGridRef} filename={`superlatives-week${latestWeek}`} />
+            </span>
           </div>
-          <div className="card-grid">
+          <div className="card-grid" ref={superlativesGridRef}>
             {superlatives.data.awards
               .filter((a) => a.week === latestWeek)
               .map((a, i) => (

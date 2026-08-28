@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { useApp } from "../state/AppContext";
 import { pts } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
@@ -19,7 +20,9 @@ const POSTURE_ORDER: Record<SpectrumLabel, number> = {
   Rebuilding: 2,
 };
 
-export default function ContendRebuildTable({ spectrum }: { spectrum: Spectrum }) {
+const ContendRebuildTable = forwardRef<HTMLTableElement, { spectrum: Spectrum }>(function ContendRebuildTable(
+  { spectrum }, ref,
+) {
   const { teamName } = useApp();
   const sort = useSort<Spectrum["teams"][number]>("label", 1, (r, key) => {
     if (key === "team") return teamName(r.team_id);
@@ -30,7 +33,7 @@ export default function ContendRebuildTable({ spectrum }: { spectrum: Spectrum }
 
   return (
     <div className="table-wrap">
-      <table className="stat">
+      <table className="stat" ref={ref}>
         <thead>
           <tr>
             <th scope="col" className="sortable" aria-sort={sort.ariaSort("team")}
@@ -78,4 +81,6 @@ export default function ContendRebuildTable({ spectrum }: { spectrum: Spectrum }
       </p>
     </div>
   );
-}
+});
+
+export default ContendRebuildTable;

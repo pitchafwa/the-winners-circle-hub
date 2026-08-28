@@ -31,6 +31,60 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Screenshot rollout: every table/card block, league-wide (2026-08-28)
+
+Full rollout of the "save as image" button (`ScreenshotButton.tsx`) beyond
+the Standings/Matchups test run, to every block Tommy greenlit:
+
+- **League tab**: Division Race (both divisions, self-contained buttons
+  next to each division's own label), Contend/Rebuild table, Positional
+  strength heatmap, Week N Superlatives card grid.
+- **My Team**: current roster table.
+- **Draft report card**: Haul grade + Efficiency grade tables (each
+  self-contained next to its own `<h3>`), full draft board table.
+- **Trades**: the team net-value ledger table.
+- **Pick futures board**: the full picks table.
+- **Trophy Case**: the season tally table, latest-certificates card grid.
+- **Franchise pages**: head-to-head table, draft history table.
+- **History**: Record Book's by-franchise leaders table, all-time
+  Head-to-Head matrix, Franchise Careers table.
+- **LM Tools**: Positional Strength, Buy-Low Targets, and Trade
+  Analyzer's per-team position-table results (self-contained per
+  `TeamResultCard`) all got buttons; Trade Partners' card grid got one
+  button for the whole grid.
+- **Recent Activity**: each of the top-3 trade cards gets its own corner
+  button (`TradeCard`, new small component factored out of
+  `ActivityFeed.tsx` so each card can hold its own ref) — same
+  `.card-shot` corner-overlay pattern the matchup cards use, generalized
+  from `.mu-card-shot` (renamed) since it's no longer matchup-specific.
+
+Mechanically, this was almost entirely `forwardRef` plumbing: any
+sortable table component now forwards its `<table>` ref so the owning
+page can render `<ScreenshotButton>` inline next to that block's own
+subheader/label — same recipe proven on Standings, applied to every
+`<table className="stat">` in the app except the ones deliberately
+deferred (see below). Card-grid blocks (auto-reflow `display:grid`, no
+overflow-clipping like a table) just get a ref on their own container —
+no special handling needed, since — unlike matchup cards — they aren't
+flex-shrunk into a different, much-taller mobile layout; they just
+reflow columns, which is a legitimate thing to capture as-is.
+
+**Explicitly deferred** (per Tommy, wants them but as a separate pass):
+Season Timeline bump chart and Schedule Swap matrix (recharts SVG /
+gradient-heavy — real risk of broken captures, worth its own testing
+pass) and Playoff Probability's progress bars.
+
+**Explicitly excluded** (per Tommy): Recent Activity's non-trade feed
+list (unbounded length), and all admin data-entry forms (Trade/Draft/
+Pick admin pages — input forms, not shareable content).
+
+Verified live at a 375px mobile viewport across a representative spread
+(League tab's Contend/Rebuild table, a Recent Activity trade card,
+History's Franchise Leaders table, LM Tools' Positional Strength table)
+— every capture produced a correctly-sized full-content image, no
+console errors, and the button is confirmed CSS-hidden again above
+640px.
+
 ## Screenshot button: icon-only placement + matchup cards (2026-08-28)
 
 Follow-up to the Standings test run, now generalized: renamed

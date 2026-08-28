@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../state/AppContext";
 import { useJson } from "../lib/data";
 import PasswordGate from "../components/PasswordGate";
 import EmptyState from "../components/EmptyState";
+import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import { allTeamRosters, positionRatings, tradePartners } from "../lib/teamValue";
 import type { PositionRating, TradePartner, TradePartnerMatch } from "../lib/teamValue";
@@ -56,6 +57,7 @@ function PartnerCard({ partner, rank }: { partner: TradePartner; rank: number })
 export default function TradePartnersPage() {
   const { meta, myTeamId, setMyTeamId } = useApp();
   const season = meta?.season ?? null;
+  const gridRef = useRef<HTMLDivElement>(null);
   const roster = useJson<Roster>(season !== null ? `${season}/roster.json` : null);
   const playerValues = useJson<PlayerValues>("player_values.json");
 
@@ -78,7 +80,10 @@ export default function TradePartnersPage() {
       <section className="section" style={{ marginTop: 0 }}>
         <div className="section-head">
           <h2>Trade partners</h2>
-          <span className="label">every team ranked by how much their positional surplus overlaps your need, and yours theirs</span>
+          <span className="label">
+            every team ranked by how much their positional surplus overlaps your need, and yours theirs
+            <ScreenshotButton targetRef={gridRef} filename="trade-partners" />
+          </span>
         </div>
 
         <label style={{ display: "block", marginBottom: "1rem" }}>
@@ -97,7 +102,7 @@ export default function TradePartnersPage() {
           <EmptyState>No other teams on file right now.</EmptyState>
         )}
         {partners && partners.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.75rem" }}>
+          <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.75rem" }}>
             {partners.map((p, i) => <PartnerCard key={p.team_id} partner={p} rank={i + 1} />)}
           </div>
         )}

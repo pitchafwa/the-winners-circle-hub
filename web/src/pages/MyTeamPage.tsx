@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
@@ -9,6 +9,7 @@ import EmptyState from "../components/EmptyState";
 import PlayerCardTrigger from "../components/PlayerCardTrigger";
 import PlayerHeadshot from "../components/PlayerHeadshot";
 import RosterTable from "../components/RosterTable";
+import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import { BenchChart, CoachChart, ScoringChart } from "../components/TeamCharts";
 import type { Badges, ProjectionReportRow, Roster, Sim, Teams, TopScorer } from "../types/data";
@@ -45,6 +46,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 
 export default function MyTeamPage() {
   const { season, meta, myTeamId, teamsById, teamName } = useApp();
+  const rosterTableRef = useRef<HTMLTableElement>(null);
   const base = season !== null ? `${season}` : null;
   const teams = useJson<Teams>(base ? `${base}/teams.json` : null);
   const badges = useJson<Badges>("badges.json");
@@ -130,9 +132,12 @@ export default function MyTeamPage() {
           <section className="section">
             <div className="section-head">
               <h2>Current roster</h2>
-              <span className="label">week {roster.data!.current_week}</span>
+              <span className="label">
+                week {roster.data!.current_week}
+                <ScreenshotButton targetRef={rosterTableRef} filename="my-roster" />
+              </span>
             </div>
-            <RosterTable roster={myRoster} />
+            <RosterTable ref={rosterTableRef} roster={myRoster} />
             <p className="muted" style={{ fontSize: "0.72rem", marginTop: "0.5rem", fontStyle: "italic" }}>
               Last = points in the most recent game. Last3 = average points over the last 3 games. Diff = average
               of actual minus projected points per game over the last 3 games. 🔥/🧊 = well ahead of/behind

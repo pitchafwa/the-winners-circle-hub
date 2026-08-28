@@ -1,7 +1,9 @@
+import { useRef } from "react";
 import { useApp } from "../state/AppContext";
 import { useJson } from "../lib/data";
 import { pts, shortDate, signed } from "../lib/format";
 import EmptyState from "../components/EmptyState";
+import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import type { TradeGradeAsset, TradeGrades } from "../types/data";
 
@@ -32,6 +34,7 @@ function AssetLine({ p, teamName }: { p: TradeGradeAsset; teamName: (id: number)
 
 export default function TradesPage() {
   const { teamName } = useApp();
+  const ledgerTableRef = useRef<HTMLTableElement>(null);
   const trades = useJson<TradeGrades>("trades.json");
   const list = trades.data?.trades ?? [];
   const ledger = trades.data?.team_ledger ?? [];
@@ -41,7 +44,10 @@ export default function TradesPage() {
     <section className="section">
       <div className="section-head">
         <h2>Trade grades</h2>
-        <span className="label">graded on dynasty market value as of the trade — same table as the draft report card</span>
+        <span className="label">
+          graded on dynasty market value as of the trade — same table as the draft report card
+          <ScreenshotButton targetRef={ledgerTableRef} filename="trade-ledger" />
+        </span>
       </div>
 
       {trades.error && <div className="error-state" style={{ marginBottom: "1rem" }}>{trades.error}</div>}
@@ -56,7 +62,7 @@ export default function TradesPage() {
         <>
           {ledger.length > 0 && (
             <div className="table-wrap" style={{ marginBottom: "2rem" }}>
-              <table className="stat">
+              <table className="stat" ref={ledgerTableRef}>
                 <thead>
                   <tr>
                     <th scope="col">Team</th>

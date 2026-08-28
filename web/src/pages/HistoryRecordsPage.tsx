@@ -1,13 +1,16 @@
+import { useRef } from "react";
 import { useApp } from "../state/AppContext";
 import { useJson } from "../lib/data";
 import { useAllSeasons } from "../lib/useAllSeasons";
 import { FranchiseLeaders, RecordBook } from "../components/HistoryCharts";
+import ScreenshotButton from "../components/ScreenshotButton";
 import type { Ownership } from "../types/data";
 
 export default function HistoryRecordsPage() {
   const all = useAllSeasons();
   const { meta } = useApp();
   const ownership = useJson<Ownership>("ownership.json");
+  const franchiseLeadersRef = useRef<HTMLTableElement>(null);
 
   return (
     <>
@@ -23,10 +26,13 @@ export default function HistoryRecordsPage() {
       <section className="section">
         <div className="section-head">
           <h2>By franchise</h2>
-          <span className="label">each team's all-time leading scorer and most-used starter</span>
+          <span className="label">
+            each team's all-time leading scorer and most-used starter
+            <ScreenshotButton targetRef={franchiseLeadersRef} filename="franchise-leaders" />
+          </span>
         </div>
         {ownership.error && <div className="error-state">{ownership.error}</div>}
-        {meta && <FranchiseLeaders ownership={ownership.data} meta={meta} />}
+        {meta && <FranchiseLeaders ref={franchiseLeadersRef} ownership={ownership.data} meta={meta} />}
       </section>
     </>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useApp } from "../state/AppContext";
 import { loadJson, useJson } from "../lib/data";
@@ -10,6 +10,7 @@ import BadgeShelf from "../components/BadgeShelf";
 import EmptyState from "../components/EmptyState";
 import { CareerLeaderboards } from "../components/HistoryCharts";
 import PlayerHeadshot from "../components/PlayerHeadshot";
+import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import type { Badges, Draft, DraftPick, H2H, Ownership, TradeGrades } from "../types/data";
 
@@ -55,6 +56,8 @@ export default function FranchisePage() {
   const { teamId } = useParams<{ teamId: string }>();
   const tid = Number(teamId);
   const { teamsById, teamName, currentTeamName, meta } = useApp();
+  const h2hTableRef = useRef<HTMLTableElement>(null);
+  const draftHistoryTableRef = useRef<HTMLTableElement>(null);
   const badges = useJson<Badges>("badges.json");
   const trades = useJson<TradeGrades>("trades.json");
   const ownership = useJson<Ownership>("ownership.json");
@@ -124,14 +127,17 @@ export default function FranchisePage() {
       <section className="section">
         <div className="section-head">
           <h2>Head-to-head</h2>
-          <span className="label">this franchise's all-time record against every other</span>
+          <span className="label">
+            this franchise's all-time record against every other
+            <ScreenshotButton targetRef={h2hTableRef} filename={`h2h-${currentTeamName(tid)}`} />
+          </span>
         </div>
         {h2h.error && <div className="error-state">{h2h.error}</div>}
         {h2hRows.length === 0 ? (
           !h2h.loading && <EmptyState>No head-to-head games on file yet.</EmptyState>
         ) : (
           <div className="table-wrap">
-            <table className="stat">
+            <table className="stat" ref={h2hTableRef}>
               <thead>
                 <tr>
                   <th scope="col" className="sortable" aria-sort={h2hSort.ariaSort("opponent")}
@@ -219,12 +225,17 @@ export default function FranchisePage() {
       <section className="section">
         <div className="section-head">
           <h2>Draft history</h2>
+          {draftPicks.picks.length > 0 && (
+            <span className="label">
+              <ScreenshotButton targetRef={draftHistoryTableRef} filename={`draft-history-${currentTeamName(tid)}`} />
+            </span>
+          )}
         </div>
         {draftPicks.picks.length === 0 ? (
           !draftPicks.loading && <EmptyState>No draft picks on file for this franchise.</EmptyState>
         ) : (
           <div className="table-wrap">
-            <table className="stat">
+            <table className="stat" ref={draftHistoryTableRef}>
               <thead>
                 <tr>
                   <th scope="col">Year</th>

@@ -1,9 +1,11 @@
+import { forwardRef, useRef } from "react";
 import { useApp } from "../state/AppContext";
 import { useJson } from "../lib/data";
 import { pts } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import EmptyState from "../components/EmptyState";
 import PasswordGate from "../components/PasswordGate";
+import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import { allTeamRosters, positionRatings } from "../lib/teamValue";
 import type { PositionRating } from "../lib/teamValue";
@@ -38,7 +40,8 @@ function cellStyle(diff: number, scale: number): React.CSSProperties {
   };
 }
 
-function RatingsTable({ candidates, sort }: { candidates: Row[]; sort: ReturnType<typeof useSort<Row>> }) {
+const RatingsTable = forwardRef<HTMLTableElement, { candidates: Row[]; sort: ReturnType<typeof useSort<Row>> }>(
+  function RatingsTable({ candidates, sort }, ref) {
   const { teamName } = useApp();
   const rows = useSorted(candidates, sort);
 
@@ -53,7 +56,7 @@ function RatingsTable({ candidates, sort }: { candidates: Row[]; sort: ReturnTyp
 
   return (
     <div className="table-wrap">
-      <table className="stat">
+      <table className="stat" ref={ref}>
         <thead>
           <tr>
             <th scope="col" className="sortable" aria-sort={sort.ariaSort("team")}
@@ -99,11 +102,12 @@ function RatingsTable({ candidates, sort }: { candidates: Row[]; sort: ReturnTyp
       </p>
     </div>
   );
-}
+});
 
 export default function PositionalStrengthPage() {
   const { meta } = useApp();
   const season = meta?.season ?? null;
+  const tableRef = useRef<HTMLTableElement>(null);
   const roster = useJson<Roster>(season !== null ? `${season}/roster.json` : null);
   const playerValues = useJson<PlayerValues>("player_values.json");
 
@@ -127,12 +131,15 @@ export default function PositionalStrengthPage() {
       <section className="section" style={{ marginTop: 0 }}>
         <div className="section-head">
           <h2>Positional strength — all teams</h2>
-          <span className="label">dynasty value: starter tier (top N at the position) + depth (everyone else rostered there) · click a column to sort</span>
+          <span className="label">
+            dynasty value: starter tier (top N at the position) + depth (everyone else rostered there) · click a column to sort
+            <ScreenshotButton targetRef={tableRef} filename="positional-strength-all-teams" />
+          </span>
         </div>
         {loading && <p className="muted" style={{ fontStyle: "italic" }}>Loading...</p>}
         {error && <div className="error-state">{error}</div>}
         {rows && rows.length === 0 && <EmptyState>No roster data on file yet.</EmptyState>}
-        {rows && rows.length > 0 && <RatingsTable candidates={rows} sort={sort} />}
+        {rows && rows.length > 0 && <RatingsTable ref={tableRef} candidates={rows} sort={sort} />}
       </section>
     </PasswordGate>
   );

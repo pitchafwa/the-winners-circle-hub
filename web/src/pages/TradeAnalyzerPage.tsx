@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { forwardRef, useMemo, useRef, useState } from "react";
 import { useApp } from "../state/AppContext";
 import { useJson } from "../lib/data";
 import { pts, signed } from "../lib/format";
 import PasswordGate from "../components/PasswordGate";
 import PlayerHeadshot from "../components/PlayerHeadshot";
+import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import { allTeamRosters, teamSnapshot } from "../lib/teamValue";
 import type { PositionRating, RosterPlayer, TeamSnapshot } from "../lib/teamValue";
@@ -106,11 +107,12 @@ function DeltaStat({ label, before, after }: { label: string; before: number; af
   );
 }
 
-function PositionTable({ before, after }: { before: Record<string, PositionRating>; after: Record<string, PositionRating> }) {
+const PositionTable = forwardRef<HTMLTableElement, { before: Record<string, PositionRating>; after: Record<string, PositionRating> }>(
+  function PositionTable({ before, after }, ref) {
   const positions = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort(positionSort);
   return (
     <div className="table-wrap">
-      <table className="stat">
+      <table className="stat" ref={ref}>
         <thead>
           <tr>
             <th scope="col">Position</th>
@@ -142,10 +144,11 @@ function PositionTable({ before, after }: { before: Record<string, PositionRatin
       </table>
     </div>
   );
-}
+});
 
 function TeamResultCard({ teamId, snapshot }: { teamId: number; snapshot: { before: TeamSnapshot; after: TeamSnapshot } }) {
   const { teamName } = useApp();
+  const tableRef = useRef<HTMLTableElement>(null);
   return (
     <section className="section">
       <div className="section-head">
@@ -157,8 +160,11 @@ function TeamResultCard({ teamId, snapshot }: { teamId: number; snapshot: { befo
         <DeltaStat label="Pick capital" before={snapshot.before.future_pick_capital} after={snapshot.after.future_pick_capital} />
         <DeltaStat label="Rebuilding value" before={snapshot.before.rebuilding_value} after={snapshot.after.rebuilding_value} />
       </div>
-      <div className="label" style={{ marginBottom: "0.3rem" }}>Positional strength — before → after</div>
-      <PositionTable before={snapshot.before.positions} after={snapshot.after.positions} />
+      <div className="label" style={{ marginBottom: "0.3rem" }}>
+        Positional strength — before → after
+        <ScreenshotButton targetRef={tableRef} filename={`trade-analysis-${teamName(teamId)}`} />
+      </div>
+      <PositionTable ref={tableRef} before={snapshot.before.positions} after={snapshot.after.positions} />
     </section>
   );
 }

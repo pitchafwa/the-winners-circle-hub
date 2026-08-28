@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { forwardRef, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -172,7 +172,9 @@ export function SwapMatrix({ swap, meta }: { swap: ScheduleSwap; meta: Meta }) {
  * games each), but the full history actually says something. Franchise
  * slot (team_id) is the join key, so this reads correctly across name/owner
  * changes the same way Franchise Careers already does. */
-export function H2HMatrix({ bundles, meta }: { bundles: SeasonBundle[]; meta: Meta }) {
+export const H2HMatrix = forwardRef<HTMLTableElement, { bundles: SeasonBundle[]; meta: Meta }>(function H2HMatrix(
+  { bundles, meta }, ref,
+) {
   const { currentTeamsById } = useApp();
   const teams = meta.teams;
   const currentName = (id: number) => currentTeamsById.get(id)?.name ?? `Team ${id}`;
@@ -191,7 +193,7 @@ export function H2HMatrix({ bundles, meta }: { bundles: SeasonBundle[]; meta: Me
 
   return (
     <div className="table-wrap">
-      <table className="stat h2h">
+      <table className="stat h2h" ref={ref}>
         <thead>
           <tr>
             <th scope="col">vs →</th>
@@ -222,7 +224,7 @@ export function H2HMatrix({ bundles, meta }: { bundles: SeasonBundle[]; meta: Me
       </table>
     </div>
   );
-}
+});
 
 interface CareerStint {
   team_id: number;
@@ -358,7 +360,8 @@ function Leaderboard({ title, subtitle, rows }: {
 /** One row per franchise: its all-time leading scorer and most-used starter,
  * from the roster-ownership timeline (career.py's per-stint aggregates,
  * merged across stints). */
-export function FranchiseLeaders({ ownership, meta }: { ownership: Ownership | null; meta: Meta }) {
+export const FranchiseLeaders = forwardRef<HTMLTableElement, { ownership: Ownership | null; meta: Meta }>(
+  function FranchiseLeaders({ ownership, meta }, ref) {
   const { currentTeamName } = useApp();
   const rows = useMemo(() => {
     const career = careerStints(ownership?.stints ?? []);
@@ -379,7 +382,7 @@ export function FranchiseLeaders({ ownership, meta }: { ownership: Ownership | n
 
   return (
     <div className="table-wrap">
-      <table className="stat">
+      <table className="stat" ref={ref}>
         <thead>
           <tr>
             <th scope="col">Franchise</th>
@@ -419,7 +422,7 @@ export function FranchiseLeaders({ ownership, meta }: { ownership: Ownership | n
       </table>
     </div>
   );
-}
+});
 
 const MIN_STARTS_FOR_RATE = 8;
 // Compared against the ROUNDED display percentage, not the raw fraction —
@@ -607,7 +610,8 @@ const CAREER_COLS: { key: keyof CareerRow | "name"; label: string; numeric: bool
   { key: "lasts", label: "Last places", numeric: true },
 ];
 
-export function CareerTable({ bundles, badges }: { bundles: SeasonBundle[]; badges: Badges | null }) {
+export const CareerTable = forwardRef<HTMLTableElement, { bundles: SeasonBundle[]; badges: Badges | null }>(
+  function CareerTable({ bundles, badges }, ref) {
   const { currentTeamName: teamName } = useApp();
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "pct", dir: -1 });
 
@@ -654,7 +658,7 @@ export function CareerTable({ bundles, badges }: { bundles: SeasonBundle[]; badg
 
   return (
     <div className="table-wrap">
-      <table className="stat">
+      <table className="stat" ref={ref}>
         <thead>
           <tr>
             {CAREER_COLS.map((c) => (
@@ -689,4 +693,4 @@ export function CareerTable({ bundles, badges }: { bundles: SeasonBundle[]; badg
       </table>
     </div>
   );
-}
+});

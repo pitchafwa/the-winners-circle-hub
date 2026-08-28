@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { useApp } from "../state/AppContext";
 import { MISSING, signed } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
@@ -16,7 +17,9 @@ function cellStyle(diff: number, scale: number): React.CSSProperties {
   };
 }
 
-export default function PositionHeatmap({ positions }: { positions: Positions }) {
+const PositionHeatmap = forwardRef<HTMLTableElement, { positions: Positions }>(function PositionHeatmap(
+  { positions }, ref,
+) {
   const { teamName } = useApp();
   const sortHook = useSort<Row>("team", 1, (r, key) =>
     key === "team" ? teamName(r.team_id) : r.values[key]?.diff ?? null,
@@ -31,7 +34,7 @@ export default function PositionHeatmap({ positions }: { positions: Positions })
 
   return (
     <div className="table-wrap">
-      <table className="stat">
+      <table className="stat" ref={ref}>
         <thead>
           <tr>
             <th scope="col" className="sortable" aria-sort={sortHook.ariaSort("team")}
@@ -70,4 +73,6 @@ export default function PositionHeatmap({ positions }: { positions: Positions })
       </p>
     </div>
   );
-}
+});
+
+export default PositionHeatmap;

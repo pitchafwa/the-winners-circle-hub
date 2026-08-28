@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useApp } from "../state/AppContext";
 import { useJson } from "../lib/data";
 import { useSort, useSorted } from "../lib/useSort";
 import EmptyState from "../components/EmptyState";
+import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import type { PickFutures, PickResolutionStatus } from "../types/data";
 
@@ -24,6 +25,7 @@ const COLS: { key: string; label: string; numeric: boolean; title?: string }[] =
 
 export default function PickFuturesPage() {
   const { teamName, meta } = useApp();
+  const boardTableRef = useRef<HTMLTableElement>(null);
   const futures = useJson<PickFutures>("pick_futures.json");
   const board = futures.data?.board ?? [];
 
@@ -54,7 +56,10 @@ export default function PickFuturesPage() {
     <section className="section">
       <div className="section-head">
         <h2>Pick futures board</h2>
-        <span className="label">every team's slate of upcoming rookie-draft picks</span>
+        <span className="label">
+          every team's slate of upcoming rookie-draft picks
+          <ScreenshotButton targetRef={boardTableRef} filename="pick-futures" />
+        </span>
       </div>
       {futures.error && <div className="error-state" style={{ marginBottom: "1rem" }}>{futures.error}</div>}
       {futures.loading ? (
@@ -88,7 +93,7 @@ export default function PickFuturesPage() {
             <EmptyState>No picks match that filter.</EmptyState>
           ) : (
             <div className="table-wrap">
-              <table className="stat">
+              <table className="stat" ref={boardTableRef}>
                 <thead>
                   <tr>
                     {COLS.map((c) => (

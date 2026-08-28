@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useApp } from "../state/AppContext";
 import { useOptionalJson } from "../lib/data";
 import { pts, signed } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import EmptyState from "../components/EmptyState";
 import PlayerHeadshot from "../components/PlayerHeadshot";
+import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import type { Draft } from "../types/data";
 
@@ -29,12 +30,16 @@ function GradeTable({
   valueOf: (r: { team_id: number; grade: string }) => { text: string; tone: "pos" | "neg" | "" };
 }) {
   const { teamName } = useApp();
+  const tableRef = useRef<HTMLTableElement>(null);
   return (
     <div>
-      <h3 style={{ fontSize: "1.05rem", marginBottom: "0.15rem" }}>{title}</h3>
+      <h3 style={{ fontSize: "1.05rem", marginBottom: "0.15rem" }}>
+        {title}
+        <ScreenshotButton targetRef={tableRef} filename={title.toLowerCase().replace(/\s+/g, "-")} />
+      </h3>
       <p className="muted" style={{ fontSize: "0.78rem", marginBottom: "0.6rem" }}>{sub}</p>
       <div className="table-wrap">
-        <table className="stat">
+        <table className="stat" ref={tableRef}>
           <thead>
             <tr>
               <th scope="col">Grade</th>
@@ -65,6 +70,7 @@ function GradeTable({
 function DraftCard({ draft }: { draft: Draft }) {
   const { teamName } = useApp();
   const [showAll, setShowAll] = useState(false);
+  const boardTableRef = useRef<HTMLTableElement>(null);
   const graded = draft.picks.filter((p) => p.value_diff !== null);
   const steals = [...graded].sort((a, b) => b.value_diff! - a.value_diff!).slice(0, 5);
   const busts = [...graded].sort((a, b) => a.value_diff! - b.value_diff!).slice(0, 5);
@@ -135,9 +141,10 @@ function DraftCard({ draft }: { draft: Draft }) {
         onClick={() => setShowAll((s) => !s)}>
         {showAll ? "hide full draft board ↑" : "show full draft board ↓"}
       </button>
+      {showAll && <ScreenshotButton targetRef={boardTableRef} filename="draft-board" />}
       {showAll && (
         <div className="table-wrap" style={{ marginTop: "0.75rem" }}>
-          <table className="stat">
+          <table className="stat" ref={boardTableRef}>
             <thead>
               <tr>
                 {BOARD_COLS.map((c) => (

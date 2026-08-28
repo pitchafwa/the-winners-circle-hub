@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useApp } from "../state/AppContext";
 import { useJson } from "../lib/data";
 import { signed } from "../lib/format";
 import { useSort, useSorted } from "../lib/useSort";
 import EmptyState from "../components/EmptyState";
+import ScreenshotButton from "../components/ScreenshotButton";
 import SuperlativeCard from "../components/SuperlativeCard";
 import TeamLink from "../components/TeamLink";
 import type { Superlatives } from "../types/data";
@@ -36,6 +37,8 @@ const SHORT_LABEL: Record<string, string> = {
 
 export default function TrophyCasePage() {
   const { season, meta, teamName } = useApp();
+  const tallyTableRef = useRef<HTMLTableElement>(null);
+  const certificatesGridRef = useRef<HTMLDivElement>(null);
   const superlatives = useJson<Superlatives>(season !== null ? `${season}/superlatives.json` : null);
 
   const tally: TallyRow[] | null = useMemo(() => {
@@ -88,7 +91,10 @@ export default function TrophyCasePage() {
       <section className="section">
         <div className="section-head">
           <h2>The tally</h2>
-          <span className="label">every weekly award, all season</span>
+          <span className="label">
+            every weekly award, all season
+            <ScreenshotButton targetRef={tallyTableRef} filename="trophy-tally" />
+          </span>
         </div>
         {superlatives.error && <div className="error-state">{superlatives.error}</div>}
         {!meta.season_started && (
@@ -96,7 +102,7 @@ export default function TrophyCasePage() {
         )}
         {tally && meta.season_started && superlatives.data && (
           <div className="table-wrap">
-            <table className="stat">
+            <table className="stat" ref={tallyTableRef}>
               <thead>
                 <tr>
                   <th scope="col" className="sortable" aria-sort={sortHook.ariaSort("team")}
@@ -143,9 +149,12 @@ export default function TrophyCasePage() {
         <section className="section">
           <div className="section-head">
             <h2>Latest certificates</h2>
-            <span className="label">week {meta.completed_weeks.at(-1)}</span>
+            <span className="label">
+              week {meta.completed_weeks.at(-1)}
+              <ScreenshotButton targetRef={certificatesGridRef} filename={`certificates-week${meta.completed_weeks.at(-1)}`} />
+            </span>
           </div>
-          <div className="card-grid">
+          <div className="card-grid" ref={certificatesGridRef}>
             {latest.map((a, i) => (
               <SuperlativeCard key={a.key} award={a} meta={superlatives.data!.awards_meta[a.key]} index={i} />
             ))}

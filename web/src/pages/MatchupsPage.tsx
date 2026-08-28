@@ -249,7 +249,7 @@ function MatchupCard({
 
   return (
     <article className={cardClass} ref={cardRef}>
-      <div className="mu-card-shot">
+      <div className="card-shot">
         <ScreenshotButton
           targetRef={cardRef}
           filename={filename}

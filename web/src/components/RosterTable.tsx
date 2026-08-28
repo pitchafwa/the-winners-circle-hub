@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { pts, signed, gameTime } from "../lib/format";
 import { displayOrderIndices } from "../lib/lineupOrder";
 import PlayerCardTrigger from "./PlayerCardTrigger";
@@ -104,7 +105,7 @@ function RosterSection({ title, cards, totalProjected }: {
   );
 }
 
-export default function RosterTable({ roster }: { roster: TeamRoster }) {
+const RosterTable = forwardRef<HTMLTableElement, { roster: TeamRoster }>(function RosterTable({ roster }, ref) {
   // Display order only — roster.json's own starting-slot order (real ESPN
   // ascending slot-id order) is untouched; RB/WR and FLEX render grouped
   // right after the WRs instead of split across the two ends of the list,
@@ -115,7 +116,7 @@ export default function RosterTable({ roster }: { roster: TeamRoster }) {
 
   return (
     <div className="table-wrap">
-      <table className="stat roster-table">
+      <table className="stat roster-table" ref={ref}>
         <thead>
           <tr>
             <th scope="col">Slot</th>
@@ -138,4 +139,6 @@ export default function RosterTable({ roster }: { roster: TeamRoster }) {
       </table>
     </div>
   );
-}
+});
+
+export default RosterTable;

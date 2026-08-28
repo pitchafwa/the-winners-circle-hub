@@ -1,5 +1,7 @@
+import { useRef } from "react";
 import { useApp } from "../state/AppContext";
 import { pct, pts, MISSING } from "../lib/format";
+import ScreenshotButton from "./ScreenshotButton";
 import TeamLink from "./TeamLink";
 import type { SimTeam, StandingsRow } from "../types/data";
 
@@ -19,6 +21,7 @@ export default function DivisionStandings({
   simByTeam: Map<number, SimTeam>;
 }) {
   const { teamName } = useApp();
+  const tableRef = useRef<HTMLTableElement>(null);
   const started = seasonStarted(rows);
   // Once real games exist, the real (tiebreak-aware) division rank drives
   // order. Before that, division_rank is arbitrary noise (nothing to break
@@ -32,9 +35,12 @@ export default function DivisionStandings({
 
   return (
     <div>
-      <p className="label" style={{ marginBottom: "0.5rem" }}>{name}</p>
+      <p className="label" style={{ marginBottom: "0.5rem" }}>
+        {name}
+        <ScreenshotButton targetRef={tableRef} filename={`division-${name}`} />
+      </p>
       <div className="table-wrap">
-        <table className="stat division-race-table">
+        <table className="stat division-race-table" ref={tableRef}>
           <thead>
             <tr>
               <th className="num" scope="col">#</th>

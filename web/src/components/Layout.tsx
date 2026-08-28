@@ -75,15 +75,17 @@ export default function Layout() {
     label: t.nickname ?? t.name,
   }));
 
-  // KTC backs draft grades, trade grades, and the contend/rebuild spectrum —
-  // fetched independently from ESPN on its own 12h cache. Showing the OLDER
-  // of the two KTC timestamps (dynasty from trades.json, redraft from
-  // spectrum.json) next to the ESPN one is a cheap way to notice if that
-  // fetch ever starts silently failing: it'll stop advancing while the ESPN
-  // timestamp keeps moving normally.
+  // Two independent market-value fetches, each on its own 12h cache: KTC
+  // (dynasty, backs draft grades/trade grades/the spectrum's "held assets"
+  // side) and, as of 2026-08-28, FantasyPros' consensus rank (redraft,
+  // backs the spectrum's "contending" side — see valuation.py's module
+  // docstring for why that source changed). Showing the OLDER of the two
+  // timestamps next to the ESPN one is a cheap way to notice if either
+  // fetch ever starts silently failing: it'll stop advancing while the
+  // ESPN timestamp keeps moving normally.
   const trades = useJson<TradeGrades>("trades.json");
   const spectrum = useJson<Spectrum>("spectrum.json");
-  const ktcUpdatedAt = [trades.data?.valuation_updated_at, spectrum.data?.redraft_valuation_updated_at]
+  const marketValuesUpdatedAt = [trades.data?.valuation_updated_at, spectrum.data?.redraft_valuation_updated_at]
     .filter((d): d is string => d !== null && d !== undefined)
     .sort()[0] ?? null;
 
@@ -173,7 +175,7 @@ export default function Layout() {
         {meta && (
           <span>
             Data pulled from ESPN {dateTime(meta.fetched_at)} · built {dateTime(meta.generated_at)}
-            {ktcUpdatedAt && <> · market values (KTC) as of {dateTime(ktcUpdatedAt)}</>}
+            {marketValuesUpdatedAt && <> · market values (KTC dynasty / FantasyPros redraft) as of {dateTime(marketValuesUpdatedAt)}</>}
           </span>
         )}
         {" · "}

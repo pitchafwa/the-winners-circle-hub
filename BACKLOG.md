@@ -31,6 +31,43 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Redraft value source switched: KTC → FantasyPros ECR (2026-08-28)
+
+Tommy didn't buy the redraft/contending-value rankings KTC's own
+`fantasy-rankings` page was producing — specifically, Antonio's team
+(Fresh Prince of Bel-Air) reading as top-2 in the league. Swapped the
+"how good is this roster RIGHT NOW" side of the model to a second,
+independently-sourced opinion instead of tuning the same one further:
+
+- `valuation.fantasypros_redraft_values_by_name()` (new) fetches
+  FantasyPros' PPR draft cheat sheet
+  (fantasypros.com/nfl/rankings/ppr-cheatsheets.php), which embeds its
+  full 517-player consensus-rank (ECR) list as inline JS the same way
+  KTC's pages do (`var ecrData = {...}`, no JS execution needed to
+  scrape). `redraft_values_by_name()` (the original KTC version) stays
+  in the file, unused, in case this ever needs revisiting.
+- Player rank gets remapped onto roughly the same 0-9999 value scale
+  KTC's own redraft numbers used — piecewise-linear interpolation
+  against 12 anchor points sampled straight off KTC's real redraft
+  curve (rank 1 → 9999 down to rank 375 → 0) — specifically so
+  `spectrum.py`'s dollar-level Contending/Balanced/Rebuilding thresholds
+  and everything else built assuming that scale keep working unmodified.
+  Only WHO ranks where changes, not the numeric range values live in.
+  `_Source` generalized with a `parser` callback so this and the two KTC
+  fetches share the same fetch/cache/offline-fallback machinery.
+- **Verified the actual complaint is fixed**: recomputed both old (KTC)
+  and new (FantasyPros) team rankings side by side — Antonio's team goes
+  from #1 under KTC to #7 under FantasyPros, no longer top-2, confirmed
+  live on the League tab's Contend/Rebuild table (Balanced, 58698, down
+  from 63360 and a #1 finish).
+- Every consumer downstream (Trade Analyzer/Trade Partners' client-side
+  port, the League tab's spectrum table) needed no code changes — they
+  all read whatever's in `player_values.json`'s `redraft` field, which
+  is source-agnostic by design.
+- Footer/docstring wording updated everywhere it said "KTC" for the
+  redraft half specifically (`Layout.tsx`'s footer, `spectrum.py`,
+  `DATA.md`) — now reads "KTC dynasty / FantasyPros redraft".
+
 ## Positional Strength: drop D/ST-K, add heat coloring (2026-08-28) — built, Tommy-only
 
 - Dropped the D/ST and K columns — both carry no meaningful dynasty

@@ -754,8 +754,13 @@ compares two different value lenses instead of roster age:
   BEST POSSIBLE STARTING LINEUP value (dominant signal) plus a 10% share
   of the rest of the roster's value (`BENCH_WEIGHT`, real bench depth has
   real but secondary insurance value against injury/breakouts), all priced
-  on REDRAFT (this-season) value from `valuation.redraft_values_by_name()`
-  (KeepTradeCut's `fantasy-rankings` page, not `dynasty-rankings`) — "how
+  on REDRAFT (this-season) value from
+  `valuation.fantasypros_redraft_values_by_name()` (FantasyPros' consensus
+  expert rank — switched 2026-08-28 from KeepTradeCut's own
+  `fantasy-rankings` page after Tommy felt KTC's redraft numbers were
+  producing roster-strength rankings he didn't trust; see valuation.py's
+  module docstring for the full story and how FantasyPros' 1-517 rank gets
+  remapped onto the same 0-9999 scale KTC's redraft values used) — "how
   good is this team right now," independent of long-term keeper value.
   D/ST and K are excluded entirely (`VALUATION_EXCLUDED_SLOTS`) — their
   redraft market prices are noise, not signal, for roster strength. Reads

@@ -737,8 +737,10 @@ def main():
     if not dynasty_values:
         print("  no valuation data available — draft grades will be skipped", file=sys.stderr)
 
-    print("Fetching redraft valuation data..." if not args.offline else "Using cached redraft valuation data...")
-    redraft_values, redraft_updated_at = valuation.redraft_values_by_name(offline=args.offline)
+    # FantasyPros' consensus rank (ECR), not KTC's own redraft market — see
+    # valuation.py's module docstring for why this switched 2026-08-28.
+    print("Fetching redraft valuation data (FantasyPros ECR)..." if not args.offline else "Using cached redraft valuation data...")
+    redraft_values, redraft_updated_at = valuation.fantasypros_redraft_values_by_name(offline=args.offline)
     if not redraft_values:
         print("  no redraft valuation data available — contend/rebuild spectrum will read 0 for the contending side", file=sys.stderr)
 

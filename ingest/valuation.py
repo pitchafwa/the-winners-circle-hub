@@ -1,15 +1,27 @@
 """External player values — independent baselines for draft grading and the
-contend/rebuild spectrum. Two sources, same site, same page structure:
+contend/rebuild spectrum. Three sources:
 
 - **Dynasty** (`keeptradecut.com/dynasty-rankings`) — long-term keeper/trade
   asset value. Backs the draft report card, trade grades, and the "held
   assets" side of the contend/rebuild spectrum.
-- **Redraft** (`keeptradecut.com/fantasy-rankings`) — this-season value
-  (their `oneQBValues.value`/`startSitValue` fields carry ADP/start-sit
-  context here, not dynasty trade context, even though the field names are
-  shared across both pages). Backs the "contending" side of the
-  contend/rebuild spectrum — a team's CURRENT roster judged on what it's
-  worth to win NOW, not what it'll be worth in three years.
+- **Redraft** (`fantasypros.com/nfl/rankings/ppr-cheatsheets.php`) —
+  this-season value, from FantasyPros' consensus expert rank (ECR) rather
+  than KeepTradeCut's own redraft market. Switched 2026-08-28 at Tommy's
+  request: KTC's redraft numbers kept producing contending-value/roster-
+  strength rankings he didn't buy (a team he felt was clearly mid-pack
+  reading as top-2) — a second, independently-sourced opinion on "who's
+  actually good this year" was the fix, not a different formula over the
+  same opinion. `_ecr_rank_to_value()` below converts FantasyPros' rank
+  onto roughly the same 0-9999 scale KTC's redraft values used (anchored
+  against KTC's own real redraft curve, sampled 2026-08-28), so everything
+  downstream that assumes that scale (spectrum.py's dollar-level
+  thresholds in particular) keeps working unmodified — only WHO ranks
+  where changes, not the numeric range values live in. Backs the
+  "contending" side of the contend/rebuild spectrum — a team's CURRENT
+  roster judged on what it's worth to win NOW, not what it'll be worth in
+  three years. (`redraft_values_by_name()` — the original KTC-sourced
+  version — is kept below, unused by build.py now, in case this ever
+  needs reverting or comparing against.)
 
 Fixes a structural bug in a same-draft self-referential model for the
 dynasty case: matching the k-th drafted player against the k-th BEST
@@ -38,6 +50,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -54,16 +67,7 @@ REQUEST_HEADERS = {"User-Agent": "Mozilla/5.0 (league-hub personal dynasty tool)
 class _Source:
     url: str
     cache_path: Path
-
-
-DYNASTY = _Source(
-    url="https://keeptradecut.com/dynasty-rankings",
-    cache_path=config.CACHE_DIR / "valuation" / "dynasty-rankings.json",
-)
-REDRAFT = _Source(
-    url="https://keeptradecut.com/fantasy-rankings",
-    cache_path=config.CACHE_DIR / "valuation" / "fantasy-rankings.json",
-)
+    parser: Callable[[str], list[dict]]
 
 
 def _parse_players_array(html: str) -> list[dict]:
@@ -73,10 +77,37 @@ def _parse_players_array(html: str) -> list[dict]:
     return json.loads(m.group(1))
 
 
+def _parse_ecr_players(html: str) -> list[dict]:
+    """FantasyPros embeds its full ranked list the same way KTC does — a
+    JS object assigned directly in the server-rendered HTML, no JS
+    execution needed (confirmed by fetching with plain requests)."""
+    m = re.search(r"var ecrData = (\{.*?\});", html, re.DOTALL)
+    if not m:
+        raise ValueError("player list not found in FantasyPros rankings page — site structure may have changed")
+    return json.loads(m.group(1))["players"]
+
+
+DYNASTY = _Source(
+    url="https://keeptradecut.com/dynasty-rankings",
+    cache_path=config.CACHE_DIR / "valuation" / "dynasty-rankings.json",
+    parser=_parse_players_array,
+)
+REDRAFT = _Source(
+    url="https://keeptradecut.com/fantasy-rankings",
+    cache_path=config.CACHE_DIR / "valuation" / "fantasy-rankings.json",
+    parser=_parse_players_array,
+)
+FANTASYPROS_REDRAFT = _Source(
+    url="https://www.fantasypros.com/nfl/rankings/ppr-cheatsheets.php",
+    cache_path=config.CACHE_DIR / "valuation" / "fantasypros-ppr-cheatsheets.json",
+    parser=_parse_ecr_players,
+)
+
+
 def _fetch_fresh(source: _Source) -> list[dict]:
     r = requests.get(source.url, headers=REQUEST_HEADERS, timeout=20)
     r.raise_for_status()
-    return _parse_players_array(r.text)
+    return source.parser(r.text)
 
 
 def _read_cache(source: _Source) -> tuple[list[dict], datetime] | None:
@@ -203,6 +234,51 @@ def redraft_values_by_name(offline: bool = False) -> tuple[dict[str, int], str |
 
     players, fetched_at = _get_players(REDRAFT, offline)
     values = {_normalize_name(p["playerName"]): p["oneQBValues"]["value"] for p in players}
+    return values, fetched_at
+
+
+# rank -> value anchors, sampled from KTC's own real redraft curve
+# (2026-08-28 snapshot: rank 1 -> 9999 down to rank 375 -> 0, KTC's ranked
+# universe at the time) — see this module's docstring for why FantasyPros'
+# rank gets remapped onto this scale rather than used as a raw 1-517
+# number. Piecewise-linear between anchors, flat-clamped past either end
+# (so anything past rank 375 reads 0, same "no meaningful market value"
+# convention as an unranked D/ST or deep dart-throw).
+_ECR_VALUE_ANCHORS: list[tuple[int, float]] = [
+    (1, 9999), (10, 8207), (25, 7274), (50, 6468), (75, 5625),
+    (100, 5136), (150, 4175), (200, 3253), (250, 2487), (300, 1699),
+    (350, 400), (375, 0),
+]
+
+
+def _interp_curve(anchors: list[tuple[int, float]], x: float) -> float:
+    if x <= anchors[0][0]:
+        return anchors[0][1]
+    if x >= anchors[-1][0]:
+        return anchors[-1][1]
+    for (x0, y0), (x1, y1) in zip(anchors, anchors[1:]):
+        if x0 <= x <= x1:
+            t = (x - x0) / (x1 - x0)
+            return y0 + t * (y1 - y0)
+    return anchors[-1][1]  # unreachable — satisfies type checkers
+
+
+def _ecr_rank_to_value(rank: int) -> int:
+    return max(0, round(_interp_curve(_ECR_VALUE_ANCHORS, rank)))
+
+
+def fantasypros_redraft_values_by_name(offline: bool = False) -> tuple[dict[str, int], str | None]:
+    """normalized_name -> this-season value (0-9999-ish), derived from
+    FantasyPros' consensus expert rank (ECR) on their PPR draft cheat
+    sheet — see this module's docstring for why this replaced
+    `redraft_values_by_name()` above as build.py's actual redraft source.
+    Same missing-player convention as every other lookup here: a player
+    outside FantasyPros' ~517-deep ranked universe is simply absent, never
+    fabricated as 0 vs. genuinely-unranked."""
+    from parse import _normalize_name  # local import: avoid a circular import at module load
+
+    players, fetched_at = _get_players(FANTASYPROS_REDRAFT, offline)
+    values = {_normalize_name(p["player_name"]): _ecr_rank_to_value(p["rank_ecr"]) for p in players}
     return values, fetched_at
 
 

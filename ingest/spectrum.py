@@ -6,9 +6,10 @@ from two different value lenses:
 
 - **Contending** side: `metrics.redraft_lineup_value()` — the current
   roster's best possible starting lineup priced on REDRAFT (this-season)
-  value (`valuation.redraft_values_by_name` — keeptradecut.com/fantasy-
-  rankings, not the dynasty-rankings page), plus a 10% share of remaining
-  bench value, D/ST and K excluded — "how good is this team RIGHT NOW,"
+  value (`valuation.fantasypros_redraft_values_by_name` — FantasyPros'
+  consensus expert rank, not KTC's own redraft market; see valuation.py's
+  module docstring for why that switched 2026-08-28), plus a 10% share of
+  remaining bench value, D/ST and K excluded — "how good is this team RIGHT NOW,"
   same methodology and calibration as the playoff-odds roster-strength
   signal (`simulate.roster_strength_prior_shift`), not a flat sum of the
   whole roster (only ~half a roster ever starts in a given week). A
@@ -29,11 +30,13 @@ from two different value lenses:
 
 Posture (`label`) is read off fixed dollar thresholds on the two value
 lenses (Tommy's own intuition for what "contending" and "rebuilding"
-roster/capital levels look like on today's KTC scale), not a league-
-relative percentile rank — see `_label` below. **This means the
-thresholds are pegged to the current KTC valuation scale and may need
-retuning if the league's overall asset values drift a lot (e.g. a market-
-wide dynasty value inflation/deflation, or a much smaller/larger league).**
+roster/capital levels look like on the KTC-dynasty / FantasyPros-ECR-
+derived scale both sides are priced on today), not a league-relative
+percentile rank — see `_label` below. **This means the thresholds are
+pegged to the current valuation scale and may need retuning if the
+league's overall asset values drift a lot (e.g. a market-wide dynasty
+value inflation/deflation, a much smaller/larger league, or either
+valuation source's own scale shifting under a future source change).**
 """
 from __future__ import annotations
 

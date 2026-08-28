@@ -31,6 +31,55 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Screenshot button: icon-only placement + matchup cards (2026-08-28)
+
+Follow-up to the Standings test run, now generalized: renamed
+`TableScreenshotButton.tsx` → `ScreenshotButton.tsx` (it's no longer
+table-specific) and reworked it into a small icon-only camera button
+(no text label) that sits inline next to a block's own subheader/label,
+instead of a separate full-width bar above the content.
+
+- **Standings**: `StandingsTable` converted to `forwardRef` so
+  `LeaguePage.tsx` can hold the `<table>` ref itself and render
+  `<ScreenshotButton>` directly inside the section-head, right next to
+  "click a column to sort" — the placement Tommy asked for.
+- **Matchup cards**: each card gets its own small camera icon in its
+  top-right corner (no shared header row to sit next to, since each
+  card in the list is its own capture target). Per Tommy's ask, the
+  capture always renders the roomier DESKTOP side-by-side layout
+  (`.mu-grid`), never the vertically-long mobile stacked list
+  (`.mobile-lineup`), regardless of the real device viewport — both
+  layouts already exist in the DOM at all times (this app's established
+  CSS-only responsive pattern, one hidden via `@media` at a time), so
+  capture just needs to temporarily flip which one is showing.
+  - New `.mu-card-force-desktop` CSS class does three things while
+    applied: shows `.mu-grid`, hides `.mobile-lineup`, and forces the
+    card to a fixed 600px width (`.mu-card`'s width is normally
+    flex-shrunk to fit the real viewport, not just visually clipped
+    like a scrollable table — un-hiding the grid alone would still
+    render it squeezed into a narrow mobile-width box).
+  - `ScreenshotButton` gained optional `prepareCapture`/`cleanupCapture`
+    hooks so a caller can toggle this kind of override right before/
+    after capture — kept generic rather than matchup-specific, for
+    reuse anywhere else a similar "always capture the desktop version"
+    need comes up.
+  - Drives the toggle through real React state + `flushSync` (not a raw
+    `classList.add` on the DOM node) — a direct DOM mutation is
+    invisible to React's reconciler, so a re-render for any unrelated
+    reason during the capture's async gap would silently wipe it;
+    `flushSync` commits synchronously so there's no gap for that race.
+- Also new: `.mu-card-force-desktop .mu-card-shot { display: none }` —
+  the camera icon hides itself during its own capture so it doesn't
+  show up inside the screenshot.
+- Verified live for both: Standings capture still works correctly at
+  the new placement; a real 2025 matchup card's screenshot rendered at
+  1200×1158px (600×579 CSS px desktop grid, 2x pixel ratio) versus its
+  live mobile rendering of 335×1158px (same numeric height by
+  coincidence — 579×2 — but a completely different, far more compact
+  layout, confirmed via canvas pixel sampling that real varied content
+  fills the desktop capture, and that the card cleanly reverts to its
+  normal mobile size afterward).
+
 ## Mobile "save table as image" — test run on Standings (2026-08-28)
 
 Tommy wanted a mobile-only button to screenshot a table's FULL contents

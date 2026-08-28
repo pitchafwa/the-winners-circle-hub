@@ -306,46 +306,46 @@ hr,
   overflow-x: auto;
 }
 
-/* Mobile-only "save table as image" button — see TableScreenshotButton.tsx.
- * Hidden on desktop, which already shows a wide table in full; the whole
- * point is standing in for the horizontal scroll a phone forces. */
-.table-capture-bar {
+/* Mobile-only "save as image" icon button — see ScreenshotButton.tsx.
+ * Hidden on desktop (already shows everything at once, no scrolling
+ * needed). Sits inline next to a block's subheader/label rather than its
+ * own row, so it reads as part of the header, not a separate UI strip. */
+.screenshot-btn {
   display: none;
 }
 
 @media (max-width: 640px) {
-  .table-capture-bar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 0.4rem;
+  .screenshot-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    margin-left: 0.4rem;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--paper-2);
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    vertical-align: middle;
   }
 }
 
-.table-screenshot-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.32rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid var(--rule);
-  background: var(--paper-2);
-  color: inherit;
-  font-family: var(--font-body);
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.table-screenshot-btn:disabled {
+.screenshot-btn:disabled {
   opacity: 0.6;
   cursor: default;
 }
 
-.table-screenshot-error {
+.screenshot-error {
+  display: block;
   color: var(--negative);
   font-size: 0.72rem;
+  margin-top: 0.2rem;
 }
 
-.table-screenshot-overlay {
+.screenshot-overlay {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -357,7 +357,7 @@ hr,
   padding: 2.5rem 1rem;
 }
 
-.table-screenshot-preview {
+.screenshot-preview {
   background: var(--paper);
   border-radius: 12px;
   padding: 1rem;
@@ -368,14 +368,14 @@ hr,
   gap: 0.75rem;
 }
 
-.table-screenshot-preview img {
+.screenshot-preview img {
   max-width: 100%;
   height: auto;
   border-radius: 6px;
   border: 1px solid var(--rule);
 }
 
-.table-screenshot-hint {
+.screenshot-hint {
   margin: 0;
   font-size: 0.8rem;
   color: #96A0BE;
@@ -979,12 +979,42 @@ select.control {
 .mu-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.25rem 1.5rem; }
 
 .mu-card {
+  position: relative; /* anchors .mu-card-shot in a corner, see below */
   flex: 0 1 calc(50% - 0.75rem);
   background: var(--paper-2);
   border: 2px solid var(--ink);
   border-radius: 10px;
   padding: 1.1rem 1.25rem;
 }
+
+/* Mobile-only screenshot icon for one game card — corner overlay rather
+ * than inline with a header, since each card in the list is its own
+ * capture target with no shared subheader row to sit next to. */
+.mu-card-shot {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+}
+
+/* Temporarily applied (ScreenshotButton's prepareCapture/cleanupCapture,
+ * see MatchupCard) right before/after capture so the screenshot always
+ * shows the roomier desktop side-by-side layout (.mu-grid) instead of the
+ * stacked mobile one (.mobile-lineup), even when the real device viewport
+ * is mobile-width. .mu-card's own width is normally flex-shrunk to fit a
+ * narrow viewport (not just visually clipped like a scrollable table), so
+ * forcing .mu-grid visible alone isn't enough — it would still render
+ * squeezed into that narrow box. A fixed width sized to roughly match a
+ * real desktop two-up card (.mu-list's ~1176px content width, minus the
+ * gap, split two ways) makes the capture look like an actual desktop
+ * screenshot rather than a squished mobile one. */
+.mu-card-force-desktop {
+  width: 600px !important;
+  max-width: none !important;
+  flex: none !important;
+}
+.mu-card-force-desktop .mu-grid { display: grid !important; }
+.mu-card-force-desktop .mobile-lineup { display: none !important; }
+.mu-card-force-desktop .mu-card-shot { display: none !important; }
 
 /* Playoff games get a slightly heavier gold border instead of the plain
    ink one — a small visual cue this game matters more. The championship

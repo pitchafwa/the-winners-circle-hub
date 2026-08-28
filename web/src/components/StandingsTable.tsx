@@ -1,8 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { forwardRef, useMemo, useState } from "react";
 import { useApp } from "../state/AppContext";
 import { pts, pct, signed, MISSING } from "../lib/format";
 import TeamLink from "./TeamLink";
-import TableScreenshotButton from "./TableScreenshotButton";
 import type { StandingsRow } from "../types/data";
 
 type Col = {
@@ -36,10 +35,14 @@ const COLS: Col[] = [
     numeric: true, render: (r) => pct(r.coach_rating), sortValue: (r) => r.coach_rating },
 ];
 
-export default function StandingsTable({ rows }: { rows: StandingsRow[] }) {
+// forwardRef so the page can hand the <table> itself to a ScreenshotButton
+// placed up in its own section-head, next to the "click a column to sort"
+// label, rather than this component owning that button internally.
+const StandingsTable = forwardRef<HTMLTableElement, { rows: StandingsRow[] }>(function StandingsTable(
+  { rows }, ref,
+) {
   const { teamsById } = useApp();
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "seed", dir: 1 });
-  const tableRef = useRef<HTMLTableElement>(null);
 
   const sorted = useMemo(() => {
     const col = COLS.find((c) => c.key === sort.key) ?? COLS[0];
@@ -65,12 +68,8 @@ export default function StandingsTable({ rows }: { rows: StandingsRow[] }) {
   };
 
   return (
-    <div>
-      <div className="table-capture-bar">
-        <TableScreenshotButton targetRef={tableRef} filename="standings" />
-      </div>
-      <div className="table-wrap">
-      <table className="stat" ref={tableRef}>
+    <div className="table-wrap">
+      <table className="stat" ref={ref}>
         <thead>
           <tr>
             {COLS.map((c) => (
@@ -114,7 +113,8 @@ export default function StandingsTable({ rows }: { rows: StandingsRow[] }) {
           })}
         </tbody>
       </table>
-      </div>
     </div>
   );
-}
+});
+
+export default StandingsTable;

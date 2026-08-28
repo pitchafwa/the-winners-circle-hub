@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
 import StandingsTable from "../components/StandingsTable";
@@ -8,6 +9,7 @@ import ActivityFeed from "../components/ActivityFeed";
 import EmptyState from "../components/EmptyState";
 import PositionHeatmap from "../components/PositionHeatmap";
 import ContendRebuildTable from "../components/ContendRebuildTable";
+import ScreenshotButton from "../components/ScreenshotButton";
 import { BumpChart, SwapMatrix } from "../components/HistoryCharts";
 import type {
   Activity, Positions, Schedule, ScheduleSwap, Sim, Spectrum, Standings, Superlatives,
@@ -15,6 +17,7 @@ import type {
 
 export default function LeaguePage() {
   const { season, meta } = useApp();
+  const standingsTableRef = useRef<HTMLTableElement>(null);
   const base = season !== null ? `${season}` : null;
   const standings = useJson<Standings>(base ? `${base}/standings.json` : null);
   const superlatives = useJson<Superlatives>(base ? `${base}/superlatives.json` : null);
@@ -35,10 +38,13 @@ export default function LeaguePage() {
       <section className="section" aria-labelledby="standings-h">
         <div className="section-head">
           <h2 id="standings-h">Standings</h2>
-          <span className="label">click a column to sort</span>
+          <span className="label">
+            click a column to sort
+            <ScreenshotButton targetRef={standingsTableRef} filename="standings" />
+          </span>
         </div>
         {standings.error && <div className="error-state">{standings.error}</div>}
-        {standings.data && <StandingsTable rows={standings.data.rows} />}
+        {standings.data && <StandingsTable ref={standingsTableRef} rows={standings.data.rows} />}
       </section>
 
       <section className="section" aria-labelledby="race-h">

@@ -1,28 +1,35 @@
 import { useState } from "react";
 import type { RefObject } from "react";
 
-// Mobile-only "save this table as a photo" button. Renders nothing on
-// desktop (hidden via CSS, .table-capture-bar in global.css) since the
-// whole point is standing in for the horizontal scroll a phone screen
-// forces on wide tables — desktop already shows everything at once.
+// Mobile-only "save this as a photo" icon button — camera emoji, CSS-hidden
+// above 640px (global.css) since desktop already shows everything without
+// scrolling. Reusable across any block (tables, matchup cards, ...): the
+// caller supplies a ref to the DOM node to capture and a filename.
 //
-// The trick that makes this actually capture the FULL table (not just
+// The trick that makes this actually capture the FULL content (not just
 // whatever's currently scrolled into view): html-to-image renders straight
 // from the DOM tree, reading the target element's own natural width
-// (offsetWidth), not the viewport's clipped visible area. A <table> inside
-// a `.table-wrap { overflow-x: auto }` ancestor still lays out at its own
-// full natural content width — only the ANCESTOR clips/scrolls it — so
-// pointing the ref at the <table> itself (never at .table-wrap) is what
-// gets the whole thing, no scrolling or stitching required.
+// (offsetWidth), not the viewport's clipped visible area. An element inside
+// an `overflow-x: auto` ancestor still lays out at its own full natural
+// content width — only the ANCESTOR clips/scrolls it — so pointing the ref
+// at the actual content element (never at the scrolling wrapper around it)
+// is what gets the whole thing, no scrolling or stitching required.
 //
 // html-to-image is dynamically imported so it only ever loads into the
 // bundle if someone actually taps the button — no cost to everyone else's
 // page weight for a mobile-only, occasionally-used feature.
-export default function TableScreenshotButton({
-  targetRef, filename,
+export default function ScreenshotButton({
+  targetRef, filename, prepareCapture, cleanupCapture,
 }: {
   targetRef: RefObject<HTMLElement | null>;
   filename: string;
+  /** Optional hook to mutate the DOM into a different visual state right
+   * before capture — e.g. MatchupCard uses this to force its desktop
+   * side-by-side layout instead of the mobile stacked one, regardless of
+   * the real viewport width. `cleanupCapture` (if given) undoes it
+   * afterward, success or failure. */
+  prepareCapture?: () => void;
+  cleanupCapture?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +45,7 @@ export default function TableScreenshotButton({
     setBusy(true);
     setError(null);
     try {
+      prepareCapture?.();
       const node = targetRef.current;
       const { toSvg } = await import("html-to-image");
       const svgDataUrl = await toSvg(node, {
@@ -46,8 +54,8 @@ export default function TableScreenshotButton({
         // on the page (not just what the target subtree uses) and re-fetches
         // every @font-face src to inline as base64 — for this app's ~30
         // IBM Plex Mono weight/subset files that's slow, and can be
-        // avoided entirely: the table only needs its own text legible, not
-        // exact kerning, so a system-font fallback in the capture is the
+        // avoided entirely: the captured block only needs its own text
+        // legible, not exact kerning, so a system-font fallback is the
         // right trade.
         skipFonts: true,
       });
@@ -107,6 +115,7 @@ export default function TableScreenshotButton({
     } catch {
       setError("Couldn't create image — try again");
     } finally {
+      cleanupCapture?.();
       setBusy(false);
     }
   };
@@ -115,20 +124,21 @@ export default function TableScreenshotButton({
     <>
       <button
         type="button"
-        className="table-screenshot-btn"
+        className="screenshot-btn"
         onClick={capture}
         disabled={busy}
-        aria-label="Save table as image"
+        aria-label="Save as image"
+        title="Save as image"
       >
-        {busy ? "Capturing…" : "📷 Save as image"}
+        {busy ? "⏳" : "📷"}
       </button>
-      {error && <span className="table-screenshot-error">{error}</span>}
+      {error && <span className="screenshot-error">{error}</span>}
       {previewUrl && (
-        <div className="table-screenshot-overlay" onClick={closePreview}>
-          <div className="table-screenshot-preview" onClick={(e) => e.stopPropagation()}>
-            <p className="table-screenshot-hint">Long-press the image to save or share it</p>
-            <img src={previewUrl} alt={`${filename} — captured table`} />
-            <button type="button" className="table-screenshot-btn" onClick={closePreview}>Close</button>
+        <div className="screenshot-overlay" onClick={closePreview}>
+          <div className="screenshot-preview" onClick={(e) => e.stopPropagation()}>
+            <p className="screenshot-hint">Long-press the image to save or share it</p>
+            <img src={previewUrl} alt={`${filename} — captured`} />
+            <button type="button" className="control" onClick={closePreview}>Close</button>
           </div>
         </div>
       )}

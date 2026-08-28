@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
 import { MISSING, pct, pts, signed } from "../lib/format";
@@ -6,6 +7,7 @@ import EmptyState from "../components/EmptyState";
 import MobileLineupList from "../components/MobileLineupList";
 import PlayerCardTrigger from "../components/PlayerCardTrigger";
 import PlayerHeadshot from "../components/PlayerHeadshot";
+import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import WeeklyMatchupProjections from "../components/WeeklyMatchupProjections";
 import type { TeamInfo } from "../components/WeeklyMatchupProjections";
@@ -188,6 +190,25 @@ function MatchupCard({
   awardsMeta: Record<string, AwardMeta>;
 }) {
   const { teamName, meta } = useApp();
+  const cardRef = useRef<HTMLElement>(null);
+  // Forces the card into its desktop side-by-side layout for the duration
+  // of a screenshot capture, regardless of the real (mobile) viewport —
+  // see .mu-card-force-desktop in global.css for what this class actually
+  // overrides and why simply un-hiding .mu-grid alone isn't enough.
+  //
+  // Driven through real React state (via flushSync), not a direct
+  // `classList.add` on the DOM node: a raw DOM mutation is invisible to
+  // React's own reconciler, so if this component re-rendered for any
+  // unrelated reason during the capture's async gap (loading html-to-image,
+  // decoding the image), React would reassert `className` from its virtual
+  // DOM and silently wipe the manually-added class mid-capture. flushSync
+  // forces the state update to commit synchronously before capture
+  // proceeds, so there's no gap for that race to happen in — the safer
+  // way to drive this even though a raw classList toggle happened to test
+  // out fine here.
+  const [forceDesktop, setForceDesktop] = useState(false);
+  const prepareCapture = () => flushSync(() => setForceDesktop(true));
+  const cleanupCapture = () => flushSync(() => setForceDesktop(false));
   if (!m.away) {
     return (
       <article className="mu-card">
@@ -214,7 +235,7 @@ function MatchupCard({
   const isRealPlayoff = m.playoff_tier === "WINNERS_BRACKET";
   const isChampionship = isRealPlayoff && m.matchup_period === meta?.championship_week;
   const decided = m.winner !== "UNDECIDED" && m.winner !== "TIE";
-  const cardClass = `mu-card${isRealPlayoff ? " mu-playoff" : ""}${isChampionship ? " mu-championship" : ""}`;
+  const cardClass = `mu-card${isRealPlayoff ? " mu-playoff" : ""}${isChampionship ? " mu-championship" : ""}${forceDesktop ? " mu-card-force-desktop" : ""}`;
   const realSlotOrder = meta?.starting_slots ?? [];
   // Reordered for display only — meta.starting_slots itself (the real
   // ESPN order) is untouched; this permutation just changes what order
@@ -223,8 +244,19 @@ function MatchupCard({
   const homeAligned = alignBySlot(m.home.lineup, slotOrder);
   const awayAligned = alignBySlot(m.away.lineup, slotOrder);
 
+  const filename = `matchup-week${m.matchup_period}-${teamName(m.away.team_id)}-vs-${teamName(m.home.team_id)}`
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
   return (
-    <article className={cardClass}>
+    <article className={cardClass} ref={cardRef}>
+      <div className="mu-card-shot">
+        <ScreenshotButton
+          targetRef={cardRef}
+          filename={filename}
+          prepareCapture={prepareCapture}
+          cleanupCapture={cleanupCapture}
+        />
+      </div>
       {m.is_playoff && <div className="label" style={{ marginBottom: "0.4rem" }}>
         {isChampionship ? "championship" : isRealPlayoff ? "playoffs" : "consolation"}</div>}
       <div className="mu-head">

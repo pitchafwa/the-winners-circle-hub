@@ -636,6 +636,35 @@ def cached_seasons() -> list[int]:
     )
 
 
+def built_seasons() -> list[int]:
+    """Every season with a real, already-built meta.json sitting in
+    DATA_DIR — a superset of cached_seasons() whenever this run's
+    ingest/.cache/ doesn't hold every season's raw league.json (e.g. a CI
+    run whose actions/cache restore is stale, partial, or evicted: GitHub
+    evicts caches over the 10GB repo cap or after 7 days unused, and this
+    workflow's per-run unique cache key means storage only ever grows
+    until that happens — 2026-08-29 confirmed live: seasons.json quietly
+    shrank from all 15 real seasons down to just 3 over several automated
+    runs, even though 2012-2023's own JSON files sat on disk untouched
+    and correct the whole time, because seasons.json's own season list
+    was built from cached_seasons() alone). Used ONLY for seasons.json's
+    listing, not for all_seasons (badges/h2h aggregation genuinely needs
+    a fresh cache-backed parse.load_league() per season, so those stay
+    scoped to whatever's cache-available this run) — this makes the
+    *listing* self-healing against a thin cache without ever silently
+    computing cross-season stats from stale/partial data. build_season()
+    is guarded elsewhere to never overwrite real per-season data with an
+    empty result on a cache-miss run, so a season showing up here always
+    has trustworthy JSON behind it, cache or no cache this run."""
+    if not config.DATA_DIR.exists():
+        return []
+    return sorted(
+        (int(p.name) for p in config.DATA_DIR.iterdir()
+         if p.is_dir() and p.name.isdigit() and (p / "meta.json").exists()),
+        reverse=True,
+    )
+
+
 def _season_summary(season: int) -> dict:
     """Read a season's seasons.json summary straight back off its own
     meta.json — used so seasons.json can always list every cached season,
@@ -870,7 +899,14 @@ def main():
     # silently collapsed this file down to just that one season, breaking
     # the season picker and every cross-season page (History, Draft, etc.)
     # that fans out over seasons.json's own list.
-    all_summaries = [_season_summary(s) for s in sorted(all_seasons, reverse=True)]
+    #
+    # Unioned with built_seasons() (see its docstring), not all_seasons
+    # alone — otherwise a run whose ingest/.cache/ is thin (a cold/evicted
+    # CI cache restore) silently shrinks this list down to whatever's
+    # cache-fresh THIS run, even though every other season's real JSON is
+    # still sitting on disk untouched and correct.
+    seasons_for_index = sorted(set(all_seasons) | set(built_seasons()), reverse=True)
+    all_summaries = [_season_summary(s) for s in seasons_for_index]
     _write(config.DATA_DIR / "seasons.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "default_season": config.SEASON if any(s["season"] == config.SEASON for s in all_summaries)

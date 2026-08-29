@@ -3,6 +3,62 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: season dropdown had shrunk to 2024-2026 (2026-08-29)
+
+Tommy's report: "Year select dropdown only shows 2024-26, please fix."
+
+Root cause was in `ingest/build.py`, not the frontend. `seasons.json` —
+the file the season dropdown reads — is rebuilt from `cached_seasons()`
+every run: every season directory under `ingest/.cache/` that has a real
+`league.json`. The `9a49786f` fix (2026-08-26) added `actions/cache` so
+CI's cache would persist across runs instead of starting cold every
+time, but that cache still only ever holds whatever this repo's Actions
+cache storage happens to still have — GitHub evicts caches over the 10GB
+repo-wide cap or after 7 days unused, and this workflow saves a brand
+new cache entry under a unique key every single run (by design, since
+the cache only ever grows), which means cache storage accumulates fast
+under a 15-minutes-during-games schedule. Confirmed live: `seasons.json`
+had quietly shrunk from all 15 real seasons (2012-2026, added by the
+`0a4c909b` historical backfill on 2026-08-25) down to just 3 over the
+last several automated commits, even though 2012-2023's own per-season
+JSON files sat on disk in `web/public/data/`, committed and completely
+correct, the entire time — nothing was actually lost, `seasons.json`'s
+listing had just stopped trusting data it didn't personally have fresh
+in this run's cache.
+
+- New `built_seasons()` in `build.py`: every season with a real
+  `meta.json` already sitting in `DATA_DIR` (`web/public/data/`),
+  independent of whether `ingest/.cache/` has that season's raw data
+  this run. `seasons.json`'s own season list is now
+  `set(all_seasons) | set(built_seasons())` — self-healing against a
+  thin/evicted cache from here on, since the real signal for "does this
+  site have a real, browsable season" is whether the built JSON exists,
+  not whether this particular run's ephemeral cache happens to.
+  Deliberately NOT applied to `all_seasons` itself (used for
+  `build_badges`/`_all_time_h2h`, which genuinely need a fresh
+  cache-backed `parse.load_league()` per season) — a season only
+  appears in `built_seasons()` once it has a real, previously-built
+  `meta.json` on disk, so this can't cause those cross-season
+  aggregates to run against stale/half-built data.
+- Ran a full `python build.py --offline` locally (real local cache has
+  all 15 seasons back to 2012) to regenerate every file, confirming the
+  fix end-to-end rather than just reading the code. Diffed the full
+  279-file result: every historical file changed ONLY its
+  `generated_at`/`fetched_at` timestamp, byte-identical otherwise — a
+  real no-op on content, confirming this was purely the listing bug and
+  not stale/wrong underlying data. `seasons.json` now correctly lists
+  all 15 seasons again.
+- Verified live: the season `<select>` now renders all 15 options
+  (2012-2026); switching to 2012 (the thinnest historical season —
+  meta.json's `completed_weeks` reads `[]` for the pre-2017 years since
+  that's derived from box-score availability, which doesn't exist that
+  far back) renders real standings/records with no crash, and the new
+  Points race chart still renders a real 17-week line from that
+  season's `schedule.json` even though `meta.completed_weeks` is empty
+  for it — confirms the chart's own week-derivation (from
+  `schedule.entries` directly) doesn't depend on that field either.
+  `npx tsc --noEmit` and production build both clean.
+
 ## Points race chart: include real playoff games (2026-08-29)
 
 Tommy's follow-up: "add playoff weeks for the teams that made the

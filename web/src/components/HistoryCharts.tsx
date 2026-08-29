@@ -119,10 +119,10 @@ export const BumpChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: 
   );
 });
 
-/** Same idea as BumpTooltip above, but for raw cumulative points instead
- * of standings rank — sorted descending (higher score first) rather than
+/** Same idea as BumpTooltip above, but for a PPG figure instead of
+ * standings rank — sorted descending (higher pace first) rather than
  * ascending (lower rank first), since here bigger is what's good. */
-function PointsTooltip({
+function PaceTooltip({
   active, payload, label, teamName, myTeamId,
 }: {
   active?: boolean;
@@ -143,7 +143,7 @@ function PointsTooltip({
         const id = Number(String(p.dataKey).slice(1));
         return (
           <div key={p.dataKey} style={id === myTeamId ? { color: ACCENT } : undefined}>
-            {pts(p.value ?? 0, 0)} {teamName(id)}
+            {pts(p.value ?? 0, 1)} {teamName(id)}
           </div>
         );
       })}
@@ -151,15 +151,22 @@ function PointsTooltip({
   );
 }
 
-/** Cumulative points-for, week by week, all ten teams on one chart — same
- * shape as the bump chart above but tracking raw scoring pace instead of
- * standings rank, so a team grinding out close wins reads differently
- * than one racking up blowout-sized scores, which finishing position
- * alone doesn't show. Same regular-season-only, decided-games-only
+/** Trailing 3-week average points-for, week by week, all ten teams on one
+ * chart — same shape as the bump chart above but tracking scoring pace
+ * instead of standings rank. A raw weekly-score chart is too spiky to
+ * read with ten overlapping lines, and a cumulative-total chart (an
+ * earlier version of this) compresses all the interesting variation into
+ * a few pixels once everyone's summed total climbs into the thousands —
+ * a rolling average keeps the Y-axis on a PPG scale (roughly 80-180)
+ * where real separation between teams is actually visible, while still
+ * smoothing out single-week spikes/duds into a readable trend. Window
+ * shrinks to whatever's available for the first two weeks (week 1 = that
+ * week's score, week 2 = average of weeks 1-2) rather than leaving the
+ * chart blank until week 3. Same regular-season-only, decided-games-only
  * filtering as BumpChart, for the same reason (a consolation-bracket
  * score late in a lost season isn't a real scoring-pace signal). */
-export const CumulativePointsChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: Meta; forceDesktop?: boolean }>(
-  function CumulativePointsChart({ schedule, meta, forceDesktop }, ref) {
+export const PointsPaceChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: Meta; forceDesktop?: boolean }>(
+  function PointsPaceChart({ schedule, meta, forceDesktop }, ref) {
   const { myTeamId, teamName } = useApp();
   const { data, teamIds } = useMemo(() => {
     const decided = schedule.entries.filter(
@@ -169,15 +176,22 @@ export const CumulativePointsChart = forwardRef<HTMLDivElement, { schedule: Sche
     );
     const weeks = [...new Set(decided.map((e) => e.matchup_period))].sort((a, b) => a - b);
     const ids = meta.teams.map((t) => t.id);
-    const cumulative = new Map(ids.map((id) => [id, 0]));
+    const weeklyScores = new Map<number, number[]>(ids.map((id) => [id, []]));
     const rows: Record<string, number>[] = [];
+    const WINDOW = 3;
     for (const w of weeks) {
       for (const e of decided.filter((x) => x.matchup_period === w)) {
-        cumulative.set(e.home_id, (cumulative.get(e.home_id) ?? 0) + e.home_score);
-        cumulative.set(e.away_id!, (cumulative.get(e.away_id!) ?? 0) + e.away_score);
+        weeklyScores.get(e.home_id)!.push(e.home_score);
+        weeklyScores.get(e.away_id!)!.push(e.away_score);
       }
       const row: Record<string, number> = { week: w };
-      ids.forEach((id) => { row[`t${id}`] = Math.round((cumulative.get(id) ?? 0) * 10) / 10; });
+      ids.forEach((id) => {
+        const scores = weeklyScores.get(id)!;
+        const trailing = scores.slice(-WINDOW);
+        if (trailing.length === 0) return;
+        const avg = trailing.reduce((sum, s) => sum + s, 0) / trailing.length;
+        row[`t${id}`] = Math.round(avg * 10) / 10;
+      });
       rows.push(row);
     }
     return { data: rows, teamIds: ids };
@@ -193,14 +207,14 @@ export const CumulativePointsChart = forwardRef<HTMLDivElement, { schedule: Sche
           <XAxis dataKey="week" tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }}
             tickLine={false} axisLine={{ stroke: RULE }} />
           <YAxis width={40} tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }}
-            tickLine={false} axisLine={false} />
-          <Tooltip content={<PointsTooltip teamName={teamName} myTeamId={myTeamId} />} />
+            tickLine={false} axisLine={false} domain={["auto", "auto"]} />
+          <Tooltip content={<PaceTooltip teamName={teamName} myTeamId={myTeamId} />} />
           {teamIds.map((id) => {
             const mine = id === myTeamId;
             return (
               <Line key={id} type="monotone" dataKey={`t${id}`}
                 stroke={mine ? ACCENT : INK_MUTED} strokeWidth={mine ? 2.4 : 1}
-                strokeOpacity={mine ? 1 : 0.45} dot={false} />
+                strokeOpacity={mine ? 1 : 0.45} dot={false} connectNulls />
             );
           })}
         </LineChart>

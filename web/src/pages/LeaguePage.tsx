@@ -11,7 +11,7 @@ import EmptyState from "../components/EmptyState";
 import PositionHeatmap from "../components/PositionHeatmap";
 import ContendRebuildTable from "../components/ContendRebuildTable";
 import ScreenshotButton from "../components/ScreenshotButton";
-import { BumpChart, CumulativePointsChart, SwapMatrix } from "../components/HistoryCharts";
+import { BumpChart, PointsPaceChart, SwapMatrix } from "../components/HistoryCharts";
 import type {
   Activity, Positions, Schedule, ScheduleSwap, Sim, Spectrum, Standings, Superlatives,
 } from "../types/data";
@@ -164,7 +164,7 @@ export default function LeaguePage() {
         <div className="section-head">
           <h2 id="points-h">Points race</h2>
           <span className="label">
-            cumulative points scored, week by week — your team in green
+            3-week rolling average PPG — your team in green
             {schedule.data && (
               <ScreenshotButton
                 targetRef={pointsChartRef}
@@ -176,7 +176,7 @@ export default function LeaguePage() {
           </span>
         </div>
         {schedule.data ? (
-          <CumulativePointsChart ref={pointsChartRef} schedule={schedule.data} meta={meta} forceDesktop={points.forceDesktop} />
+          <PointsPaceChart ref={pointsChartRef} schedule={schedule.data} meta={meta} forceDesktop={points.forceDesktop} />
         ) : (
           !schedule.loading && <EmptyState>No schedule data.</EmptyState>
         )}

@@ -3,6 +3,43 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Points race chart: cumulative total → 3-week rolling PPG (2026-08-29)
+
+Tommy's feedback on the just-shipped cumulative version: "given the range
+of the Y axis (roughly 0-2000) you can't really learn much from it."
+Right diagnosis — with 10 lines all climbing toward ~2000, the real
+variation between teams was a few pixels of vertical spread. Talked
+through three alternatives (trailing rolling average, raw weekly, and
+cumulative-vs-league-average pace); Tommy picked a 3-week trailing
+average, with the added ask that the first two weeks not be blank —
+week 1 shows that week's raw score, week 2 shows the 2-week average,
+week 3+ uses a true trailing 3-week window.
+
+- **`HistoryCharts.tsx`**: `CumulativePointsChart` renamed
+  `PointsPaceChart` (no longer cumulative, so the old name was actively
+  misleading); `PointsTooltip` renamed `PaceTooltip` and now formats to
+  one decimal place (`pts(value, 1)`) since PPG figures, unlike whole
+  cumulative totals, need it. Computation swapped from a running total
+  to `weeklyScores.get(id).slice(-3)` averaged per week — the shrinking-
+  window behavior for weeks 1-2 falls out naturally from `slice(-3)` on
+  a short array, no special-casing needed. Y-axis domain set to
+  `["auto", "auto"]` (recharts default was fine for the 0-2000 cumulative
+  scale but needs to actually rescale to the ~60-180 PPG range now).
+  `connectNulls` added to the `<Line>`s as a defensive measure in case a
+  team is winless-so-far in some future small-sample edge case.
+- `LeaguePage.tsx` updated to import/render `PointsPaceChart` and the
+  section subtitle changed from "cumulative points scored, week by
+  week" to "3-week rolling average PPG".
+- Verified the math directly against real 2025 schedule data (not just
+  visually): pulled Tommy's own 14-week score list via a live `fetch()`
+  in the browser console and hand-computed the same trailing-window
+  average client-side — matched the chart's rendered path data exactly
+  (week 1 = 127 raw, week 2 = 126 = avg(127,125), week 3 = 125.3 =
+  avg(127,125,124), etc.). Confirmed live: Y-axis now reads ~60-180
+  instead of 0-2000, my-team line still renders in accent color with a
+  real non-flat path, `npx tsc --noEmit` and production build both
+  clean, no console errors.
+
 ## Points race chart (2026-08-29)
 
 Tommy's request: "add a chart similar to the season timeline and 'regret'

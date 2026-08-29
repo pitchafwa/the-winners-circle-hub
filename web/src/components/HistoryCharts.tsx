@@ -119,6 +119,96 @@ export const BumpChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: 
   );
 });
 
+/** Same idea as BumpTooltip above, but for raw cumulative points instead
+ * of standings rank — sorted descending (higher score first) rather than
+ * ascending (lower rank first), since here bigger is what's good. */
+function PointsTooltip({
+  active, payload, label, teamName, myTeamId,
+}: {
+  active?: boolean;
+  payload?: BumpTooltipEntry[];
+  label?: string | number;
+  teamName: (id: number | null | undefined) => string;
+  myTeamId: number | null;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const sorted = [...payload].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  return (
+    <div style={{
+      background: PAPER_2, border: `1px solid ${RULE}`,
+      fontFamily: FONT_MONO, fontSize: "0.72rem", padding: "0.5rem 0.65rem",
+    }}>
+      <div style={{ marginBottom: "0.3rem", fontWeight: 600 }}>Week {label}</div>
+      {sorted.map((p) => {
+        const id = Number(String(p.dataKey).slice(1));
+        return (
+          <div key={p.dataKey} style={id === myTeamId ? { color: ACCENT } : undefined}>
+            {pts(p.value ?? 0, 0)} {teamName(id)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Cumulative points-for, week by week, all ten teams on one chart — same
+ * shape as the bump chart above but tracking raw scoring pace instead of
+ * standings rank, so a team grinding out close wins reads differently
+ * than one racking up blowout-sized scores, which finishing position
+ * alone doesn't show. Same regular-season-only, decided-games-only
+ * filtering as BumpChart, for the same reason (a consolation-bracket
+ * score late in a lost season isn't a real scoring-pace signal). */
+export const CumulativePointsChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: Meta; forceDesktop?: boolean }>(
+  function CumulativePointsChart({ schedule, meta, forceDesktop }, ref) {
+  const { myTeamId, teamName } = useApp();
+  const { data, teamIds } = useMemo(() => {
+    const decided = schedule.entries.filter(
+      (e) => e.winner !== "UNDECIDED" && !e.is_playoff && e.away_id !== null
+        && e.matchup_period <= meta.reg_season_weeks
+        && !(e.home_score === 0 && e.away_score === 0),
+    );
+    const weeks = [...new Set(decided.map((e) => e.matchup_period))].sort((a, b) => a - b);
+    const ids = meta.teams.map((t) => t.id);
+    const cumulative = new Map(ids.map((id) => [id, 0]));
+    const rows: Record<string, number>[] = [];
+    for (const w of weeks) {
+      for (const e of decided.filter((x) => x.matchup_period === w)) {
+        cumulative.set(e.home_id, (cumulative.get(e.home_id) ?? 0) + e.home_score);
+        cumulative.set(e.away_id!, (cumulative.get(e.away_id!) ?? 0) + e.away_score);
+      }
+      const row: Record<string, number> = { week: w };
+      ids.forEach((id) => { row[`t${id}`] = Math.round((cumulative.get(id) ?? 0) * 10) / 10; });
+      rows.push(row);
+    }
+    return { data: rows, teamIds: ids };
+  }, [schedule, meta]);
+
+  if (data.length === 0) return <EmptyState>No completed weeks to chart.</EmptyState>;
+
+  return (
+    <div ref={ref} style={forceDesktop ? { width: "650px" } : undefined}>
+      <ResponsiveContainer width="100%" height={280}>
+        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid stroke={RULE} vertical={false} strokeWidth={0.5} />
+          <XAxis dataKey="week" tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }}
+            tickLine={false} axisLine={{ stroke: RULE }} />
+          <YAxis width={40} tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }}
+            tickLine={false} axisLine={false} />
+          <Tooltip content={<PointsTooltip teamName={teamName} myTeamId={myTeamId} />} />
+          {teamIds.map((id) => {
+            const mine = id === myTeamId;
+            return (
+              <Line key={id} type="monotone" dataKey={`t${id}`}
+                stroke={mine ? ACCENT : INK_MUTED} strokeWidth={mine ? 2.4 : 1}
+                strokeOpacity={mine ? 1 : 0.45} dot={false} />
+            );
+          })}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
 export function SwapMatrix({ swap, meta }: { swap: ScheduleSwap; meta: Meta }) {
   const teams = meta.teams;
   const abbrev = new Map(teams.map((t) => [t.id, t.abbrev || String(t.id)]));

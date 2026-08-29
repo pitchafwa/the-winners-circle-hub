@@ -3,6 +3,47 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Points race chart (2026-08-29)
+
+Tommy's request: "add a chart similar to the season timeline and 'regret'
+charts that shows cumulative season points scored for each team as a
+10-line line graph." New "Points race" section on the League page,
+directly below Season Timeline.
+
+- **`CumulativePointsChart`** (`HistoryCharts.tsx`) — reuses `BumpChart`'s
+  exact filtering (regular-season, decided-games-only, skips the
+  all-zero-score placeholder rows) but accumulates `home_score`/
+  `away_score` into a running per-team total instead of computing a
+  weekly rank. Same 10-line recharts `LineChart`, same accent-for-
+  my-team/muted-for-everyone-else coloring, same `forwardRef` +
+  `forceDesktop` prop shape as `BumpChart` so it drops into the existing
+  screenshot pipeline with no new capture logic.
+- New `PointsTooltip` (local, not exported) — same idea as the existing
+  `BumpTooltip` but sorted descending by point value instead of
+  ascending by rank, since here bigger is what's good.
+- **`LeaguePage.tsx` refactor**: the `useState`/`flushSync`/optional-
+  `setTimeout` boilerplate for force-desktop capture had been hand-
+  written twice already (Playoff Probability, Season Timeline); factored
+  it into a local `useForceDesktopCapture(asyncDelayMs?)` hook before
+  adding a third copy for Points Race. All three call sites (`odds`,
+  `bump`, `points`) now share one implementation.
+- Verified live against real 2025 season data (2026 is preseason, no
+  completed weeks): all 10 lines render, tooltip logic mirrors the
+  already-shipped `BumpTooltip` pattern exactly. Confirmed via canvas
+  pixel sampling of a real capture — corner pixel matches the frame's
+  `#FAF3E1` background exactly (not transparent), multiple rows through
+  the image show real non-background content (chart lines, gridlines),
+  and ~218 dark-ink pixels confirm the title text rasterized. Captured
+  image was 1396×734 at pixelRatio 2 (698×367 CSS px) — consistent with
+  the 650px forced-desktop chart width plus frame padding. No console
+  errors.
+- Same caveat as `BumpChart`'s existing entry above: the accent line
+  (`#0FA894`, "your team") did not rasterize through this capture in
+  the test environment — 0 accent-colored pixels found in the pixel
+  scan, matching the exact pre-existing, already-documented browser/
+  color-specific SVG rasterization limitation, not a new bug. Every
+  other line and the title rasterized correctly.
+
 ## Trade analyzer + buy-low targets (2026-08-27) — built, Tommy-only
 
 Two new LM Tools, password-gated like the rest, local-dev-only (need the

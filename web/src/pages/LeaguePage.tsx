@@ -11,10 +11,34 @@ import EmptyState from "../components/EmptyState";
 import PositionHeatmap from "../components/PositionHeatmap";
 import ContendRebuildTable from "../components/ContendRebuildTable";
 import ScreenshotButton from "../components/ScreenshotButton";
-import { BumpChart, SwapMatrix } from "../components/HistoryCharts";
+import { BumpChart, CumulativePointsChart, SwapMatrix } from "../components/HistoryCharts";
 import type {
   Activity, Positions, Schedule, ScheduleSwap, Sim, Spectrum, Standings, Superlatives,
 } from "../types/data";
+
+// Shared by every bar-chart-style block below (no border/header of its
+// own to frame it the way a table does) — the real mobile layout wraps/
+// squeezes these specifically to fit a phone screen, which is exactly
+// what a "send this to the group chat" screenshot shouldn't be
+// constrained by. flushSync (not a plain setState) so the wider layout
+// is guaranteed to have committed before ScreenshotButton reads
+// anything. `asyncDelayMs`, when given, is for recharts'
+// ResponsiveContainer specifically: unlike pure-CSS blocks (settle the
+// instant the class/width flips), it only re-renders its SVG at the new
+// width after its own ResizeObserver actually fires — a real async step
+// flushSync can't force through. A short fixed wait (not
+// requestAnimationFrame — confirmed live elsewhere in this feature that
+// rAF never fires in a backgrounded/non-compositing tab) gives that time
+// to settle before capture reads the resized chart.
+function useForceDesktopCapture(asyncDelayMs?: number) {
+  const [forceDesktop, setForceDesktop] = useState(false);
+  const prepareCapture = () => {
+    flushSync(() => setForceDesktop(true));
+    if (asyncDelayMs) return new Promise<void>((resolve) => setTimeout(resolve, asyncDelayMs));
+  };
+  const cleanupCapture = () => flushSync(() => setForceDesktop(false));
+  return { forceDesktop, prepareCapture, cleanupCapture };
+}
 
 export default function LeaguePage() {
   const { season, meta } = useApp();
@@ -24,34 +48,11 @@ export default function LeaguePage() {
   const superlativesGridRef = useRef<HTMLDivElement>(null);
   const playoffTracksRef = useRef<HTMLDivElement>(null);
   const bumpChartRef = useRef<HTMLDivElement>(null);
+  const pointsChartRef = useRef<HTMLDivElement>(null);
 
-  // Both bar-chart-style blocks (no border/header of their own to frame
-  // them the way a table does) capture noticeably better wide — the real
-  // mobile layout wraps/squeezes them specifically to fit a phone screen,
-  // which is exactly what a "send this to the group chat" screenshot
-  // shouldn't be constrained by. See .playoff-tracks-force-desktop in
-  // global.css and BumpChart's forceDesktop prop for what each actually
-  // does; flushSync (not a plain setState) so the wider layout is
-  // guaranteed to have committed before ScreenshotButton reads anything.
-  const [oddsForceDesktop, setOddsForceDesktop] = useState(false);
-  const prepareOddsCapture = () => flushSync(() => setOddsForceDesktop(true));
-  const cleanupOddsCapture = () => flushSync(() => setOddsForceDesktop(false));
-
-  const [bumpForceDesktop, setBumpForceDesktop] = useState(false);
-  // Unlike the playoff bars (pure CSS, settles the instant the class
-  // flips), recharts' ResponsiveContainer only re-renders its SVG at the
-  // new width after its own ResizeObserver actually fires — an
-  // inherently async step, not something flushSync can force through.
-  // A short fixed wait (not requestAnimationFrame — confirmed live
-  // elsewhere in this feature that rAF never fires in a backgrounded/
-  // non-compositing tab, which a real device shouldn't hit but isn't
-  // worth risking either) gives it time to settle before capture reads
-  // the resized chart.
-  const prepareBumpCapture = () => {
-    flushSync(() => setBumpForceDesktop(true));
-    return new Promise<void>((resolve) => setTimeout(resolve, 150));
-  };
-  const cleanupBumpCapture = () => flushSync(() => setBumpForceDesktop(false));
+  const odds = useForceDesktopCapture();
+  const bump = useForceDesktopCapture(150);
+  const points = useForceDesktopCapture(150);
 
   const base = season !== null ? `${season}` : null;
   const standings = useJson<Standings>(base ? `${base}/standings.json` : null);
@@ -113,15 +114,15 @@ export default function LeaguePage() {
               <ScreenshotButton
                 targetRef={playoffTracksRef}
                 filename="playoff-probability"
-                prepareCapture={prepareOddsCapture}
-                cleanupCapture={cleanupOddsCapture}
+                prepareCapture={odds.prepareCapture}
+                cleanupCapture={odds.cleanupCapture}
               />
             )}
           </span>
         </div>
         {sim.data ? (
           <>
-            <PlayoffProbabilityTracks ref={playoffTracksRef} teams={sim.data.teams} forceDesktop={oddsForceDesktop} />
+            <PlayoffProbabilityTracks ref={playoffTracksRef} teams={sim.data.teams} forceDesktop={odds.forceDesktop} />
             <p className="muted" style={{ fontSize: "0.72rem", marginTop: "0.9rem", fontStyle: "italic" }}>
               {sim.data.n_sims.toLocaleString()} simulations, {sim.data.remaining_matchups} games left. {sim.data.model}.
             </p>
@@ -146,14 +147,36 @@ export default function LeaguePage() {
               <ScreenshotButton
                 targetRef={bumpChartRef}
                 filename="season-timeline"
-                prepareCapture={prepareBumpCapture}
-                cleanupCapture={cleanupBumpCapture}
+                prepareCapture={bump.prepareCapture}
+                cleanupCapture={bump.cleanupCapture}
               />
             )}
           </span>
         </div>
         {schedule.data ? (
-          <BumpChart ref={bumpChartRef} schedule={schedule.data} meta={meta} forceDesktop={bumpForceDesktop} />
+          <BumpChart ref={bumpChartRef} schedule={schedule.data} meta={meta} forceDesktop={bump.forceDesktop} />
+        ) : (
+          !schedule.loading && <EmptyState>No schedule data.</EmptyState>
+        )}
+      </section>
+
+      <section className="section" aria-labelledby="points-h">
+        <div className="section-head">
+          <h2 id="points-h">Points race</h2>
+          <span className="label">
+            cumulative points scored, week by week — your team in green
+            {schedule.data && (
+              <ScreenshotButton
+                targetRef={pointsChartRef}
+                filename="points-race"
+                prepareCapture={points.prepareCapture}
+                cleanupCapture={points.cleanupCapture}
+              />
+            )}
+          </span>
+        </div>
+        {schedule.data ? (
+          <CumulativePointsChart ref={pointsChartRef} schedule={schedule.data} meta={meta} forceDesktop={points.forceDesktop} />
         ) : (
           !schedule.loading && <EmptyState>No schedule data.</EmptyState>
         )}

@@ -36,9 +36,12 @@ export default function ScreenshotButton({
   /** Optional hook to mutate the DOM into a different visual state right
    * before capture — e.g. MatchupCard uses this to force its desktop
    * side-by-side layout instead of the mobile stacked one, regardless of
-   * the real viewport width. `cleanupCapture` (if given) undoes it
-   * afterward, success or failure. */
-  prepareCapture?: () => void;
+   * the real viewport width. May return a Promise: a chart that resizes
+   * via ResizeObserver (recharts' ResponsiveContainer) needs a real
+   * moment for that to actually fire and re-render before the capture
+   * proceeds, not just a synchronous state flip. `cleanupCapture` (if
+   * given) undoes it afterward, success or failure. */
+  prepareCapture?: () => void | Promise<void>;
   cleanupCapture?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -56,7 +59,7 @@ export default function ScreenshotButton({
     setError(null);
     let stage: HTMLDivElement | null = null;
     try {
-      prepareCapture?.();
+      await prepareCapture?.();
       const node = targetRef.current;
 
       // A bare table or chart cropped right at its own edge, with no

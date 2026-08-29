@@ -4,14 +4,13 @@ import { pct } from "../lib/format";
 import TeamLink from "./TeamLink";
 import type { SimTeam } from "../types/data";
 
-const PlayoffProbabilityTracks = forwardRef<HTMLDivElement, { teams: SimTeam[] }>(function PlayoffProbabilityTracks(
-  { teams }, ref,
-) {
+const PlayoffProbabilityTracks = forwardRef<HTMLDivElement, { teams: SimTeam[]; forceDesktop?: boolean }>(
+  function PlayoffProbabilityTracks({ teams, forceDesktop }, ref) {
   const { teamName } = useApp();
   const sorted = [...teams].sort((a, b) => b.playoff_pct - a.playoff_pct);
 
   return (
-    <div className="playoff-tracks" ref={ref}>
+    <div className={`playoff-tracks${forceDesktop ? " playoff-tracks-force-desktop" : ""}`} ref={ref}>
       {sorted.map((t) => {
         const cur = t.playoff_pct;
         const lose = t.playoff_pct_if_lose_next;

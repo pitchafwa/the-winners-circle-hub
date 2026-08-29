@@ -58,9 +58,8 @@ function BumpTooltip({
 }
 
 /** Standings-by-week bump chart for the selected season. */
-export const BumpChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: Meta }>(function BumpChart(
-  { schedule, meta }, ref,
-) {
+export const BumpChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: Meta; forceDesktop?: boolean }>(
+  function BumpChart({ schedule, meta, forceDesktop }, ref) {
   const { myTeamId, teamName } = useApp();
   const { data, teamIds } = useMemo(() => {
     const decided = schedule.entries.filter(
@@ -97,7 +96,7 @@ export const BumpChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: 
   if (data.length === 0) return <EmptyState>No completed weeks to chart.</EmptyState>;
 
   return (
-    <div ref={ref}>
+    <div ref={ref} style={forceDesktop ? { width: "650px" } : undefined}>
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -22 }}>
           <CartesianGrid stroke={RULE} vertical={false} strokeWidth={0.5} />

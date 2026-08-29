@@ -786,6 +786,31 @@ table.stat tr.cutline td { border-bottom: 2px solid var(--ink); }
   }
 }
 
+/* Temporarily applied (ScreenshotButton's prepareCapture/cleanupCapture,
+ * see LeaguePage) so a mobile-viewport capture renders the roomier
+ * desktop single-row layout instead of the wrapped mobile one — plain
+ * `@media (max-width: 640px)` is keyed off the real viewport, which is
+ * still mobile-width during capture, so the override has to win on
+ * specificity/!important instead of conditionally not applying. An
+ * explicit width is required too, not just un-wrapping: with no fixed
+ * width of its own, `.playoff-track`'s flex:1 1 auto item has zero
+ * intrinsic content size, so in an unconstrained shrink-to-fit capture
+ * frame the bar would still collapse toward 0 even one line. */
+.playoff-tracks-force-desktop {
+  width: 600px !important;
+}
+.playoff-tracks-force-desktop .playoff-track-row {
+  flex-wrap: nowrap !important;
+  row-gap: 0 !important;
+}
+.playoff-tracks-force-desktop .playoff-track-team {
+  flex: 0 0 13rem !important;
+}
+.playoff-tracks-force-desktop .playoff-track {
+  flex: 1 1 auto !important;
+  height: 0.75rem !important;
+}
+
 /* Activity feed */
 .feed {
   list-style: none;

@@ -1,4 +1,5 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
 import StandingsTable from "../components/StandingsTable";
@@ -23,6 +24,35 @@ export default function LeaguePage() {
   const superlativesGridRef = useRef<HTMLDivElement>(null);
   const playoffTracksRef = useRef<HTMLDivElement>(null);
   const bumpChartRef = useRef<HTMLDivElement>(null);
+
+  // Both bar-chart-style blocks (no border/header of their own to frame
+  // them the way a table does) capture noticeably better wide — the real
+  // mobile layout wraps/squeezes them specifically to fit a phone screen,
+  // which is exactly what a "send this to the group chat" screenshot
+  // shouldn't be constrained by. See .playoff-tracks-force-desktop in
+  // global.css and BumpChart's forceDesktop prop for what each actually
+  // does; flushSync (not a plain setState) so the wider layout is
+  // guaranteed to have committed before ScreenshotButton reads anything.
+  const [oddsForceDesktop, setOddsForceDesktop] = useState(false);
+  const prepareOddsCapture = () => flushSync(() => setOddsForceDesktop(true));
+  const cleanupOddsCapture = () => flushSync(() => setOddsForceDesktop(false));
+
+  const [bumpForceDesktop, setBumpForceDesktop] = useState(false);
+  // Unlike the playoff bars (pure CSS, settles the instant the class
+  // flips), recharts' ResponsiveContainer only re-renders its SVG at the
+  // new width after its own ResizeObserver actually fires — an
+  // inherently async step, not something flushSync can force through.
+  // A short fixed wait (not requestAnimationFrame — confirmed live
+  // elsewhere in this feature that rAF never fires in a backgrounded/
+  // non-compositing tab, which a real device shouldn't hit but isn't
+  // worth risking either) gives it time to settle before capture reads
+  // the resized chart.
+  const prepareBumpCapture = () => {
+    flushSync(() => setBumpForceDesktop(true));
+    return new Promise<void>((resolve) => setTimeout(resolve, 150));
+  };
+  const cleanupBumpCapture = () => flushSync(() => setBumpForceDesktop(false));
+
   const base = season !== null ? `${season}` : null;
   const standings = useJson<Standings>(base ? `${base}/standings.json` : null);
   const superlatives = useJson<Superlatives>(base ? `${base}/superlatives.json` : null);
@@ -79,12 +109,19 @@ export default function LeaguePage() {
           <h2 id="odds-h">Playoff Probability</h2>
           <span className="label">
             current odds · red = if you lose this week · green = if you win
-            {sim.data && <ScreenshotButton targetRef={playoffTracksRef} filename="playoff-probability" />}
+            {sim.data && (
+              <ScreenshotButton
+                targetRef={playoffTracksRef}
+                filename="playoff-probability"
+                prepareCapture={prepareOddsCapture}
+                cleanupCapture={cleanupOddsCapture}
+              />
+            )}
           </span>
         </div>
         {sim.data ? (
           <>
-            <PlayoffProbabilityTracks ref={playoffTracksRef} teams={sim.data.teams} />
+            <PlayoffProbabilityTracks ref={playoffTracksRef} teams={sim.data.teams} forceDesktop={oddsForceDesktop} />
             <p className="muted" style={{ fontSize: "0.72rem", marginTop: "0.9rem", fontStyle: "italic" }}>
               {sim.data.n_sims.toLocaleString()} simulations, {sim.data.remaining_matchups} games left. {sim.data.model}.
             </p>
@@ -105,11 +142,18 @@ export default function LeaguePage() {
           <h2 id="arc-h">Season timeline</h2>
           <span className="label">
             {meta.season} standings by week — your team in green
-            {schedule.data && <ScreenshotButton targetRef={bumpChartRef} filename="season-timeline" />}
+            {schedule.data && (
+              <ScreenshotButton
+                targetRef={bumpChartRef}
+                filename="season-timeline"
+                prepareCapture={prepareBumpCapture}
+                cleanupCapture={cleanupBumpCapture}
+              />
+            )}
           </span>
         </div>
         {schedule.data ? (
-          <BumpChart ref={bumpChartRef} schedule={schedule.data} meta={meta} />
+          <BumpChart ref={bumpChartRef} schedule={schedule.data} meta={meta} forceDesktop={bumpForceDesktop} />
         ) : (
           !schedule.loading && <EmptyState>No schedule data.</EmptyState>
         )}

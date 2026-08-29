@@ -31,6 +31,49 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Screenshot capture: force-desktop for the two bar/chart blocks (2026-08-29)
+
+Tommy's follow-up after seeing real captures: Season Timeline looked
+good, but Playoff Probability's mobile-wrapped layout (name+pct on one
+line, bar squeezed onto its own line below) reads worse in a static
+screenshot than it does live — wants both to capture the roomier
+desktop layout instead, same idea as the matchup cards.
+
+- **Playoff Probability** (`PlayoffProbabilityTracks.tsx`): new
+  `forceDesktop` prop adds a `.playoff-tracks-force-desktop` class,
+  overriding the `@media (max-width: 640px)` mobile wrap back to a
+  single-row desktop layout (`!important`, since a plain media query is
+  keyed off the real viewport — still mobile-width during capture — not
+  something a class can conditionally opt out of) plus a fixed 600px
+  container width. The width matters as much as the un-wrapping: with
+  no width of its own, `.playoff-track`'s flex:1 auto bar has zero
+  intrinsic content size, so even single-line it would've collapsed
+  toward 0 in an unconstrained shrink-to-fit capture frame — the same
+  "squeezed bar" problem the original mobile fix existed to solve in
+  the first place, just relocated.
+- **Season Timeline** (`BumpChart`): new `forceDesktop` prop widens its
+  wrapping div to 650px. Unlike the playoff bars (pure CSS, settles
+  instantly), recharts' `ResponsiveContainer` only re-renders its SVG
+  at the new width after its own `ResizeObserver` actually fires — a
+  real async step. `ScreenshotButton`'s `prepareCapture` hook now
+  accepts returning a `Promise`, and this one does: flips the width via
+  `flushSync`, then waits a short fixed 150ms (not
+  `requestAnimationFrame` — confirmed elsewhere in this feature that
+  rAF never fires in a backgrounded/non-compositing tab) before the
+  capture proceeds, giving the resize+re-render time to actually
+  finish.
+- Both driven from `LeaguePage.tsx` (owns the `forceDesktop` state +
+  flushSync setters, same pattern as `MatchupCard`), not
+  self-contained, since the `ScreenshotButton` for each lives in the
+  section-head, separate from the block it's capturing.
+- Verified live: Season Timeline capture now 698×367 CSS px (650px
+  chart + padding) with real title/gridline/line colors present;
+  Playoff Probability now 648×399 CSS px (600px forced width + padding,
+  visibly shorter than the old all-wrapped capture since rows are
+  single-line again) with real title/bar colors present, and confirmed
+  the live page cleanly reverts to its normal mobile layout
+  (class stripped, width back to 335px) after the capture completes.
+
 ## Screenshot capture: title + padding frame (2026-08-28)
 
 Tommy's feedback after the charts pass: tables and matchup cards looked

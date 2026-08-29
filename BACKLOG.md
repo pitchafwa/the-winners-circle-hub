@@ -3,6 +3,72 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Standings table: real playoff finish, not just regular-season seed (2026-08-29)
+
+Tommy's request: once playoff rounds are decided, the standings table
+should reflect each team's actual finish (champion 1st, runner-up 2nd,
+3rd/4th decided by regular-season PF among the semifinal losers, etc.),
+progressively as each round locks in — not just at season's end. Teams
+that missed the real playoffs keep exactly their current record-based
+order underneath. Confirmed with Tommy up front (via AskUserQuestion):
+progressive round-by-round, not all-or-nothing; the week-by-week
+"standings as of week N" dropdown he also floated is a separate
+follow-up, not part of this pass.
+
+- **Checked ESPN's own `rankCalculatedFinal` first and rejected it**:
+  pulled real 2025 cache data and found it reorders NON-playoff teams
+  by their consolation-ladder ("toilet bowl") results, not regular-
+  season record — exactly the opposite of what Tommy asked for
+  ("teams that didn't make the playoffs... I believe you already have
+  their standings calculated correctly"). Building this from the real
+  `WINNERS_BRACKET` game results instead, same "material games" signal
+  already established for the Points race chart, rather than trusting
+  ESPN's own field or its `playoffSeed` number for who qualified —
+  spot-checked live and found a real case where a team with a *worse*
+  seed number made the actual bracket over two teams with better
+  seeds, confirming seed-based qualification would have been wrong.
+- New `metrics.compute_playoff_standing()`: walks `WINNERS_BRACKET`
+  games in matchup-period order, tracks who's been eliminated and in
+  which round: champion = the sole team with zero bracket losses once
+  the last round played has been decided, runner-up + every other
+  round's group of eliminated teams tied and broken by regular-season
+  PF (descending), most-recently-eliminated round ranked above earlier
+  ones. Teams still alive mid-bracket share the current best remaining
+  tier (ordered by seed for a stable display, not a final ranking)
+  until they actually win or lose — this is what makes it progressive
+  rather than all-or-nothing. Returns `{}` before any `WINNERS_BRACKET`
+  game exists, so the fallback is exactly today's seed-only order with
+  zero behavior change pre-playoffs.
+- New `standing_rank` field on each `standings.json` row
+  (`build.py`): playoff-bracket teams get their computed tier; every
+  non-bracket team keeps its current seed-based relative order,
+  appended as a block underneath. `rows` are now pre-sorted by this
+  field instead of raw `seed` (`seed` itself is untouched in the JSON,
+  still there for reference — nothing else in the codebase reads
+  standings.json's seed value besides this table, confirmed via a full
+  grep before touching its meaning).
+  `DATA.md` updated alongside.
+- **Frontend** (`StandingsTable.tsx`): the leftmost column (was
+  "Seed") is now "Rank", sourced from and default-sorted by
+  `standing_rank` — everything else about the table (the other 9
+  sortable columns, click-to-sort behavior) is unchanged.
+- Verified against real data, not just logic review: ran a full
+  `python build.py --offline` (real local cache, all 15 seasons) and
+  hand-checked the regenerated `standing_rank` for 2025 and 2024
+  against the actual bracket results and PF totals by hand — matched
+  exactly in both seasons, including the correct PF-broken order
+  within each tied round-elimination group. Confirmed 2026 (preseason,
+  no bracket yet) comes back with `standing_rank` identical to `seed`,
+  i.e. zero behavior change before playoffs exist. Diffed the full
+  283-file rebuild: every unrelated file changed only its
+  `generated_at` timestamp. Verified live in the browser: 2025's table
+  now opens with the actual champion (a middling 8-6 regular-season
+  team) at rank 1 above two teams with better records who lost earlier
+  in the bracket, and clicking a different column (Record) still
+  re-sorts correctly, confirming the new default rank didn't disturb
+  the existing sort machinery. `npx tsc --noEmit` and production build
+  both clean, no console errors.
+
 ## Fix: season dropdown had shrunk to 2024-2026 (2026-08-29)
 
 Tommy's report: "Year select dropdown only shows 2024-26, please fix."

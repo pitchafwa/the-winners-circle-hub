@@ -64,11 +64,24 @@ that same week).
 
 ## `{season}/standings.json`
 
-`rows[]`, pre-sorted by ESPN playoff seed; every column the standings table can sort on:
-`team_id, seed, final_rank, wins/losses/ties, record, win_pct, points_for, points_against,
-division_id, division_record, division_rank, games_back, cushion, streak,
+`rows[]`, pre-sorted by `standing_rank`; every column the standings table can sort on:
+`team_id, seed, final_rank, standing_rank, wins/losses/ties, record, win_pct, points_for,
+points_against, division_id, division_record, division_rank, games_back, cushion, streak,
 all_play_wins/losses/ties, all_play_record, all_play_pct, expected_wins, luck,
 lineup_points, optimal_points, coach_rating, bench_points_lost`.
+
+`standing_rank` (`metrics.compute_playoff_standing()`, new 2026-08-29) is the
+table's real default order and its leftmost "Rank" column — 1 = champion, 2 =
+runner-up, then each playoff round's eliminated teams tied for the next block
+of ranks broken by regular-season PF, most-recently-eliminated round first;
+non-bracket teams keep their plain seed order underneath. Progressive: a team
+already eliminated has its rank locked in immediately, teams still alive in
+the bracket share the current best remaining tier until they actually win or
+lose. Deliberately NOT the same as `seed` (ESPN's regular-season playoff
+seed, unchanged, still present) or `final_rank` (ESPN's own
+`rankCalculatedFinal`, which reorders non-playoff teams by their
+consolation-bracket results — `standing_rank` never touches a non-bracket
+team's relative order).
 
 `division_rank`/`games_back`/`cushion` (`metrics.division_race()`, new 2026-08)
 are the REAL, current standing within each team's division under this

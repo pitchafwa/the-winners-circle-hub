@@ -56,6 +56,7 @@ export interface StandingsRow {
   team_id: number;
   seed: number;
   final_rank: number;
+  standing_rank: number;
   wins: number;
   losses: number;
   ties: number;

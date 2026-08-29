@@ -296,6 +296,74 @@ def division_race(league: LeagueData) -> dict[int, dict]:
     return result
 
 
+def compute_playoff_standing(league: LeagueData) -> dict[int, int]:
+    """Real, progressive actual-finish rank for every team that has ever
+    appeared in a `WINNERS_BRACKET` game this season — 1 = champion, 2 =
+    runner-up, then each round's eliminated teams tied for the next block
+    of ranks, broken by regular-season PF (bigger first), most-recently-
+    eliminated round ranked above earlier rounds. Deliberately NOT
+    ESPN's own `rankCalculatedFinal`: that field reorders non-playoff
+    teams by their consolation-ladder ("toilet bowl") results, which
+    isn't what "actual finish" means here — a team that missed the real
+    playoffs keeps its regular-season standing regardless of how its
+    consolation games went, so this function only ever returns entries
+    for teams that made the real bracket, never touching anyone else.
+
+    Progressive, not all-or-nothing: called at any point in the playoffs,
+    not just once the season is over. A team eliminated in an earlier
+    round already has its final rank locked in (that round is fully
+    decided), while every team still alive — including one lone
+    undefeated team, until it's actually won the last round played —
+    shares the current best remaining rank tier, ordered by seed only as
+    a stable, non-final display order. Returns {} before the playoffs
+    start (no `WINNERS_BRACKET` games exist yet in the schedule at all),
+    so callers can fall back to seed-only ordering unchanged in that
+    case — this only ever narrows in on the real ordering as rounds
+    actually get decided, never guesses ahead of the results."""
+    bracket = [e for e in league.full_schedule if e.playoff_tier == "WINNERS_BRACKET"]
+    if not bracket:
+        return {}
+    participants = {e.home_id for e in bracket} | {e.away_id for e in bracket if e.away_id is not None}
+    decided = [e for e in bracket if e.winner in ("HOME", "AWAY") and e.away_id is not None]
+    rounds = sorted({e.matchup_period for e in decided})
+
+    _, _, pf, _ = current_records(league)
+    eliminated_round: dict[int, int] = {}
+    alive = set(participants)
+    for w in rounds:
+        for e in decided:
+            if e.matchup_period != w:
+                continue
+            loser = e.away_id if e.winner == "HOME" else e.home_id
+            if loser in alive:
+                eliminated_round[loser] = w
+                alive.discard(loser)
+
+    max_round = rounds[-1] if rounds else None
+    champion = next(iter(alive)) if len(alive) == 1 and max_round is not None else None
+
+    tiers: list[list[int]] = []
+    still_alive = sorted(alive - ({champion} if champion else set()),
+                          key=lambda t: league.teams[t].playoff_seed or 99)
+    if not champion and still_alive:
+        tiers.append(still_alive)  # bracket still in progress — best remaining tier, order not final
+    if champion:
+        tiers.append([champion])
+
+    for w in sorted(set(eliminated_round.values()), reverse=True):
+        group = [t for t, r in eliminated_round.items() if r == w]
+        group.sort(key=lambda t: pf.get(t, 0.0), reverse=True)
+        tiers.append(group)
+
+    rank_map: dict[int, int] = {}
+    rank = 1
+    for tier in tiers:
+        for tid in tier:
+            rank_map[tid] = rank
+            rank += 1
+    return rank_map
+
+
 def team_week_coach(tw: TeamWeek, starting_slots: list[int]) -> dict:
     """Coach quality is judged on lineup production only — the home-field
     bonus and commissioner adjustments in the official total aren't coaching."""

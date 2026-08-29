@@ -141,6 +141,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
 
     # ---- standings.json ---------------------------------------------------
     race = metrics.division_race(league)
+    playoff_standing = metrics.compute_playoff_standing(league)
     rows = []
     for t in league.teams.values():
         ap = all_play[t.team_id]
@@ -150,6 +151,13 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             "team_id": t.team_id,
             "seed": t.playoff_seed,
             "final_rank": t.final_rank,
+            # real, progressive playoff-adjusted standing — see
+            # metrics.compute_playoff_standing()'s docstring. None for a
+            # team that hasn't appeared in a real WINNERS_BRACKET game
+            # (either the playoffs haven't started yet, or this team
+            # didn't make the real bracket) — filled in below, in seed
+            # order, once every bracket team's slot is known.
+            "standing_rank": playoff_standing.get(t.team_id),
             "wins": t.wins, "losses": t.losses, "ties": t.ties,
             "record": _record_str(t.wins, t.losses, t.ties),
             "win_pct": round((t.wins + 0.5 * t.ties) / max(t.wins + t.losses + t.ties, 1), 4),
@@ -176,7 +184,20 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             "bench_points_lost": season_coach.get("bench_lost"),
             "consistency": consistency.get(t.team_id),
         })
-    rows.sort(key=lambda r: (r["seed"] if r["seed"] else 99))
+    # Non-bracket teams (missed the real playoffs, or the playoffs haven't
+    # started) keep exactly their current seed-based order — only fill in
+    # their standing_rank AFTER every real bracket team already has one, so
+    # they always sort below the playoff group as a block, same as before
+    # playoff_standing existed at all when it's empty (preseason/regular
+    # season: every row falls into this branch, numbering 1..N by seed,
+    # identical to the old seed-only sort).
+    non_bracket = sorted((r for r in rows if r["standing_rank"] is None),
+                         key=lambda r: r["seed"] if r["seed"] else 99)
+    next_rank = len(playoff_standing) + 1
+    for r in non_bracket:
+        r["standing_rank"] = next_rank
+        next_rank += 1
+    rows.sort(key=lambda r: r["standing_rank"])
     _write(out_dir / "standings.json", {"generated_at": generated_at, "rows": rows})
 
     # ---- power.json -------------------------------------------------------

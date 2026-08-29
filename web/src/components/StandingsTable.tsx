@@ -14,7 +14,9 @@ type Col = {
 };
 
 const COLS: Col[] = [
-  { key: "seed", label: "Seed", numeric: true, render: (r) => (r.seed ? String(r.seed) : MISSING) },
+  { key: "standing_rank", label: "Rank",
+    title: "Regular-season seed, or actual playoff finish once the bracket is underway",
+    numeric: true, render: (r) => (r.standing_rank ? String(r.standing_rank) : MISSING) },
   { key: "team", label: "Team", numeric: false, render: () => "" },
   { key: "record", label: "Record", numeric: true, render: (r) => r.record,
     sortValue: (r) => r.win_pct },
@@ -42,7 +44,7 @@ const StandingsTable = forwardRef<HTMLTableElement, { rows: StandingsRow[] }>(fu
   { rows }, ref,
 ) {
   const { teamsById } = useApp();
-  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "seed", dir: 1 });
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "standing_rank", dir: 1 });
 
   const sorted = useMemo(() => {
     const col = COLS.find((c) => c.key === sort.key) ?? COLS[0];
@@ -63,7 +65,7 @@ const StandingsTable = forwardRef<HTMLTableElement, { rows: StandingsRow[] }>(fu
     setSort((s) =>
       s.key === col.key
         ? { key: col.key, dir: s.dir === 1 ? -1 : 1 }
-        : { key: col.key as string, dir: col.key === "seed" || col.key === "team" ? 1 : -1 },
+        : { key: col.key as string, dir: col.key === "standing_rank" || col.key === "team" ? 1 : -1 },
     );
   };
 

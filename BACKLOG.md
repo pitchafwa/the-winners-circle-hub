@@ -3,6 +3,73 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Standings table: "as of week N" picker (2026-08-29)
+
+Tommy's follow-up to the playoff-finish standings change: "Implement the
+as-of standings for any seasons where we can actually compute them" —
+the week-picker idea he'd floated and deliberately deferred earlier.
+Answer: every season with real schedule data can compute this (2012
+on) — box-score-dependent columns just degrade gracefully per-season,
+same fallback the season-total numbers already use.
+
+- New `metrics.standings_by_week()`: for every completed regular-season
+  week, recomputes the exact same shape `standings.json`'s rows use —
+  record/PF/PA/division standing/streak/all-play/luck (pure
+  schedule-derived, works for every season on file) plus
+  lineup/optimal/coach/bench-lost/consistency (reuses
+  `compute_all_play()`'s and `compute_coach()`'s own per-week
+  breakdowns, cumulative-summed through week N, rather than
+  recomputing optimal lineups per snapshot — those come back `None`
+  for a week/season with no box-score cache, exactly like the existing
+  season-end fallback). No playoff-adjusted `standing_rank` here —
+  every snapshot is a regular-season week, so applies the same real
+  tiebreak `division_race()` uses (wins → H2H → PF), league-wide.
+- Refactored `division_race()`'s internal tiebreak/ranking logic into
+  two shared helpers (`_tiebreak_order`, `_rank_with_cutoff`) so
+  `standings_by_week()` could reuse the exact same real tiebreak
+  math for its own division-rank and league-wide Rank column, instead
+  of a second, drifting copy of the logic. Verified this refactor was
+  a pure no-op: diffed the full rebuild, every `standings.json`
+  (division_race's actual output) changed only its `generated_at`
+  timestamp, byte-identical otherwise.
+- New `{season}/standings_by_week.json`: `{generated_at, weeks: {"1":
+  [...rows], "7": [...], ...}}`, one entry per completed regular-season
+  week. `DATA.md` + `types/data.ts` (`StandingsByWeek`) updated
+  alongside.
+- **Real bug found and fixed during verification, not just eyeballed**:
+  the first pass folded ties into `wins`/`losses` as 0.5 each (the
+  convention `current_records()`/the tiebreak helpers actually need
+  internally) and used that SAME folded value for the row's own
+  `wins`/`losses`/`record` fields — produced a real `"5.0-2.0"`-style
+  record string instead of `"5-2"`. Fixed by tracking true integer
+  win/loss/tie counts separately from the folded tiebreak-only values;
+  re-verified via the exact same real-data check that first caught it.
+- **Frontend** (`LeaguePage.tsx`): new "as of week" `<select>` next to
+  the existing "click a column to sort" hint in the Standings
+  section-head — "Current" (default, unchanged) or any completed
+  regular-season week, populated from whatever weeks
+  `standings_by_week.json` actually has for that season. Resets to
+  "Current" on every season switch (`useEffect`) so a stale week
+  selection can't silently carry over into a different season's data.
+  `StandingsTable` itself needed zero changes — a snapshot row is the
+  same `StandingsRow` shape, just fed in instead of the live one.
+- Verified against real data end-to-end: hand-computed 2025's week-7
+  snapshot independently and matched it against the live-rendered
+  table exactly (after the wins/losses fix); confirmed week
+  `reg_season_weeks`'s snapshot matches the season-end `standings.json`
+  record/PF/PA/division/all-play/luck fields exactly for every season
+  checked (documented the one deliberate, expected exception:
+  `coach_rating` at the final regular-season week won't quite match
+  season-end, since the season-end number folds in playoff weeks too
+  and every `standings_by_week.json` snapshot is regular-season-only
+  by design). Verified live in the browser: 2025's week-7 dropdown
+  selection matches the hand-computed data exactly, switching back to
+  "Current" correctly restores the playoff-aware order, and 2013 (no
+  box-score cache at all) renders real record/PF/PA/streak/all-play
+  numbers with the box-score-dependent columns correctly showing "—"
+  instead of a fake number. `npx tsc --noEmit` and production build
+  both clean, no console errors.
+
 ## Standings table: real playoff finish, not just regular-season seed (2026-08-29)
 
 Tommy's request: once playoff rounds are decided, the standings table

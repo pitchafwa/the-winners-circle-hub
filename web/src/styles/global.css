@@ -306,6 +306,19 @@ hr,
   overflow-x: auto;
 }
 
+/* Standings' "as of week N" picker — sits inline in the same uppercase
+ * .label strip as the "click a column to sort" hint and the screenshot
+ * button, so it needs its own normal-case, normal-tracking reset (the
+ * label's text-transform/letter-spacing would otherwise apply to the
+ * dropdown's own text) plus a little breathing room on both sides. */
+.week-select {
+  margin: 0 0.5rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.35rem;
+}
+
 /* Mobile-only "save as image" icon button — see ScreenshotButton.tsx.
  * Hidden on desktop (already shows everything at once, no scrolling
  * needed). Sits inline next to a block's subheader/label rather than its

@@ -89,6 +89,11 @@ export interface Standings {
   rows: StandingsRow[];
 }
 
+export interface StandingsByWeek {
+  generated_at: string;
+  weeks: Record<string, StandingsRow[]>;
+}
+
 export interface PowerComponents {
   all_play: number;
   points_for: number;

@@ -200,6 +200,44 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     rows.sort(key=lambda r: r["standing_rank"])
     _write(out_dir / "standings.json", {"generated_at": generated_at, "rows": rows})
 
+    # ---- standings_by_week.json --------------------------------------------
+    # "What did the standings look like after week N" — see
+    # metrics.standings_by_week()'s docstring for what's computed vs. left
+    # None per season. Every season with real schedule data gets an entry
+    # here (2012 on); box-score-dependent columns just come back None for
+    # a season/week that has no box-score cache, same "known weeks only"
+    # fallback the season-total numbers already use.
+    by_week = metrics.standings_by_week(league)
+    weeks_out: dict[str, list[dict]] = {}
+    for w, team_rows in by_week.items():
+        week_rows = []
+        for tid, r in team_rows.items():
+            t = league.teams[tid]
+            week_rows.append({
+                "team_id": tid,
+                "seed": r["standing_rank"], "final_rank": r["standing_rank"],
+                "standing_rank": r["standing_rank"],
+                "wins": r["wins"], "losses": r["losses"], "ties": r["ties"],
+                "record": _record_str(r["wins"], r["losses"], r["ties"]),
+                "win_pct": round((r["wins"] + 0.5 * r["ties"]) / max(r["wins"] + r["losses"] + r["ties"], 1), 4),
+                "points_for": r["points_for"], "points_against": r["points_against"],
+                "division_id": t.division_id,
+                "division_record": "",  # not tracked as-of-week; not shown as its own column anyway
+                "division_rank": r["division_rank"], "games_back": r["games_back"], "cushion": r["cushion"],
+                "streak": r["streak"],
+                "all_play_wins": r["all_play_wins"], "all_play_losses": r["all_play_losses"],
+                "all_play_ties": r["all_play_ties"],
+                "all_play_record": _record_str(r["all_play_wins"], r["all_play_losses"], r["all_play_ties"]),
+                "all_play_pct": r["all_play_pct"],
+                "expected_wins": r["expected_wins"], "luck": r["luck"],
+                "lineup_points": r["lineup_points"], "optimal_points": r["optimal_points"],
+                "coach_rating": r["coach_rating"], "bench_points_lost": r["bench_points_lost"],
+                "consistency": r["consistency"],
+            })
+        week_rows.sort(key=lambda r: r["standing_rank"])
+        weeks_out[str(w)] = week_rows
+    _write(out_dir / "standings_by_week.json", {"generated_at": generated_at, "weeks": weeks_out})
+
     # ---- power.json -------------------------------------------------------
     _write(out_dir / "power.json", {
         "generated_at": generated_at,

@@ -240,6 +240,52 @@ def current_records(league: LeagueData):
     return wins, losses, pf, h2h
 
 
+def _tiebreak_order(group: list[int], wins, losses, pf, h2h) -> list[int]:
+    """Real tiebreak: wins -> head-to-head among the exact-tied group -> PF
+    -> deterministic team_id fallback. Shared by division_race() (per
+    division) and standings_by_week() (whole-league, for its as-of-week
+    Rank column — pre-playoffs, this is exactly what `seed` approximates)."""
+    by_wins: dict[float, list[int]] = defaultdict(list)
+    for t in group:
+        by_wins[wins[t]].append(t)
+    out = []
+    for w in sorted(by_wins, reverse=True):
+        tied_group = by_wins[w]
+        ranked = sorted(tied_group, key=lambda t: (
+            sum(h2h.get((t, o), 0) for o in tied_group if o != t),
+            pf[t],
+            -t,
+        ), reverse=True)
+        out.extend(ranked)
+    return out
+
+
+def _rank_with_cutoff(group: list[int], wins, losses, pf, h2h, cutoff: int) -> dict[int, dict]:
+    """Rank one group (a division, in every real caller so far) by
+    _tiebreak_order, with games_back/cushion relative to the cutoff-th
+    spot (e.g. cutoff=3 for "top 3 make the playoffs"). Returns
+    {team_id: {rank, games_back, cushion}}."""
+    ranked = _tiebreak_order(group, wins, losses, pf, h2h)
+    real_cutoff = min(cutoff, len(ranked))
+    first_out_wins = wins[ranked[real_cutoff]] if len(ranked) > real_cutoff else None
+    first_out_losses = losses[ranked[real_cutoff]] if len(ranked) > real_cutoff else None
+    cut_wins = wins[ranked[real_cutoff - 1]] if real_cutoff >= 1 else 0.0
+    cut_losses = losses[ranked[real_cutoff - 1]] if real_cutoff >= 1 else 0.0
+    result: dict[int, dict] = {}
+    for i, tid in enumerate(ranked):
+        rank = i + 1
+        if rank <= real_cutoff:
+            cushion = (
+                round(((wins[tid] - first_out_wins) + (first_out_losses - losses[tid])) / 2, 1)
+                if first_out_wins is not None else None
+            )
+            result[tid] = {"rank": rank, "games_back": 0.0, "cushion": cushion}
+        else:
+            gb = round(((cut_wins - wins[tid]) + (losses[tid] - cut_losses)) / 2, 1)
+            result[tid] = {"rank": rank, "games_back": gb, "cushion": None}
+    return result
+
+
 def division_race(league: LeagueData) -> dict[int, dict]:
     """Real, CURRENT (not simulated) division standing under this league's
     actual playoff format — top 3 per division make the playoffs, no
@@ -255,45 +301,174 @@ def division_race(league: LeagueData) -> dict[int, dict]:
     set for a playoff-spot team, else None)}}."""
     wins, losses, pf, h2h = current_records(league)
 
-    def order(group: list[int]) -> list[int]:
-        by_wins: dict[float, list[int]] = defaultdict(list)
-        for t in group:
-            by_wins[wins[t]].append(t)
-        out = []
-        for w in sorted(by_wins, reverse=True):
-            tied_group = by_wins[w]
-            ranked = sorted(tied_group, key=lambda t: (
-                sum(h2h.get((t, o), 0) for o in tied_group if o != t),
-                pf[t],
-                -t,
-            ), reverse=True)
-            out.extend(ranked)
-        return out
-
     by_division: dict[int, list[int]] = defaultdict(list)
     for tid, team in league.teams.items():
         by_division[team.division_id].append(tid)
 
     result: dict[int, dict] = {}
     for group in by_division.values():
-        ranked = order(group)
-        cutoff = min(3, len(ranked))  # top 3 make it, per the confirmed real format
-        first_out_wins = wins[ranked[cutoff]] if len(ranked) > cutoff else None
-        first_out_losses = losses[ranked[cutoff]] if len(ranked) > cutoff else None
-        cut_wins = wins[ranked[cutoff - 1]] if cutoff >= 1 else 0.0
-        cut_losses = losses[ranked[cutoff - 1]] if cutoff >= 1 else 0.0
-        for i, tid in enumerate(ranked):
-            rank = i + 1
-            if rank <= cutoff:
-                cushion = (
-                    round(((wins[tid] - first_out_wins) + (first_out_losses - losses[tid])) / 2, 1)
-                    if first_out_wins is not None else None
-                )
-                result[tid] = {"division_rank": rank, "games_back": 0.0, "cushion": cushion}
-            else:
-                gb = round(((cut_wins - wins[tid]) + (losses[tid] - cut_losses)) / 2, 1)
-                result[tid] = {"division_rank": rank, "games_back": gb, "cushion": None}
+        for tid, d in _rank_with_cutoff(group, wins, losses, pf, h2h, cutoff=3).items():
+            result[tid] = {"division_rank": d["rank"], "games_back": d["games_back"], "cushion": d["cushion"]}
     return result
+
+
+def standings_by_week(league: LeagueData) -> dict[int, dict[int, dict]]:
+    """As-of-week standings snapshots for every completed regular-season
+    week — the "what did the standings look like after week N" picker.
+    Returns {week: {team_id: {...raw fields...}}}; build.py formats each
+    team's dict into the same row shape standings.json uses (record
+    strings etc.), same division of labor every other metrics.py
+    function here already follows.
+
+    Computed purely from `league.full_schedule` capped at each week, so
+    it works for every season with real schedule data — every season on
+    file, 2012 on, since that's the one thing every backfill tier has
+    (even 2012-2016, which have no box scores at all). Where a season
+    genuinely can't support a number (optimal_points/coach_rating/
+    bench_points_lost need real box scores; those are None for weeks a
+    season has no box-score cache for — reuses compute_all_play()'s and
+    compute_coach()'s own per-week breakdowns rather than recomputing
+    optimal lineups per snapshot, summing each through week N), the
+    field comes back None and the frontend renders it the same "—" it
+    already does for every other not-yet-meaningful stat.
+
+    No playoff-adjusted standing_rank here — every snapshot is a
+    regular-season week, so the bracket doesn't exist yet at any of
+    them. `standing_rank` is the same real tiebreak division_race() uses
+    (wins -> head-to-head -> PF), applied league-wide instead of per
+    division — exactly what `seed` approximates before the playoffs
+    start anyway."""
+    weekly_scores = _weekly_scores(league)
+    if not weekly_scores:
+        return {}
+    all_play = compute_all_play(league)
+    coach = compute_coach(league)
+    weeks_sorted = sorted(w for w in weekly_scores if w <= league.reg_season_weeks)
+    all_team_ids = list(league.teams)
+
+    snapshots: dict[int, dict[int, dict]] = {}
+    for w in weeks_sorted:
+        # wins/losses fold in 0.5 per tie — the same convention
+        # current_records()/division_race() use, needed for the tiebreak
+        # helpers below. wins_real/losses_real/ties_ct are the true
+        # integer counts a record string and win_pct actually want (a tie
+        # is neither a win nor a loss, tracked on its own) — conflating
+        # the two here once produced a real "5.0-2.0"-style record bug
+        # before this split existed.
+        wins: dict[int, float] = defaultdict(float)
+        losses: dict[int, float] = defaultdict(float)
+        wins_real: dict[int, int] = defaultdict(int)
+        losses_real: dict[int, int] = defaultdict(int)
+        ties_ct: dict[int, int] = defaultdict(int)
+        pf: dict[int, float] = defaultdict(float)
+        pa: dict[int, float] = defaultdict(float)
+        h2h: dict[tuple[int, int], float] = defaultdict(float)
+        results_by_team: dict[int, list[str]] = defaultdict(list)
+        for e in league.full_schedule:
+            if (e.is_playoff or e.winner == "UNDECIDED" or e.away_id is None
+                    or e.matchup_period > w):
+                continue
+            pf[e.home_id] += e.home_score
+            pf[e.away_id] += e.away_score
+            pa[e.home_id] += e.away_score
+            pa[e.away_id] += e.home_score
+            if e.winner == "HOME":
+                wins[e.home_id] += 1
+                losses[e.away_id] += 1
+                wins_real[e.home_id] += 1
+                losses_real[e.away_id] += 1
+                h2h[(e.home_id, e.away_id)] += 1
+                results_by_team[e.home_id].append("W")
+                results_by_team[e.away_id].append("L")
+            elif e.winner == "AWAY":
+                wins[e.away_id] += 1
+                losses[e.home_id] += 1
+                wins_real[e.away_id] += 1
+                losses_real[e.home_id] += 1
+                h2h[(e.away_id, e.home_id)] += 1
+                results_by_team[e.away_id].append("W")
+                results_by_team[e.home_id].append("L")
+            else:  # TIE
+                wins[e.home_id] += 0.5
+                wins[e.away_id] += 0.5
+                losses[e.home_id] += 0.5
+                losses[e.away_id] += 0.5
+                ties_ct[e.home_id] += 1
+                ties_ct[e.away_id] += 1
+                h2h[(e.home_id, e.away_id)] += 0.5
+                h2h[(e.away_id, e.home_id)] += 0.5
+                results_by_team[e.home_id].append("T")
+                results_by_team[e.away_id].append("T")
+
+        by_division: dict[int, list[int]] = defaultdict(list)
+        for tid, team in league.teams.items():
+            by_division[team.division_id].append(tid)
+        division_ranked: dict[int, dict] = {}
+        for group in by_division.values():
+            for tid, d in _rank_with_cutoff(group, wins, losses, pf, h2h, cutoff=3).items():
+                division_ranked[tid] = d
+        league_order = _tiebreak_order(all_team_ids, wins, losses, pf, h2h)
+
+        rows: dict[int, dict] = {}
+        for tid in all_team_ids:
+            streak = ""
+            seq = results_by_team.get(tid, [])
+            if seq:
+                last = seq[-1]
+                n = 0
+                for r in reversed(seq):
+                    if r != last:
+                        break
+                    n += 1
+                streak = f"{last}{n}"
+
+            ap_weeks = {wk: d for wk, d in all_play[tid]["weeks"].items() if wk <= w}
+            ap_wins = sum(d["wins"] for d in ap_weeks.values())
+            ap_losses = sum(d["losses"] for d in ap_weeks.values())
+            ap_ties = sum(d["ties"] for d in ap_weeks.values())
+            ap_games = ap_wins + ap_losses + ap_ties
+            expected = sum(d["expected_wins"] for d in ap_weeks.values())
+            actual_wins = sum(
+                1.0 if d["result"] == "W" else 0.5 if d["result"] == "T" else 0.0
+                for d in ap_weeks.values()
+            )
+
+            coach_weeks = {wk: d for wk, d in coach[tid]["weeks"].items() if wk <= w}
+            known = [d for d in coach_weeks.values() if d["optimal"] is not None]
+            if known:
+                known_actual = round(sum(d["actual"] for d in known), 2)
+                total_optimal = round(sum(d["optimal"] for d in known), 2)
+                coach_rating = round(known_actual / total_optimal, 4) if total_optimal else None
+                bench_lost = round(sum(d["bench_lost"] for d in known), 2)
+            else:
+                total_optimal = coach_rating = bench_lost = None
+            lineup_points = round(sum(d["actual"] for d in coach_weeks.values()), 2) if coach_weeks else None
+
+            scores_so_far = [
+                weekly_scores[wk][0][tid] for wk in weeks_sorted
+                if wk <= w and tid in weekly_scores[wk][0]
+            ]
+            consistency = round(statistics.stdev(scores_so_far), 2) if len(scores_so_far) > 1 else None
+
+            div = division_ranked.get(tid, {})
+            rows[tid] = {
+                "standing_rank": league_order.index(tid) + 1,
+                "wins": wins_real.get(tid, 0), "losses": losses_real.get(tid, 0), "ties": ties_ct.get(tid, 0),
+                "points_for": round(pf.get(tid, 0.0), 2), "points_against": round(pa.get(tid, 0.0), 2),
+                "division_rank": div.get("rank"), "games_back": div.get("games_back"), "cushion": div.get("cushion"),
+                "streak": streak,
+                "all_play_wins": int(ap_wins), "all_play_losses": int(ap_losses), "all_play_ties": int(ap_ties),
+                "all_play_pct": round((ap_wins + 0.5 * ap_ties) / ap_games, 4) if ap_games else None,
+                "expected_wins": round(expected, 2) if ap_games else None,
+                "luck": round(actual_wins - round(expected, 2), 2) if ap_games else None,
+                "lineup_points": lineup_points,
+                "optimal_points": total_optimal,
+                "coach_rating": coach_rating,
+                "bench_points_lost": bench_lost,
+                "consistency": consistency,
+            }
+        snapshots[w] = rows
+    return snapshots
 
 
 def compute_playoff_standing(league: LeagueData) -> dict[int, int]:

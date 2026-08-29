@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
@@ -13,7 +13,7 @@ import ContendRebuildTable from "../components/ContendRebuildTable";
 import ScreenshotButton from "../components/ScreenshotButton";
 import { BumpChart, PointsPaceChart, SwapMatrix } from "../components/HistoryCharts";
 import type {
-  Activity, Positions, Schedule, ScheduleSwap, Sim, Spectrum, Standings, Superlatives,
+  Activity, Positions, Schedule, ScheduleSwap, Sim, Spectrum, Standings, StandingsByWeek, Superlatives,
 } from "../types/data";
 
 // Shared by every bar-chart-style block below (no border/header of its
@@ -54,8 +54,11 @@ export default function LeaguePage() {
   const bump = useForceDesktopCapture(150);
   const points = useForceDesktopCapture(150);
 
+  const [standingsWeek, setStandingsWeek] = useState<"current" | number>("current");
+
   const base = season !== null ? `${season}` : null;
   const standings = useJson<Standings>(base ? `${base}/standings.json` : null);
+  const standingsByWeek = useOptionalJson<StandingsByWeek>(base ? `${base}/standings_by_week.json` : null);
   const superlatives = useJson<Superlatives>(base ? `${base}/superlatives.json` : null);
   const activity = useJson<Activity>(base ? `${base}/activity.json` : null);
   const sim = useOptionalJson<Sim>(base ? `${base}/sim.json` : null);
@@ -64,10 +67,25 @@ export default function LeaguePage() {
   const schedule = useOptionalJson<Schedule>(base ? `${base}/schedule.json` : null);
   const scheduleSwap = useOptionalJson<ScheduleSwap>(base ? `${base}/schedule_swap.json` : null);
 
+  // Switching seasons with a specific past week still selected would silently
+  // show the wrong (or missing) season's data under a stale week label.
+  useEffect(() => setStandingsWeek("current"), [season]);
+
   if (!meta) return null;
 
   const latestWeek = meta.completed_weeks.at(-1) ?? null;
   const simByTeam = new Map((sim.data?.teams ?? []).map((t) => [t.team_id, t]));
+
+  // Weeks the season actually has an as-of-week snapshot for (every
+  // completed regular-season week — see standings_by_week.json's own
+  // docstring for which seasons/columns that does and doesn't cover).
+  // Sorted ascending as numbers, not strings, since object keys are "1".."14".
+  const standingsWeekOptions = standingsByWeek.data
+    ? Object.keys(standingsByWeek.data.weeks).map(Number).sort((a, b) => a - b)
+    : [];
+  const standingsRows = standingsWeek === "current"
+    ? standings.data?.rows
+    : standingsByWeek.data?.weeks[String(standingsWeek)];
 
   return (
     <>
@@ -76,11 +94,24 @@ export default function LeaguePage() {
           <h2 id="standings-h">Standings</h2>
           <span className="label">
             click a column to sort
+            {standingsWeekOptions.length > 0 && (
+              <select
+                className="control week-select"
+                aria-label="Standings as of week"
+                value={standingsWeek}
+                onChange={(e) => setStandingsWeek(e.target.value === "current" ? "current" : Number(e.target.value))}
+              >
+                <option value="current">Current</option>
+                {standingsWeekOptions.map((w) => (
+                  <option key={w} value={w}>As of week {w}</option>
+                ))}
+              </select>
+            )}
             <ScreenshotButton targetRef={standingsTableRef} filename="standings" />
           </span>
         </div>
         {standings.error && <div className="error-state">{standings.error}</div>}
-        {standings.data && <StandingsTable ref={standingsTableRef} rows={standings.data.rows} />}
+        {standingsRows && <StandingsTable ref={standingsTableRef} rows={standingsRows} />}
       </section>
 
       <section className="section" aria-labelledby="race-h">

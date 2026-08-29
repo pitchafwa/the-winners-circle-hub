@@ -83,6 +83,28 @@ seed, unchanged, still present) or `final_rank` (ESPN's own
 consolation-bracket results — `standing_rank` never touches a non-bracket
 team's relative order).
 
+## `{season}/standings_by_week.json`
+
+`weeks{}`, keyed by week number as a string ("1".."reg_season_weeks"),
+each value a `rows[]` in the exact same shape as `standings.json` above
+(same fields, same `StandingsRow` type on the frontend) — "what did the
+standings look like after week N," for every completed regular-season
+week (`metrics.standings_by_week()`, new 2026-08-29). Present for every
+season with real schedule data (2012 on); `division_record` is always
+`""` (not tracked as-of-week) and box-score-dependent fields
+(`lineup_points`/`optimal_points`/`coach_rating`/`bench_points_lost`)
+come back `null` for a season/week with no box-score cache, same
+"known weeks only" fallback the season-total numbers already use.
+`standing_rank`/`seed`/`final_rank` are all the same value here (the
+real wins → head-to-head → PF tiebreak, applied league-wide) — no
+playoff-adjusted reordering, since every snapshot is a regular-season
+week and the bracket doesn't exist yet at any of them. One quirk worth
+knowing: unlike `standings.json`'s season-end `coach_rating` (which
+folds in playoff weeks too), every `standings_by_week.json` snapshot —
+including the final regular-season week — is regular-season-only by
+design, so the two won't quite match at week `reg_season_weeks` for a
+completed season.
+
 `division_rank`/`games_back`/`cushion` (`metrics.division_race()`, new 2026-08)
 are the REAL, current standing within each team's division under this
 league's actual playoff format — top 3 per division make it, no wildcards

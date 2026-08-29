@@ -31,6 +31,40 @@ docstring and the code review above for the full design.
   original `${season}-${round}` selection key collapsed them into one
   checkbox.
 
+## Home-screen icon for "Add to Home Screen" (2026-08-29)
+
+Tommy's iPhone "Add to Home Screen" (Chrome) was auto-generating a plain
+letter-on-grey tile instead of a real icon — iOS reads `apple-touch-icon`
+specifically for this, separate from the favicon and ignoring
+manifest.json entirely.
+
+- Generated `apple-touch-icon.png` (180×180), `icon-192.png`, and
+  `icon-512.png` — navy `#12213D` background (matches the masthead
+  exactly) with the same 🏈 emoji the existing favicon already uses, so
+  the home-screen icon and the browser tab read as the same app. Real
+  emoji glyph, not a generated letter tile: rendered via Pillow using
+  Windows' own Segoe UI Emoji color font (`embedded_color=True`), run in
+  an ephemeral `uv run --with pillow` environment rather than adding
+  Pillow to the project's own venv for a one-off asset generation task.
+- `index.html` gained `apple-touch-icon`, `apple-mobile-web-app-capable`
+  (launches without Safari's URL bar/chrome, closer to a real installed
+  app), `apple-mobile-web-app-title` (name under the icon — "League Hub"
+  instead of the full page title), and — for Android/Chrome parity, which
+  reads these instead — a `manifest.json` + `theme-color`.
+- All new asset references use RELATIVE paths (`apple-touch-icon.png`,
+  not `/apple-touch-icon.png`) rather than root-absolute — confirmed via
+  a real `GITHUB_PAGES=1` build that Vite only rewrites recognized
+  script/link[stylesheet] tags with the `/the-winners-circle-hub/` base
+  prefix, not arbitrary `<link>` hrefs, so a root-absolute path would
+  have 404'd on the actual deployed site while working fine locally.
+  Relative paths resolve correctly under either base with no rewriting
+  needed at all.
+- Verified live: both build modes (plain and `GITHUB_PAGES=1`) checked
+  directly by inspecting build output; confirmed the icon file itself
+  actually loads and decodes (tab title showed real "180×180" dimensions,
+  not a broken-image state) and all new `<meta>`/`<link>` tags resolve to
+  correct absolute URLs in the live DOM, no console errors.
+
 ## Screenshot capture: force-desktop for the two bar/chart blocks (2026-08-29)
 
 Tommy's follow-up after seeing real captures: Season Timeline looked

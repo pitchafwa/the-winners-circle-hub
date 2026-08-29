@@ -5,6 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%8F%88</text></svg>" />
+
+    <!-- "Add to Home Screen" on iOS reads apple-touch-icon specifically —
+         it ignores the favicon above and manifest.json's icons entirely,
+         and without this falls back to auto-generating a plain letter
+         tile. apple-mobile-web-app-capable launches it without Safari's
+         browser chrome (URL bar, tab strip), closer to a real installed
+         app; apple-mobile-web-app-title controls the name printed under
+         the home-screen icon (otherwise it'd use the full <title> below,
+         which is fine full-length but a bit long under an icon). -->
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="League Hub" />
+
+    <!-- Same idea for Android/Chrome's own "Add to Home Screen" (which
+         DOES read manifest.json + theme-color, unlike iOS above). -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#12213D" />
+
     <title>The League Hub</title>
   </head>
   <body>

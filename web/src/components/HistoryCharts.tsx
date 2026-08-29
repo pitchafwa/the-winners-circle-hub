@@ -162,16 +162,25 @@ function PaceTooltip({
  * smoothing out single-week spikes/duds into a readable trend. Window
  * shrinks to whatever's available for the first two weeks (week 1 = that
  * week's score, week 2 = average of weeks 1-2) rather than leaving the
- * chart blank until week 3. Same regular-season-only, decided-games-only
- * filtering as BumpChart, for the same reason (a consolation-bracket
- * score late in a lost season isn't a real scoring-pace signal). */
+ * chart blank until week 3.
+ *
+ * Regular season plus real playoff games (ESPN's `WINNERS_BRACKET` tier)
+ * both count — a playoff game is exactly the kind of material scoring
+ * data this chart exists to show. `WINNERS_CONSOLATION_LADDER` and
+ * `LOSERS_CONSOLATION_LADDER` (both also `is_playoff: true`) are
+ * excluded: those are the 5th-10th-place bracket for teams that already
+ * missed the playoffs, where a score reflects nothing about real playoff
+ * performance. A team stops contributing new data — and its line simply
+ * gaps via `connectNulls` rather than flatlining — the week it's
+ * eliminated from `WINNERS_BRACKET`, since it has no more real games to
+ * average in. */
 export const PointsPaceChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: Meta; forceDesktop?: boolean }>(
   function PointsPaceChart({ schedule, meta, forceDesktop }, ref) {
   const { myTeamId, teamName } = useApp();
   const { data, teamIds } = useMemo(() => {
     const decided = schedule.entries.filter(
-      (e) => e.winner !== "UNDECIDED" && !e.is_playoff && e.away_id !== null
-        && e.matchup_period <= meta.reg_season_weeks
+      (e) => e.winner !== "UNDECIDED" && e.away_id !== null
+        && (!e.is_playoff || e.playoff_tier === "WINNERS_BRACKET")
         && !(e.home_score === 0 && e.away_score === 0),
     );
     const weeks = [...new Set(decided.map((e) => e.matchup_period))].sort((a, b) => a - b);
@@ -180,15 +189,18 @@ export const PointsPaceChart = forwardRef<HTMLDivElement, { schedule: Schedule; 
     const rows: Record<string, number>[] = [];
     const WINDOW = 3;
     for (const w of weeks) {
+      const playedThisWeek = new Set<number>();
       for (const e of decided.filter((x) => x.matchup_period === w)) {
         weeklyScores.get(e.home_id)!.push(e.home_score);
         weeklyScores.get(e.away_id!)!.push(e.away_score);
+        playedThisWeek.add(e.home_id);
+        playedThisWeek.add(e.away_id!);
       }
       const row: Record<string, number> = { week: w };
       ids.forEach((id) => {
+        if (!playedThisWeek.has(id)) return; // eliminated / bye — leave a gap, don't repeat a stale average
         const scores = weeklyScores.get(id)!;
         const trailing = scores.slice(-WINDOW);
-        if (trailing.length === 0) return;
         const avg = trailing.reduce((sum, s) => sum + s, 0) / trailing.length;
         row[`t${id}`] = Math.round(avg * 10) / 10;
       });

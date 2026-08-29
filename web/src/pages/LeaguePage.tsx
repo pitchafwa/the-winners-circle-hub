@@ -164,7 +164,7 @@ export default function LeaguePage() {
         <div className="section-head">
           <h2 id="points-h">Points race</h2>
           <span className="label">
-            3-week rolling average PPG — your team in green
+            3-week rolling average PPG, playoffs included — your team in green
             {schedule.data && (
               <ScreenshotButton
                 targetRef={pointsChartRef}

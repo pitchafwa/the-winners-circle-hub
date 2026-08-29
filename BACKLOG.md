@@ -3,6 +3,49 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Points race chart: include real playoff games (2026-08-29)
+
+Tommy's follow-up: "add playoff weeks for the teams that made the
+playoffs, again only counting actual material playoff games and not
+consolation."
+
+- ESPN's `playoff_tier` on each `ScheduleEntry` distinguishes three
+  `is_playoff: true` buckets: `WINNERS_BRACKET` (the real championship
+  bracket), `WINNERS_CONSOLATION_LADDER`, and
+  `LOSERS_CONSOLATION_LADDER` (5th-10th place games for teams that
+  already missed the real playoffs). Confirmed this directly against
+  real 2025 data before writing any code. The filter in
+  `PointsPaceChart` now admits `!e.is_playoff || e.playoff_tier ===
+  "WINNERS_BRACKET"` instead of excluding all playoff weeks outright —
+  the previous `matchup_period <= meta.reg_season_weeks` cutoff is gone
+  too, since it's now redundant with the tier filter.
+- **A team that misses the playoffs (or gets eliminated from
+  `WINNERS_BRACKET`) needs its line to stop, not flatline.** Added a
+  per-week `playedThisWeek` set built from that week's actual decided
+  `WINNERS_BRACKET`/regular-season entries; a team's `row[t{id}]` is
+  only written for weeks it actually played. Combined with the
+  existing `connectNulls` on each `<Line>`, this renders as a real gap
+  in a missed/eliminated team's line rather than repeating its last
+  known rolling average indefinitely into playoff weeks it didn't
+  play — the code previously would have kept recomputing a "trailing
+  average" from stale scores since `weeklyScores` never got a fresh
+  push, silently faking data for weeks with no real game.
+- Subtitle updated: "3-week rolling average PPG, playoffs included —
+  your team in green".
+- Verified against real 2025 data end-to-end, not just visually:
+  independently recomputed the whole per-team weekly series via a live
+  `fetch()` in the browser console (same filter/window logic,
+  hand-written separately from the component) and it matched the
+  chart's rendered path data exactly, including Tommy's own team's
+  values through week 17. Separately confirmed via the rendered SVG
+  path endpoints that exactly the 4 teams that missed the real
+  `WINNERS_BRACKET` (`[2, 7, 8, 9]` this season) have lines stopping
+  at week 14, and the 6 teams that made it (`[1, 3, 4, 5, 6, 10]`)
+  extend into weeks 15-17, each stopping at its own real elimination
+  point rather than every playoff team's line ending at the same week.
+  `npx tsc --noEmit` and production build both clean, no console
+  errors.
+
 ## Points race chart: cumulative total → 3-week rolling PPG (2026-08-29)
 
 Tommy's feedback on the just-shipped cumulative version: "given the range

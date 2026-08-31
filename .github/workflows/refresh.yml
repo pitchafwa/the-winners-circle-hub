@@ -180,6 +180,12 @@ jobs:
       - name: Run ingest
         working-directory: ingest
         env:
+          # Python fully block-buffers stdout when it isn't a real
+          # terminal (true here) — without this, build.py's own print()
+          # progress lines can sit invisible in the live Actions log for
+          # minutes even though the run is progressing normally
+          # underneath, which reads as a hang when it may not be one.
+          PYTHONUNBUFFERED: "1"
           LEAGUE_ID: "29471"
           # Set these as repository secrets before enabling the schedule above.
           # Public-league fetches work without them; they're only needed to

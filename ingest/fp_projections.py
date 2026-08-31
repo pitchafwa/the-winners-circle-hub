@@ -156,6 +156,7 @@ def points_by_pid(season: int, week: int, league_names: dict[int, str], offline:
     from parse import _normalize_name  # local import: avoid a circular import at module load
 
     name_to_fp = valuation.fantasypros_player_ids_by_name(offline)
+    print(f"  FantasyPros crosswalk: {len(name_to_fp)} names available from the cheat-sheet scrape")
 
     espn_to_fpid: dict[int, int] = {}
     ids_by_position: dict[str, list[int]] = {}
@@ -170,16 +171,22 @@ def points_by_pid(season: int, week: int, league_names: dict[int, str], offline:
         fpid, position = hit
         espn_to_fpid[pid] = fpid
         ids_by_position.setdefault(position, []).append(fpid)
+    print(f"  FantasyPros crosswalk: {len(espn_to_fpid)}/{len(league_names)} rostered players matched an id")
 
     path = _cache_path(season, week)
     cached = _read_cache(path)
     points_by_fpid: dict[str, float] = {}
     if cached and (cached[1] and (datetime.now(timezone.utc) - cached[1]) <= MIN_REFETCH_INTERVAL):
+        print(f"  FantasyPros projections: using cache from {cached[1].isoformat()} "
+              f"({len(cached[0])} players) — within the {MIN_REFETCH_INTERVAL} refetch interval")
         points_by_fpid = cached[0]
     elif not offline and config.FANTASYPROS_API_KEY:
+        print(f"  FantasyPros projections: fetching fresh (cache "
+              f"{'absent' if cached is None else 'stale, last ' + cached[1].isoformat()})")
         try:
             points_by_fpid = _fetch_all(season, week, ids_by_position)
             _write_cache(path, points_by_fpid, datetime.now(timezone.utc))
+            print(f"  FantasyPros projections: fetched {len(points_by_fpid)} players' worth of data")
         except Exception as e:  # noqa: BLE001 — network failure: fall back, don't crash the build
             print(f"  FantasyPros projections fetch failed ({e}); "
                   f"using cached values" if cached else
@@ -187,9 +194,14 @@ def points_by_pid(season: int, week: int, league_names: dict[int, str], offline:
             points_by_fpid = cached[0] if cached else {}
     elif cached:
         points_by_fpid = cached[0]
+    else:
+        print(f"  FantasyPros projections: skipped (offline={offline}, "
+              f"key {'set' if config.FANTASYPROS_API_KEY else 'missing'}, no cache)")
 
-    return {
+    result = {
         pid: points_by_fpid[str(fpid)]
         for pid, fpid in espn_to_fpid.items()
         if str(fpid) in points_by_fpid
     }
+    print(f"  FantasyPros projections: {len(result)}/{len(league_names)} rostered players have a real week {week} projection")
+    return result

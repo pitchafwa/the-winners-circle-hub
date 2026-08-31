@@ -17,7 +17,16 @@ from __future__ import annotations
 import parse
 
 
-def build_roster_cards(season: int, league: parse.LeagueData) -> dict[int, dict]:
+def build_roster_cards(season: int, league: parse.LeagueData,
+                       fp_points: dict[int, float] | None = None) -> dict[int, dict]:
+    """`fp_points` (player_id -> FantasyPros' PPR projection for the
+    current week, from fp_projections.points_by_pid()) is optional —
+    None/empty just means every card's `fp_projection` comes back None,
+    same as any other not-yet-available stat here. Kept as a plain
+    parameter rather than fetched inside this module so build.py stays
+    the one place that decides whether/when to hit a rate-limited
+    external API, matching how every other network-backed input
+    (dynasty/redraft values, pick curves) already flows into build_season."""
     raw = parse._load(season, "league")
     if not raw:
         return {}
@@ -26,6 +35,7 @@ def build_roster_cards(season: int, league: parse.LeagueData) -> dict[int, dict]
     pro = parse.pro_team_schedule(season)
     recent = parse.recent_player_performance(league)
     current_week = parse.current_fantasy_week(league)
+    fp_points = fp_points or {}
 
     out: dict[int, dict] = {}
     for t in raw.get("teams", []):
@@ -77,6 +87,11 @@ def build_roster_cards(season: int, league: parse.LeagueData) -> dict[int, dict]
                 "on_bye": on_bye,
                 "next_game": next_game,
                 "week_projection": week_projection,
+                # FantasyPros' generic-PPR consensus for the same week —
+                # LM-Tools-gated on the frontend (see fp_projections.py's
+                # module docstring for why this is a second opinion, not
+                # scored against this league's exact custom rules).
+                "fp_projection": fp_points.get(pid),
                 "recent": player_recent,
                 "recent_avg_diff": round(sum(diffs) / len(diffs), 1) if diffs else None,
                 "on_fire": on_fire,
@@ -129,7 +144,7 @@ def build_roster_cards(season: int, league: parse.LeagueData) -> dict[int, dict]
                     "player_id": None, "name": None, "position": None,
                     "pro_team": None, "slot": parse.SLOT_NAMES.get(slot_id, str(slot_id)),
                     "injury_status": None, "on_bye": False, "next_game": None,
-                    "week_projection": None, "recent": [], "recent_avg_diff": None,
+                    "week_projection": None, "fp_projection": None, "recent": [], "recent_avg_diff": None,
                     "on_fire": False, "on_ice": False, "suggested": False,
                 }
 

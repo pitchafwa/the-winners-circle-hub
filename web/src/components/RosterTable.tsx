@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { pts, signed, gameTime } from "../lib/format";
 import { displayOrderIndices } from "../lib/lineupOrder";
+import { useApp } from "../state/AppContext";
 import PlayerCardTrigger from "./PlayerCardTrigger";
 import PlayerHeadshot from "./PlayerHeadshot";
 import type { RosterPlayerCard, TeamRoster } from "../types/data";
@@ -30,7 +31,7 @@ function OppCell({ card }: { card: RosterPlayerCard }) {
   );
 }
 
-function PlayerRow({ card }: { card: RosterPlayerCard }) {
+function PlayerRow({ card, showFp }: { card: RosterPlayerCard; showFp: boolean }) {
   const injury =
     card.injury_status && card.injury_status !== "ACTIVE"
       ? (INJURY_ABBR[card.injury_status] ?? card.injury_status)
@@ -78,6 +79,11 @@ function PlayerRow({ card }: { card: RosterPlayerCard }) {
       </td>
       <td><OppCell card={card} /></td>
       <td className="num">{pts(card.week_projection)}</td>
+      {showFp && (
+        <td className="num muted" title="FantasyPros' generic PPR consensus projection — a second opinion, not scored against this league's exact custom rules the way ESPN's own projection above is">
+          {pts(card.fp_projection)}
+        </td>
+      )}
       <td className="num muted">{pts(last)}</td>
       <td className="num muted">{pts(last3)}</td>
       <td className={`num ${card.recent_avg_diff !== null ? (card.recent_avg_diff >= 0 ? "pos" : "neg") : ""}`}>
@@ -87,8 +93,8 @@ function PlayerRow({ card }: { card: RosterPlayerCard }) {
   );
 }
 
-function RosterSection({ title, cards, totalProjected }: {
-  title: string; cards: RosterPlayerCard[]; totalProjected?: number;
+function RosterSection({ title, cards, totalProjected, totalFp, showFp }: {
+  title: string; cards: RosterPlayerCard[]; totalProjected?: number; totalFp?: number; showFp: boolean;
 }) {
   if (cards.length === 0) return null;
   return (
@@ -96,16 +102,23 @@ function RosterSection({ title, cards, totalProjected }: {
       <tr className="roster-section-row">
         <td colSpan={3}>{title}</td>
         <td className="num">{totalProjected !== undefined ? pts(totalProjected) : ""}</td>
+        {showFp && <td className="num muted">{totalFp !== undefined ? pts(totalFp) : ""}</td>}
         <td colSpan={3}></td>
       </tr>
       {cards.map((c, i) => (
-        <PlayerRow key={c.player_id ?? `empty-${i}`} card={c} />
+        <PlayerRow key={c.player_id ?? `empty-${i}`} card={c} showFp={showFp} />
       ))}
     </>
   );
 }
 
 const RosterTable = forwardRef<HTMLTableElement, { roster: TeamRoster }>(function RosterTable({ roster }, ref) {
+  // FantasyPros' projection column is LM-Tools-gated (same password gate
+  // as the rest of that menu) — a third-party projection isn't core site
+  // content the way ESPN's own is, and this keeps the column out of the
+  // way for anyone who hasn't unlocked LM Tools.
+  const { adminUnlocked } = useApp();
+
   // Display order only — roster.json's own starting-slot order (real ESPN
   // ascending slot-id order) is untouched; RB/WR and FLEX render grouped
   // right after the WRs instead of split across the two ends of the list,
@@ -113,6 +126,7 @@ const RosterTable = forwardRef<HTMLTableElement, { roster: TeamRoster }>(functio
   const slotLabels = roster.starters.map((s) => s.slot);
   const orderedStarters = displayOrderIndices(slotLabels).map((i) => roster.starters[i]);
   const totalProjected = roster.starters.reduce((sum, s) => sum + (s.week_projection ?? 0), 0);
+  const totalFp = roster.starters.reduce((sum, s) => sum + (s.fp_projection ?? 0), 0);
 
   return (
     <div className="table-wrap">
@@ -123,6 +137,9 @@ const RosterTable = forwardRef<HTMLTableElement, { roster: TeamRoster }>(functio
             <th scope="col">Player</th>
             <th scope="col">Next game</th>
             <th scope="col" className="num">Proj</th>
+            {adminUnlocked && (
+              <th scope="col" className="num" title="FantasyPros' generic PPR consensus projection">FP</th>
+            )}
             <th scope="col" className="num" title="Points scored, most recent game">Last</th>
             <th scope="col" className="num" title="Average points scored over the last 3 games">Last3</th>
             <th scope="col" className="num"
@@ -132,9 +149,10 @@ const RosterTable = forwardRef<HTMLTableElement, { roster: TeamRoster }>(functio
           </tr>
         </thead>
         <tbody>
-          <RosterSection title="Starters" cards={orderedStarters} totalProjected={totalProjected} />
-          <RosterSection title="Bench" cards={roster.bench} />
-          <RosterSection title="IR" cards={roster.ir} />
+          <RosterSection title="Starters" cards={orderedStarters} totalProjected={totalProjected}
+            totalFp={totalFp} showFp={adminUnlocked} />
+          <RosterSection title="Bench" cards={roster.bench} showFp={adminUnlocked} />
+          <RosterSection title="IR" cards={roster.ir} showFp={adminUnlocked} />
         </tbody>
       </table>
     </div>

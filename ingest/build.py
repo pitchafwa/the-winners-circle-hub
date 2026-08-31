@@ -16,6 +16,7 @@ import time
 from datetime import datetime, timezone
 
 import config
+import fp_projections
 import metrics
 import ownership
 import parse
@@ -80,7 +81,8 @@ def _record_str(w, l, t):
 def build_season(season: int, dynasty_values: dict[str, int] | None = None,
                  valuation_updated_at: str | None = None,
                  redraft_values: dict[str, int] | None = None,
-                 pick_curves: dict[str, dict[str, list[float]]] | None = None) -> dict:
+                 pick_curves: dict[str, dict[str, list[float]]] | None = None,
+                 offline: bool = False) -> dict:
     """Write every data file for one season. Returns summary for seasons.json."""
     league = parse.load_league(season)
     out_dir = config.DATA_DIR / str(season)
@@ -515,7 +517,18 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     # season's roster anyway (it's always TODAY'S roster). Same
     # stale-file-must-not-outlive-its-data-source rule as sim.json/draft.json.
     if not league.season_over:
-        cards = roster_card.build_roster_cards(season, league)
+        # Only this season's actually-rostered players, NOT
+        # global_player_names()'s full ~2,600-player NFL-wide pool (that
+        # merge is right for values_by_pid()'s valuation use case, where
+        # any player anywhere might matter, but wrong here — it triples
+        # the real chunk count against the rate-limited API for names
+        # that will never appear on a roster card anyway).
+        fp_points = fp_projections.points_by_pid(
+            season, parse.current_fantasy_week(league),
+            parse.roster_player_names(season),
+            offline=offline,
+        )
+        cards = roster_card.build_roster_cards(season, league, fp_points)
         if cards:
             _write(out_dir / "roster.json", {
                 "generated_at": generated_at,
@@ -848,7 +861,8 @@ def main():
 
     for season in seasons:
         print(f"Building {season}...")
-        build_season(season, dynasty_values, valuation_updated_at, redraft_values, pick_curves)
+        build_season(season, dynasty_values, valuation_updated_at, redraft_values, pick_curves,
+                    offline=args.offline)
 
     # cross-season aggregates always span every season on record, even when
     # --season restricted the per-season build loop above (e.g. the trade/

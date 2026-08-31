@@ -19,6 +19,10 @@ SEASON = int(os.getenv("SEASON", "2026"))
 ESPN_S2 = os.getenv("ESPN_S2") or None
 SWID = os.getenv("SWID") or None
 
+# Optional — only needed for the FantasyPros weekly-projection column on
+# the My Team roster (fp_projections.py). Free tier, 50 requests/day.
+FANTASYPROS_API_KEY = os.getenv("FANTASYPROS_API_KEY") or None
+
 CACHE_DIR = Path(__file__).resolve().parent / ".cache"
 DATA_DIR = ROOT / "web" / "public" / "data"
 

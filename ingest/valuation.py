@@ -282,6 +282,28 @@ def fantasypros_redraft_values_by_name(offline: bool = False) -> tuple[dict[str,
     return values, fetched_at
 
 
+def fantasypros_player_ids_by_name(offline: bool = False) -> dict[str, tuple[int, str]]:
+    """normalized_name -> (FantasyPros player_id, position_id), from the
+    SAME free cheat-sheet scrape `fantasypros_redraft_values_by_name()`
+    already fetches — no extra request against the rate-limited v2 API.
+    This is the crosswalk fp_projections.py needs: the v2 Projections API
+    hard-caps every browse-style response at 10 players regardless of any
+    paging param (confirmed live 2026-08-31 — a `players=<id1>:<id2>:...`
+    request bypasses that cap for the exact ids you ask for, up to 10 per
+    call, but there's no way to ask it "who are you, Brock Purdy?" without
+    already knowing his numeric id first). This scrape has no such cap
+    (~517 players, every position including DST) and already carries a
+    real numeric `player_id` per player — the same one the Projections
+    API's `players=` filter expects."""
+    players, _ = _get_players(FANTASYPROS_REDRAFT, offline)
+    from parse import _normalize_name  # local import: avoid a circular import at module load
+
+    return {
+        _normalize_name(p["player_name"]): (p["player_id"], p["player_position_id"])
+        for p in players
+    }
+
+
 def ages_by_name(offline: bool = False) -> tuple[dict[str, float], str | None]:
     """normalized_name -> real age (fractional years, e.g. 24.4), from the
     SAME dynasty-rankings fetch values_by_name() already makes — no extra

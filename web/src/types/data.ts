@@ -729,6 +729,7 @@ export interface RosterPlayerCard {
   on_bye: boolean;
   next_game: RosterNextGame | null;
   week_projection: number | null;
+  fp_projection: number | null;
   recent: RosterRecentWeek[];
   recent_avg_diff: number | null;
   on_fire: boolean;

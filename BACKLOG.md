@@ -3,6 +3,83 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## FantasyPros weekly projections on the My Team roster (2026-08-31)
+
+Tommy got a FantasyPros API key (free tier, 50 requests/day) and wanted
+weekly projections shown next to ESPN's own on the My Team roster,
+LM-Tools-gated.
+
+- **The free tier hard-caps every browse-style response at 10 players,
+  no matter what** — confirmed live by downloading and reading the raw
+  OpenAPI spec (no `limit`/`page`/`offset` param exists at all) and by
+  testing `limit`/`page`/`offset` anyway (identical 10 players back
+  every time). The response payload itself self-labels this:
+  `{"limit":10,"public_api_limited":true,"tier":"free"}`. Talked
+  through the implications with Tommy directly before building around
+  it — his read: 10-per-call plus 50-calls/day explicitly implies up to
+  500 players/day is within the API's own stated rules, not a
+  workaround of them, and chunking requests to use exactly that is
+  legitimate. Confirmed technically too: an explicit
+  `players=<id1>:<id2>:...` request for specific FantasyPros ids (not a
+  broad position browse) DOES return real, non-fabricated data for
+  players outside the top-10 — tested live with Brock Purdy and Kyler
+  Murray, both well outside any top-10-by-position list, both came back
+  with real projections.
+- **Getting from an ESPN player to a FantasyPros id doesn't cost
+  anything against the 50/day budget**: new
+  `valuation.fantasypros_player_ids_by_name()` reuses the SAME free,
+  uncapped HTML-scrape cheat-sheet fetch `fantasypros_redraft_values_by_name()`
+  already makes every build for the redraft valuation feature (~517
+  players, every position including all 32 D/ST, real numeric FantasyPros
+  `player_id` per entry) — zero extra requests against the rate-limited
+  API.
+- New `ingest/fp_projections.py`: crosswalks this season's actually-
+  rostered ESPN players (NOT the ~2,600-player global name pool —
+  found and fixed a real bug where the first pass matched against that
+  instead, tripling the real chunk count for names that could never
+  appear on a roster card) against FantasyPros ids by name, with a
+  from-scratch D/ST nickname matcher (ESPN: "Jaguars D/ST", FantasyPros:
+  "Jacksonville Jaguars" — matches on the last real word once the D/ST
+  marker is stripped, no hardcoded team table needed since every current
+  NFL nickname is one word). Chunks the matched ids into <=10-id
+  `players=` requests per position, one real API call per chunk — a
+  10-team league's ~180 rostered players is ~19 calls, comfortably
+  inside the 50/day cap even cached at a 12h refetch interval (same
+  convention `valuation.py` already uses). Per-chunk failure handling
+  (one bad chunk doesn't cost every other chunk's results) plus a
+  `MAX_CALLS_PER_FETCH=45` hard ceiling regardless of how large the
+  matched-id set ever gets.
+- New `fp_projection` field on every `roster.json` player card
+  (`DATA.md` updated). `RosterTable.tsx`: new "FP" column, rendered
+  (header and cells) only when `adminUnlocked` — verified live both
+  ways, present when LM Tools is unlocked, completely absent from the
+  DOM when it's locked.
+- `FANTASYPROS_API_KEY` added to `.env` (gitignored, mirrors
+  `ESPN_S2`/`SWID`'s existing convention) and to `refresh.yml` as a new
+  repository secret reference — **Tommy still needs to add the actual
+  secret value in GitHub's repo settings himself**, same as he did for
+  `ESPN_S2`/`SWID` originally; no `gh` CLI available in this
+  environment to do it directly.
+- Verified the crosswalk end-to-end offline (no live calls needed):
+  178/179 rostered players matched a real FantasyPros id, the one miss
+  being a genuinely deep bench player FantasyPros' own ~517-player
+  universe doesn't cover. Ran a full offline rebuild across all 15
+  seasons to confirm zero regressions (every unrelated file changed
+  only its `generated_at` timestamp) and a live single-season rebuild
+  end-to-end with no crashes.
+- **Known limitation, not yet resolved**: real live-fetched projection
+  numbers aren't in production yet — this session's own testing (many
+  manual API calls made while diagnosing the 10-result cap and proving
+  the chunking workaround) used up today's real 50-request daily quota
+  before the actual roster fetch could complete, so `roster.json`
+  currently ships with every `fp_projection` still `null`. The code
+  path itself is proven correct (crosswalk + a handful of live
+  `players=` calls both confirmed working before quota ran out) — this
+  self-heals on the next scheduled CI run once FantasyPros' daily quota
+  resets, no code change needed, but real numbers won't appear on the
+  live site until that happens (and until the GitHub secret above is
+  actually set).
+
 ## Standings table: "as of week N" picker (2026-08-29)
 
 Tommy's follow-up to the playoff-finish standings change: "Implement the

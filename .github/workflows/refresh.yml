@@ -188,6 +188,11 @@ jobs:
           # season, since the cache above persists it after that.
           ESPN_S2: ${{ secrets.ESPN_S2 }}
           SWID: ${{ secrets.SWID }}
+          # Also a repository secret — needed for the FantasyPros weekly
+          # projections on the My Team roster (fp_projections.py). Free
+          # tier, 50 requests/day; missing entirely just means that
+          # column stays blank, same "optional" pattern as ESPN_S2/SWID.
+          FANTASYPROS_API_KEY: ${{ secrets.FANTASYPROS_API_KEY }}
         run: ~/.local/bin/uv run python build.py
 
       - name: Commit changed data

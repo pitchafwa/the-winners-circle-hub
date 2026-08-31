@@ -472,7 +472,7 @@ hold whatever's actually in those slots, no placeholders (they're not
 slot-count-limited the same way starters are).
 
 Each player card: `{player_id, name, position, pro_team, slot,
-injury_status, on_bye, next_game, week_projection, recent[],
+injury_status, on_bye, next_game, week_projection, fp_projection, recent[],
 recent_avg_diff, on_fire, on_ice, suggested}`.
 - `pro_team`: NFL team abbreviation (`parse.pro_team_schedule()`, sourced
   from the same cached `proschedule.json` the refresh-schedule generator
@@ -485,6 +485,17 @@ recent_avg_diff, on_fire, on_ice, suggested}`.
   (`statSourceId: 1`), read straight off the live roster snapshot — no
   separate fetch needed, the projection is already embedded in the same
   `league.json` response the roster itself comes from.
+- `fp_projection` (`ingest/fp_projections.py`, new 2026-08-31): FantasyPros'
+  generic PPR consensus projection for the same week — a second opinion,
+  not scored against this league's exact custom rules the way
+  `week_projection` above is. LM-Tools-gated on the frontend
+  (`RosterTable.tsx` only renders the column when `adminUnlocked`). Missing
+  for anyone FantasyPros doesn't have an id or projection for (a genuinely
+  deep/injured player, or the free tier's real per-call 10-result cap —
+  see that module's docstring for the full story, including why it's
+  fetched via chunked, explicitly-id'd requests rather than one broad
+  per-position browse). `null` entirely for any season other than the one
+  currently live, same as every other field on this file.
 - `recent[]`: up to the last 3 COMPLETED weeks' `{week, points, projected}`,
   newest first (`parse.recent_player_performance()`) — scanned from every
   team's real lineup that week (bench included), regardless of which

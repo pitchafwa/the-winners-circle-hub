@@ -719,15 +719,23 @@ def built_seasons() -> list[int]:
     shrank from all 15 real seasons down to just 3 over several automated
     runs, even though 2012-2023's own JSON files sat on disk untouched
     and correct the whole time, because seasons.json's own season list
-    was built from cached_seasons() alone). Used ONLY for seasons.json's
-    listing, not for all_seasons (badges/h2h aggregation genuinely needs
-    a fresh cache-backed parse.load_league() per season, so those stay
-    scoped to whatever's cache-available this run) — this makes the
-    *listing* self-healing against a thin cache without ever silently
-    computing cross-season stats from stale/partial data. build_season()
-    is guarded elsewhere to never overwrite real per-season data with an
-    empty result on a cache-miss run, so a season showing up here always
-    has trustworthy JSON behind it, cache or no cache this run."""
+    was built from cached_seasons() alone). Two uses, both read-only
+    against DATA_DIR, never all_seasons (badges/h2h aggregation
+    genuinely needs a fresh cache-backed parse.load_league() per season,
+    so those stay scoped to whatever's cache-available this run): (1)
+    seasons.json's own listing, self-healing against a thin cache
+    without ever silently computing cross-season stats from stale/
+    partial data; (2) main()'s pre-loop historical backfill, skipping
+    any year already here rather than blindly re-attempting a live ESPN
+    fetch for it every single run regardless of whether that year would
+    even get rebuilt this run — 2026-08-31 confirmed live: this used to
+    unconditionally re-attempt fetching ALL of 2012-2023's history every
+    run whenever the CI cache was thin, a real contributor to that same
+    run's later 429 flooding on the current season's own fetches.
+    build_season() is guarded elsewhere to never overwrite real
+    per-season data with an empty result on a cache-miss run, so a
+    season showing up here always has trustworthy JSON behind it, cache
+    or no cache this run."""
     if not config.DATA_DIR.exists():
         return []
     return sorted(
@@ -799,9 +807,29 @@ def main():
             print(f"FETCH FAILED: {e}", file=sys.stderr)
             print("Continuing with previously cached data.", file=sys.stderr)
 
-        # one-time backfill of past seasons (immutable, cached forever)
+        # One-time backfill of past seasons (immutable, cached forever) —
+        # skip any year already_built (real meta.json already on disk and
+        # committed) rather than checking ingest/.cache/ alone. That cache
+        # is CI-ephemeral (actions/cache, evictable — see built_seasons()'s
+        # docstring for the full story) and this loop used to run
+        # unconditionally every single time regardless of whether that
+        # cache was actually intact: on a run with a thin/evicted cache,
+        # this silently attempted a full live refetch of ALL 2012-2023
+        # history every run, even though not one of those years would
+        # even get rebuilt this run (a year missing from cached_seasons()
+        # below never enters the per-season build loop either) — pure
+        # wasted request volume against ESPN for years that never
+        # actually change, and very plausibly a real contributor to the
+        # 429 flooding seen 2026-08-31 on the SAME run's later, real
+        # current-season fetches. A genuinely new past season (last
+        # year's, freshly concluded) still gets picked up here exactly
+        # once, the first run after it's not "current" anymore — it just
+        # won't be re-attempted every run after that like it used to.
+        already_built = set(built_seasons())
         previous = league.previousSeasons if league else []
         for year in previous:
+            if year in already_built:
+                continue
             try:
                 if fetch.fetch_history_raw(year) is not None:
                     print(f"  fetched history {year}")
@@ -813,6 +841,8 @@ def main():
         # web page stops displaying it — everything from 2024 on already comes
         # through fetch_season() above as the "current" season of its year.
         for year in HISTORICAL_BOXSCORE_YEARS:
+            if year in already_built:
+                continue
             try:
                 n = fetch.fetch_history_boxscores(year)
                 if n:

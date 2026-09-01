@@ -3,6 +3,86 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Real historical KTC values for trade & draft grades (2026-08-31)
+
+Tommy found a real resource: a community-maintained Google Sheet
+(gid `699541356`, "1QB Historical Data" tab) snapshotting KTC's full 1QB
+dynasty rankings once a day since 2020-04-01 — confirmed live, 2,344 rows,
+~464 named players plus 37 draft-pick columns already shaped like KTC's
+live Early/Mid/Late round-tier format. Used it to fix a real accuracy gap:
+trade grades and draft grades were both pricing every asset at TODAY's
+value, not what it was actually worth when the transaction happened.
+
+- **New `ingest/ktc_history.py`**: one-time fetch of the archive's CSV
+  export (public, no auth), cached forever
+  (`ingest/.cache/ktc_history/1qb-daily.json`, gitignored like every other
+  raw fetch cache — re-fetching costs nothing if a CI cache eviction ever
+  loses it, since it's the same immutable historical rows either way, so no
+  special persistence handling needed beyond the existing `actions/cache`).
+  `value_on_date(name, date)` and `pick_value_on_date(pick_year, round,
+  round_pick, date)` / `pick_round_average_on_date(pick_year, round, date)`
+  — the pick functions reuse `valuation.py`'s existing
+  `_TIER_ANCHOR_SLOT`/`_interpolate_round()` interpolation math directly
+  rather than reimplementing it, since the archive's columns are already
+  shaped exactly like KTC's live fetch. Missing means missing everywhere
+  (a player/pick not in the archive, or a date outside its range, returns
+  `None` — never fabricated).
+- **Real bug caught during verification, not shipped**: the first pass
+  derived a traded pick's draft-class YEAR from the trade's own date
+  instead of the pick's own designated year (e.g. a "2026 1st" traded in
+  November 2025 needs the 2026 columns, not 2025's) — every future-year
+  pick in a real trade silently came back `unavailable` even though the
+  archive plainly had the data, because it was reading a column that never
+  existed ("2025 Early 1st" instead of "2026 Early 1st"). Caught by
+  actually cross-checking real trades from `manual_trades.json` against the
+  archive by hand rather than trusting the code path looked right — fixed
+  by threading the pick's own year through as a real, separate parameter
+  from the lookup date everywhere. `unavailable` count dropped from 22 to
+  18 assets after the fix, and every remaining one was confirmed
+  individually legitimate (a genuinely unranked recent rookie, or a
+  2-years-out pick the archive has no data for that far ahead yet).
+- **Trade grading** (`trade_grades.py`): every asset is now priced fresh on
+  every build from the trade's real `date`, never stored/frozen.
+  Retired the earlier "freeze market value at submission time"
+  mechanism entirely (`trade_tool.py cmd_submit` no longer computes or
+  writes a `value` at all) — a trade from years ago is now priced as of
+  its own real date, not whenever it happened to get typed into this tool
+  (or, for the 22 trades that predated that mechanism, the single
+  2026-08-25 backfill date regardless of when they actually happened).
+  `value_source` simplified from `"snapshot"/"current_fallback"/
+  "unavailable"` to `"historical"/"unavailable"`; `uses_current_value_fallback`
+  removed from the schema entirely (nothing "falls back to current" for
+  trades anymore — genuinely missing data is just `unavailable`).
+- **Draft grading** (`build.py`'s `compute_draft()` call site): reverses an
+  earlier, deliberate design choice — `valuation.py`'s docstring explicitly
+  said draft grading should use "today's" value on purpose (within-class
+  normalization already handles cross-season fairness, hindsight from a
+  bust/breakout isn't real draft skill). Confirmed directly with Tommy
+  before touching it: he explicitly wants real draft-day values instead,
+  since that measures a genuinely different, also-legitimate question
+  ("was this a smart pick given what was knowable then" vs. "how good does
+  this asset look today"). Manual draft CSVs have no per-pick date at all
+  (round/pick/team/player only) — checked git blame on all three
+  `manual_draft/*.csv` files first (all added within the same two-week
+  window in one bulk-import session, so not a usable signal either) — uses
+  a single documented proxy date per season instead (`DRAFT_DATE_PROXY_MD =
+  "08-20"`, Tommy's explicit choice over digging up exact dates, since a
+  whole rookie draft happens in one sitting). Falls back to the existing
+  live/static curve per-player or per-round wherever the historical archive
+  has no data for that specific season's proxy date.
+- Updated `DATA.md`'s `trades.json` and `{season}/draft.json` contract
+  sections, and `valuation.py`'s module docstring (which used to document
+  the now-reversed "draft grading is deliberately not season-scoped"
+  reasoning as current fact).
+- Verified end-to-end: ran a full offline rebuild across all 15 seasons —
+  clean, no crashes. Spot-checked real trades from `manual_trades.json`
+  against the archive by hand (this is what caught the year-derivation
+  bug above); confirmed 2025's draft class now prices e.g. Ashton Jeanty
+  (the real 2025 1.01) at his real 2025-08-20 value rather than today's,
+  and confirmed the historical pick curve genuinely differs from the live
+  one at the same round/pick (not silently still reading the live curve).
+  `npx tsc --noEmit` clean.
+
 ## FantasyPros weekly projections on the My Team roster (2026-08-31)
 
 Tommy got a FantasyPros API key (free tier, 50 requests/day) and wanted

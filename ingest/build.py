@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 
 import config
 import fp_projections
+import ktc_history
 import metrics
 import ownership
 import parse
@@ -28,6 +29,17 @@ import trade_grades
 # Rookie draft rounds this league has ever run — matches ingest/pick_values.json
 DRAFT_ROUNDS = [1, 2, 3, 4]
 PICK_FUTURES_HORIZON_YEARS = 3
+
+# Real per-pick draft dates aren't tracked anywhere (manual_draft/*.csv has
+# no date column, just round/pick/team/player) — a rookie draft happens in
+# one sitting, so one proxy date per season is enough to price it against
+# ktc_history's real archive. Tommy's call: a documented approximation
+# (mid-to-late August, not a tracked exact date) rather than digging up the
+# real day for each season. Checked git blame on the manual_draft CSVs
+# first — all three were added within the same two-week window in one bulk
+# import session, so that's not a usable signal either, just when they
+# happened to get typed into this repo.
+DRAFT_DATE_PROXY_MD = "08-20"
 
 # ESPN's box-score API still returns per-player lineup + points data for
 # these seasons even though the box-score web page stops displaying it —
@@ -483,8 +495,29 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     picks, draft_problems = parse.load_manual_draft(season, league.teams, names)
     for prob in draft_problems:
         print(f"  manual draft {season}: {prob}", file=sys.stderr)
-    draft = metrics.compute_draft(league, picks, names, dynasty_values, valuation_updated_at,
-                                  parse.pick_values_for_season(season, pick_curves))
+
+    # Price this season's draft class against REAL market values on (a proxy
+    # for) its actual draft date, not today's — see DRAFT_DATE_PROXY_MD's
+    # comment. Falls back to the live/static current-day values (the old
+    # behavior) per-player/per-round wherever ktc_history has no real
+    # historical data for that specific lookup, never fabricated.
+    draft_date = f"{season}-{DRAFT_DATE_PROXY_MD}"
+    season_dynasty_values = dict(dynasty_values)
+    for p in picks:
+        name = p.get("player")
+        if not name:
+            continue
+        hist = ktc_history.value_on_date(name, draft_date)
+        if hist is not None:
+            season_dynasty_values[parse._normalize_name(name)] = hist
+    live_pick_values = parse.pick_values_for_season(season, pick_curves)
+    season_pick_values = {}
+    for round_str, live_curve in live_pick_values.items():
+        hist_curve = [ktc_history.pick_value_on_date(season, int(round_str), slot, draft_date) for slot in range(1, 11)]
+        season_pick_values[round_str] = hist_curve if all(v is not None for v in hist_curve) else live_curve
+
+    draft = metrics.compute_draft(league, picks, names, season_dynasty_values, valuation_updated_at,
+                                  season_pick_values)
     if draft:
         _write(out_dir / "draft.json", {
             "generated_at": generated_at, **draft, "problems": draft_problems})
@@ -797,6 +830,9 @@ def main():
     ap.add_argument("--season", type=int, help="build only this season")
     args = ap.parse_args()
 
+    if ktc_history.ensure_fetched(offline=args.offline):
+        print("Fetched the real historical KTC value archive (one-time, cached forever).")
+
     if not args.offline:
         import fetch
         print(f"Fetching season {config.SEASON}...")
@@ -917,7 +953,7 @@ def main():
     print("Building trade grades...")
     _write(config.DATA_DIR / "trades.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        **trade_grades.grade_trades(dynasty_values, valuation_updated_at, ownership_data["stints"], pick_curves),
+        **trade_grades.grade_trades(valuation_updated_at, ownership_data["stints"]),
     })
 
     print("Building pick futures board...")

@@ -145,17 +145,12 @@ def cmd_submit(payload: dict) -> dict:
     league = parse.load_league(season)
     names = _current_names(season)
 
-    # Freeze market value at the moment of the trade, straight onto the
-    # record — trade_grades.py reads this back forever after, rather than
-    # re-pricing old trades against whatever the market happens to be on
-    # each future rebuild. offline=True: use whatever's already cached
-    # (refreshed at least every 12h by normal builds) rather than blocking
-    # trade submission on a network round-trip.
-    import valuation
-    from trade_grades import _round_average
-    dynasty_values, valuation_updated_at = valuation.values_by_name(offline=True)
-    pick_curves, _pick_curves_fetched_at = valuation.pick_curve_by_year(offline=True)
-
+    # No value gets computed or frozen here anymore (2026-08-31) — every
+    # asset is priced fresh on every build, straight from ktc_history.py's
+    # real historical KTC archive, looked up on this trade's real `date`
+    # (trade_grades.py). Only the real record — who, what, when — gets
+    # stored; see that module's docstring for why a frozen-at-submission
+    # snapshot was retired in favor of always-correct historical pricing.
     manual = _load_manual_trades()
     trade_id = uuid.uuid4().hex[:8]
     stored_assets = []
@@ -164,18 +159,14 @@ def cmd_submit(payload: dict) -> dict:
             if not a.get("player_id"):
                 raise ValueError(f"cannot submit unresolved player '{a.get('raw_name')}'")
             name = names.get(a["player_id"], a.get("name") or a.get("raw_name"))
-            value = dynasty_values.get(parse._normalize_name(name)) if dynasty_values else None
             stored_assets.append({
                 "player": name,
                 "from": a["from"], "to": a["to"],
-                "value": value,
             })
         else:
-            pick_values = parse.pick_values_for_season(a["year"], pick_curves)
             stored_assets.append({
                 "pick": f"{a['year']} {a['round']}{_ordinal_suffix(a['round'])}",
                 "from": a["from"], "to": a["to"],
-                "value": _round_average(pick_values, a["round"]),
             })
             pick_tracking.upsert_pick_ownership(
                 manual["pick_ownership"], a["year"], a["round"], a["original_team_id"],
@@ -190,7 +181,6 @@ def cmd_submit(payload: dict) -> dict:
         "week": int(payload.get("week") or 0),
         "teams": involved_teams,
         "assets": stored_assets,
-        "valuation_snapshot_at": valuation_updated_at,
     })
     _save_manual_trades(manual)
     rebuild = _rebuild(season)

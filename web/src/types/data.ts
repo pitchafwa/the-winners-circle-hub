@@ -583,7 +583,7 @@ export interface Ownership {
   };
 }
 
-export type TradeValueSource = "snapshot" | "current_fallback" | "unavailable";
+export type TradeValueSource = "historical" | "unavailable";
 
 export interface TradeProductionSinceTrade {
   points_started: number;
@@ -625,7 +625,6 @@ export interface TradeGrade {
   value_by_team: Record<string, TradeValueSide>;
   winner_team_id: number | null;
   has_estimated_asset: boolean;
-  uses_current_value_fallback: boolean;
 }
 
 export interface TradeLedgerRow {

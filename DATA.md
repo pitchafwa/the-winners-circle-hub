@@ -567,19 +567,35 @@ entirely. There are two separate grades, shown separately:
   to spend to assemble its roster.
 
 `picks[]`: `{overall, round, round_pick, team_id, player_id, keeper, bid,
-name, position, value (current 1QB dynasty value, 0–9999), expected_value
-(a fixed external pick-value curve looked up by round/round_pick — see
-`ingest/pick_values.json` — NOT derived from this class's own players),
-value_diff (value − expected_value; this is what efficiency_grades sums),
-points/expected/diff (informational only: real season fantasy production and
-its own best-of-position resort — kept for context, NOT used for grading;
-null preseason)}`.
+name, position, value (1QB dynasty value on the draft's real date, 0–9999),
+expected_value (a pick-value curve looked up by round/round_pick, also
+resolved to that real draft date — NOT derived from this class's own
+players), value_diff (value − expected_value; this is what efficiency_grades
+sums), points/expected/diff (informational only: real season fantasy
+production and its own best-of-position resort — kept for context, NOT used
+for grading; null preseason)}`.
 Players outside the valuation source's ranked universe (essentially all D/ST
 and K, and deep dart-throw picks) get `value: 0` — an honest read: the market
 judges these to carry no real dynasty asset value, not unknown data.
-`expected_value` is `null` for any pick beyond what `pick_values.json` covers
-(currently rounds 1-4) rather than a guessed number, and `value_diff` is
-`null` whenever either input is — never a fabricated difference.
+`expected_value` is `null` for any pick beyond what the pick-value curve
+covers (currently rounds 1-4) rather than a guessed number, and `value_diff`
+is `null` whenever either input is — never a fabricated difference.
+
+**Priced on the draft's real date, not today's (2026-08-31 revision)**:
+`value`/`expected_value` used to come from a single always-current snapshot
+reused across every season — a rookie draft from years ago graded against
+today's market regardless of what those rookies were actually worth on
+draft day. Now sourced from `ingest/ktc_history.py`'s real daily KTC
+archive (2020-04-01 on — see that module's docstring), looked up on a proxy
+date for the season's draft (`build.py`'s `DRAFT_DATE_PROXY_MD`, currently
+August 20 of that season — manual draft CSVs have no real per-pick date on
+file, and a rookie draft happens in one sitting, so one documented
+approximate date per season is enough; this is Tommy's explicit, confirmed
+choice to reverse the earlier "always today's value" design). Falls back to
+the live/static current-day value, per-player or per-round, wherever the
+historical archive has no real data for that specific lookup (predates
+2020-04-01, or a player/pick the archive never ranked) — never fabricated,
+same "missing means missing" convention as everywhere else.
 
 **Why `expected_value` isn't derived from this league's own draft class
 (2026-08 revision)**: it used to be a smoothed average of nearby SAME-
@@ -680,40 +696,40 @@ start_season, start_week, end_season, end_week}`.
 
 ## `trades.json` (top level, cross-season)
 
-Every trade in `ingest/manual_trades.json`, graded on the same dynasty
-valuation table (`ingest/valuation.py`) that backs `draft.json` — no second
-baseline. Two independent signals per asset, deliberately never blended
-into one number (different units): market value AT THE TRADE (the actual
-grade) and, for players still on the roster, real production SINCE the
-trade (context only).
+Every trade in `ingest/manual_trades.json`, graded against real historical
+KTC values (`ingest/ktc_history.py`) looked up on the trade's own real
+`date` — no second baseline. Two independent signals per asset, deliberately
+never blended into one number (different units): market value AT THE TRADE
+(the actual grade) and, for players still on the roster, real production
+SINCE the trade (context only).
 
 `trades[]`: `{id, season, date, week, team_ids[],
 players[] {player_id, name, from_team_id, to_team_id, value, value_source,
 production_since_trade, flipped_again},
 picks[] {pick, from_team_id, to_team_id, value, value_source},
 value_by_team{"<team_id>": {gained, lost, net}}, winner_team_id,
-has_estimated_asset, uses_current_value_fallback}`.
+has_estimated_asset}`.
 
-**`value` / `value_source`** — every asset is priced the moment the trade
-is submitted: `trade_tool.py cmd_submit` snapshots the current dynasty
-value straight onto `manual_trades.json`'s asset record
-(`value_source: "snapshot"`), and that number is read back forever after,
-never re-priced against a later build's market. `value_source:
-"current_fallback"` (re-priced live every build, honestly flagged via
-`uses_current_value_fallback: true`) only happens for a trade with no
-stored snapshot at all — as of 2026-08-25, every trade on file has one
-(the 22 trades / 88 assets that predated this mechanism were backfilled
-once, at that date's market price, then frozen exactly like every other
-trade going forward) — this path is now effectively dead unless a future
-trade is somehow entered without going through `cmd_submit`. A traded pick
+**`value` / `value_source` (2026-08-31 revision)** — every asset is priced
+fresh on every build, straight from `ktc_history.value_on_date()` /
+`pick_round_average_on_date()` against the trade's real `date`
+(`value_source: "historical"`), never stored or frozen. This replaced an
+earlier design where `trade_tool.py cmd_submit` snapshotted the CURRENT
+market value onto the asset the moment the trade was entered into this tool
+(`value_source: "snapshot"`) and read that frozen number back forever after
+— meaning a trade from months or years ago was priced as of whenever it
+happened to get typed in (or, for the 22 trades that predated that
+mechanism, backfilled once on 2026-08-25 using that day's price regardless
+of the trade's real date), not what the assets were actually worth on the
+real trade date. `value_source: "unavailable"` means the archive has no
+real data for that specific asset on that date (predates 2020-04-01, or a
+player/pick the archive never ranked) — never fabricated. A traded pick
 can't be resolved to its exact draft slot from the trade record alone (that
 needs the original-owner + resolved-slot bookkeeping `pick_tracking.py`
 does at read time, not captured per historical trade), so pick `value` is
-always that draft year's **round average** — live where KTC's fetch covers
-it, `pick_values.json` fallback otherwise, see the `draft.json` section
-above — frozen at submission time same as players, and the trade gets
-`has_estimated_asset: true` regardless of source (it's always an estimate,
-never a resolved slot).
+always that draft year's **round average** on the trade's real date, and the
+trade gets `has_estimated_asset: true` regardless of source (it's always an
+estimate, never a resolved slot).
 
 **`production_since_trade`** (players only, `null` when not applicable) —
 `{points_started, points_projected_started, weeks_started, still_held}`,

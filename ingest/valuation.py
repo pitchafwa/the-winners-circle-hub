@@ -31,9 +31,27 @@ one position can see its own LATER pick's high output "steal" the expected
 value from its own EARLIER pick — punishing exactly the GMs who dominated
 a position. An external market value removes the self-reference entirely.
 
-Not season-scoped — one snapshot serves every season's draft grade, since
-the question ("how good is this asset today") is inherently a today
-question, not a historical one. Per user decision: DECAY IS HANDLED BY
+**Superseded 2026-08-31 for draft grading specifically**: this used to be
+the ONLY source draft grading had, so every season's report card was
+necessarily priced off one always-current snapshot — the reasoning below
+(decay handled by within-class normalization, not by comparing raw values
+across draft years) justified that as a deliberate design, not just a
+limitation. Once `ingest/ktc_history.py`'s real daily KTC archive existed,
+Tommy explicitly chose to reverse it: `build.py` now prices each season's
+draft class off real values on that season's actual (proxied) draft date,
+falling back to THIS module's always-current snapshot only where the
+historical archive has no data for a specific player/round. The values
+below are still what that fallback path uses, and still the sole source for
+trade grading's picks-that-predate-2020-04-01 case... except trade grading
+also moved to ktc_history.py entirely (see trade_grades.py) — at this point
+this module's real remaining primary consumers are the contend/rebuild
+spectrum (a team's CURRENT roster is inherently a today question, no
+historical dimension makes sense there) and draft grading's fallback path.
+Original reasoning, still valid for those:
+
+Not season-scoped — one snapshot serves every draft grade needing the
+fallback path, since the question ("how good is this asset today") is
+inherently a today question there. Per user decision: DECAY IS HANDLED BY
 NORMALIZING WITHIN EACH SEASON'S OWN DRAFT CLASS (share of that class's
 total current value), never by comparing raw values across different
 draft years — a rookie class from several years ago will naturally show

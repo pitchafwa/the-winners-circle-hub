@@ -4,14 +4,17 @@ Two separate signals, shown side by side rather than blended into one
 number (different units — a 0-9999 market score isn't fantasy points):
 
 - **Market value at trade time** — the actual grade. Every asset is priced
-  the moment the trade is submitted (`trade_tool.py cmd_submit` snapshots
-  `value` onto each asset in `manual_trades.json` right then, using the
-  same dynasty table that backs the draft report card) and that number is
-  frozen forever — a trade's grade doesn't drift as players' market value
-  moves after the fact. Trades entered before this existed have no stored
-  snapshot; those fall back to whatever the CURRENT dynasty value is,
-  flagged `uses_current_value_fallback` so the UI can be honest that side
-  isn't a true point-in-time read.
+  against `ktc_history.py`'s real daily KTC archive (2020-04-01 on), looked
+  up on the trade's own real `date` — not today's value, not a value frozen
+  at whatever moment the trade happened to be entered into this tool. This
+  replaced an earlier "freeze at submission time" design (`trade_tool.py
+  cmd_submit` used to snapshot `value` onto each asset right then) once real
+  historical data became available 2026-08-31 — that mechanism is retired;
+  a trade's grade is now always recomputed fresh from real history on every
+  build, never stored/frozen. `value_source` is `"historical"` when the
+  archive has real data for that asset on that date, `"unavailable"` when it
+  doesn't (predates the archive, or a player/pick the archive never ranked)
+  — flagged `has_estimated_asset`, never fabricated.
 
   This also naturally handles the "team flips the player again before he
   plays a snap" case without any lineage-tracing: each trade is graded
@@ -32,9 +35,10 @@ number (different units — a 0-9999 market score isn't fantasy points):
 Pick assets can't get a production overlay at all — resolving a pick to
 its eventual player needs the original-owner bookkeeping `pick_tracking.py`
 does at read time, which isn't captured per individual historical trade.
-Every traded pick is valued at its draft year's ROUND AVERAGE from
-pick_values.json (same as before) and the trade is flagged
-`has_estimated_asset`.
+Every traded pick is valued at its draft year's ROUND AVERAGE on the trade's
+real date (`ktc_history.pick_round_average_on_date()` — a traded pick is
+usually "a 2nd," no exact slot known yet since the season isn't over) and
+the trade is flagged `has_estimated_asset`.
 """
 from __future__ import annotations
 
@@ -44,6 +48,7 @@ from collections import defaultdict
 from datetime import datetime
 
 import config
+import ktc_history
 import metrics
 import parse
 
@@ -57,13 +62,6 @@ def _parse_pick_text(text: str) -> tuple[int, int] | None:
     if not m:
         return None
     return int(m.group(1)), int(m.group(2))
-
-
-def _round_average(pick_values: dict, round_: int) -> float | None:
-    row = pick_values.get(str(round_))
-    if not row:
-        return None
-    return round(sum(row) / len(row), 1)
 
 
 def _stints_by_team_player(stints: list[dict]) -> dict[tuple[int, int, int], list[dict]]:
@@ -90,11 +88,12 @@ def _matching_stint(index: dict[tuple[int, int, int], list[dict]],
     return None
 
 
-def grade_trades(dynasty_values: dict[str, int] | None, valuation_updated_at: str | None,
-                 stints: list[dict] | None = None,
-                 pick_curves: dict[str, dict[str, list[float]]] | None = None) -> dict:
-    dynasty_values = dynasty_values or {}
-    valuation_available = bool(dynasty_values)
+def grade_trades(valuation_updated_at: str | None, stints: list[dict] | None = None) -> dict:
+    """`valuation_updated_at` is passed straight through to the output
+    unchanged — it's the live KTC fetch timestamp shown elsewhere on the
+    site (the footer), unrelated to trade pricing now that every trade is
+    priced from ktc_history's real historical archive instead."""
+    valuation_available = ktc_history.is_available()
     stint_index = _stints_by_team_player(stints or [])
 
     path = config.ROOT / "ingest" / "manual_trades.json"
@@ -123,27 +122,20 @@ def grade_trades(dynasty_values: dict[str, int] | None, valuation_updated_at: st
         season = t["season"]
         week = t.get("week", 0)
         by_name = {parse._normalize_name(n): pid for pid, n in names_for(season).items()}
-        pick_values = parse.pick_values_for_season(season, pick_curves)
+        trade_date = t.get("date")
         date_ms = int(datetime.fromisoformat(t["date"]).timestamp() * 1000) if t.get("date") else 0
 
         value_by_team: dict[int, dict[str, float]] = {int(tid): {"gained": 0.0, "lost": 0.0}
                                                        for tid in t.get("teams", [])}
         has_estimated_asset = False
-        uses_current_value_fallback = False
         players_out, picks_out = [], []
 
         for a in t.get("assets", []):
             if "player" in a:
                 norm = parse._normalize_name(a["player"])
                 pid = by_name.get(norm)
-                stored = a.get("value")
-                if stored is not None:
-                    value, value_source = stored, "snapshot"
-                elif valuation_available:
-                    value, value_source = dynasty_values.get(norm, 0), "current_fallback"
-                    uses_current_value_fallback = True
-                else:
-                    value, value_source = None, "unavailable"
+                value = ktc_history.value_on_date(a["player"], trade_date) if trade_date else None
+                value_source = "historical" if value is not None else "unavailable"
 
                 production, flipped_again = None, False
                 if pid is not None:
@@ -169,17 +161,12 @@ def grade_trades(dynasty_values: dict[str, int] | None, valuation_updated_at: st
                     value_by_team.setdefault(a["to"], {"gained": 0.0, "lost": 0.0})["gained"] += value
                     value_by_team.setdefault(a["from"], {"gained": 0.0, "lost": 0.0})["lost"] += value
             elif "pick" in a:
-                stored = a.get("value")
-                if stored is not None:
-                    value, value_source = stored, "snapshot"
-                else:
-                    parsed = _parse_pick_text(a["pick"])
-                    value = _round_average(pick_values, parsed[1]) if parsed and valuation_available else None
-                    value_source = "current_fallback" if value is not None else "unavailable"
-                    if value is not None:
-                        uses_current_value_fallback = True
+                parsed = _parse_pick_text(a["pick"])
+                value = (ktc_history.pick_round_average_on_date(parsed[0], parsed[1], trade_date)
+                        if parsed and trade_date else None)
+                value_source = "historical" if value is not None else "unavailable"
                 if value is not None:
-                    has_estimated_asset = True
+                    has_estimated_asset = True  # always a round average, never a resolved slot
                 picks_out.append({
                     "pick": a["pick"], "from_team_id": a["from"], "to_team_id": a["to"],
                     "value": value, "value_source": value_source,
@@ -204,7 +191,6 @@ def grade_trades(dynasty_values: dict[str, int] | None, valuation_updated_at: st
             "value_by_team": {str(k): v for k, v in value_by_team.items()},
             "winner_team_id": winner_team_id,
             "has_estimated_asset": has_estimated_asset,
-            "uses_current_value_fallback": uses_current_value_fallback,
         })
 
     out.sort(key=lambda tr: -tr["date"])

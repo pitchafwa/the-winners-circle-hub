@@ -15,9 +15,6 @@ function AssetLine({ p, teamName }: { p: TradeGradeAsset; teamName: (id: number)
     <li>
       {label} → <TeamLink id={p.to_team_id}>{teamName(p.to_team_id)}</TeamLink>{" "}
       <span className="num">({valueText})</span>
-      {p.value_source === "current_fallback" && (
-        <span className="muted" style={{ fontSize: "0.72rem" }}> · current-value estimate</span>
-      )}
       {prod && (
         <span className="muted" style={{ fontSize: "0.78rem" }}>
           {" — "}{pts(prod.points_started, 0)} pts started since
@@ -108,12 +105,9 @@ export default function TradesPage() {
                       {t.players.map((p, i) => <AssetLine key={`player-${i}`} p={p} teamName={teamName} />)}
                       {t.picks.map((p, i) => <AssetLine key={`pick-${i}`} p={p} teamName={teamName} />)}
                     </ul>
-                    {(t.has_estimated_asset || t.uses_current_value_fallback) && (
+                    {t.has_estimated_asset && (
                       <div className="muted" style={{ fontSize: "0.72rem", fontStyle: "italic", marginBottom: "0.4rem" }}>
-                        {[
-                          t.has_estimated_asset && "includes an estimated pick value (round average, not a resolved slot)",
-                          t.uses_current_value_fallback && "at least one asset priced at today's value, not captured at trade time",
-                        ].filter(Boolean).join(" · ")}
+                        includes an estimated pick value (round average, not a resolved slot)
                       </div>
                     )}
                     {t.winner_team_id !== null && winnerSide ? (

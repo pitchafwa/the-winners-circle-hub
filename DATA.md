@@ -436,6 +436,62 @@ summed across the two teams, reusing those same per-team fields from
 construction, both involved teams' next remaining game). Sorted by
 `playoff_impact_score` descending — the biggest game of the week first.
 
+## `{season}/sim_by_week.json` (absent when season is over or schedule unknown, new 2026-09)
+
+Real playoff odds AS OF each completed regular-season week of the CURRENT
+season — the trend behind the League page's overlaid by-team chart and My
+Team's single-team version. Same file-lifecycle rule as `sim.json`:
+actively deleted, not just skipped, the moment `season_over` flips true.
+Deliberately not backfilled for past seasons — computing this retroactively
+for a season that's already over isn't practical (see below), so a past
+season's My Team page keeps the (unrelated) cumulative-bench-points-lost
+chart instead.
+
+`weeks{}`, keyed by week number as a string ("1".."reg_season_weeks" for
+whatever's actually been played), each value `{"<team_id>": playoff_pct}`
+for every team — no other `sim.json` fields (SE, title odds, seed
+distribution, etc.) are tracked per week, just the one number the trend
+chart needs.
+
+**How "as of week N" is computed** (`simulate.py`'s `_league_as_of_week()`
++ `playoff_pct_by_week()`): the SAME Monte Carlo engine that produces
+`sim.json`, run against a shallow-copied league whose `weeks` dict is
+filtered to `<= N` and whose `full_schedule` entries for
+`matchup_period > N` are forced back to `winner: "UNDECIDED"` — nothing in
+the simulation engine trusts `current_matchup_period`/`scoring_period_id`
+as ground truth for "how much of the season has happened," every signal is
+inferred from real decided-game data, so this truncation is sufficient to
+reuse `run()` completely unmodified. Same truncate-by-`matchup_period` idea
+`metrics.standings_by_week()` already uses for the analogous "standings as
+of week N" feature.
+
+**One accepted simplification**: `roster_strength_prior_shift()` (the
+preseason/early-season roster-quality nudge described in the `sim.json`
+section above) always reads TODAY's live roster, not week N's — so a
+reconstructed past week reflects what was actually decided through that
+week, but nudges its priors using today's roster composition. Only matters
+around a since-happened trade, and only before real results dominate the
+model's shrinkage; not worth reconstructing historical rosters to fix.
+
+**Why not backfilled for past seasons**: `roster_strength_prior_shift()`'s
+"today's roster" read is a hard dependency on the LIVE `.cache/{season}/league.json`
+roster snapshot for whichever season is CURRENT right now — there's no
+equivalent snapshot of "what a past season's roster looked like" to nudge
+priors with, and skipping that nudge entirely would make an old season's
+early weeks behave differently (and less accurately) than how the model
+actually behaves for the current season. Combined with the real compute
+cost (~20s per full season the first time), backfilling every past season
+wasn't judged worth it.
+
+**Expensive, so incrementally cached**: a full Monte Carlo run per week (up
+to ~17 weeks) took ~23s cold in testing; `playoff_pct_by_week()` reads back
+whatever this file already has on disk and reuses every week already
+present EXCEPT the single most-recently-completed one (always recomputed
+fresh, in case it just flipped from partially-played to fully decided since
+the last run) — same "completed weeks are immutable, only the current one
+refreshes" convention `fetch.py`'s box-score fetching already follows. A
+cached rerun took ~1s in the same test.
+
 ## `{season}/roster.json` (absent when season is over)
 
 Live roster cards for the My Team page — starters/bench/IR exactly as set on

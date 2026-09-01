@@ -70,8 +70,13 @@ function mastheadDate(meta: Meta | null): string {
 
 export default function Layout() {
   const { seasonsIndex, season, setSeason, meta, metaError, myTeamId, setMyTeamId, adminUnlocked } = useApp();
+  // Links to that team's CURRENT-SEASON page (MyTeamPage's team/:teamId
+  // route), not the historical franchise page — quick "check out their
+  // team" navigation without touching the globally-selected myTeamId.
+  // The historical page is still one click away from there ("View full
+  // franchise history →", already on that page).
   const franchiseItems = (meta?.teams ?? []).map((t) => ({
-    to: `/franchise/${t.id}`,
+    to: `/team/${t.id}`,
     label: t.nickname ?? t.name,
   }));
 

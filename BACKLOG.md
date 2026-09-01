@@ -3,6 +3,85 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Playoff probability by week + Franchises nav pivot (2026-09-01)
+
+Three related changes: the My Team "regret chart" (cumulative bench points
+lost) wasn't interesting — replaced with a real playoff-probability-by-week
+trend for the CURRENT season only (past seasons keep the regret chart,
+unbackfillable — see below); the League page gets the same trend overlaid
+across all 10 teams; the header's "Franchises" menu now links to a team's
+CURRENT-SEASON page instead of their historical career page (one click
+away from there instead).
+
+- **Key finding that made this cheap to build**: `ingest/simulate.py`'s
+  whole Monte Carlo engine never trusts `league.current_matchup_period` —
+  every "how much of the season has happened" signal comes from inspecting
+  `league.weeks`/`full_schedule` directly. So the real, existing engine
+  could be reused completely unmodified for "odds as of week N": new
+  `_league_as_of_week()` shallow-copies the league with `weeks` filtered
+  `<= N` and any later `full_schedule` entry forced back to
+  `winner: "UNDECIDED"`, same truncate-by-`matchup_period` idea
+  `metrics.standings_by_week()` already established for the analogous
+  "standings as of week N" feature.
+- New `simulate.playoff_pct_by_week()`: `{week: {team_id: pct}}` for every
+  completed regular-season week. Expensive (a full 10,000-sim run per
+  week), so incrementally cached — a week already in the previous build's
+  own `sim_by_week.json` is reused as-is UNLESS it's the single most-
+  recently-completed one, same "completed weeks are immutable, only the
+  current one refreshes" convention `fetch.py`'s box-score fetching
+  already follows. Verified live: a cold run across a real 14-week season
+  took ~23s, a cached rerun (only the latest week recomputed) took ~1s.
+- New `{season}/sim_by_week.json` (`build.py`, same file-lifecycle rule as
+  `sim.json` — actively deleted, not skipped, the moment `season_over`
+  flips true). One accepted simplification, documented in `DATA.md`:
+  `roster_strength_prior_shift()` always reads TODAY's live roster, not
+  week N's, so a reconstructed past week's roster-quality nudge isn't
+  perfectly period-accurate — only matters around a since-happened trade,
+  before real results dominate the model.
+- **Verified the engine's correctness against real history, not just
+  code review**: ran it against the real, completed 2025 season
+  (temporarily patched in-memory to look "in progress" for testing only,
+  never shipped) — the real 2025 champion's odds climbed to 100% by week
+  10 and held; the team that actually finished 2-12 faded to 0% by week
+  12. Exactly the shape a correct model should produce.
+- New `PlayoffOddsChart` (`HistoryCharts.tsx`), structurally identical to
+  the existing `BumpChart`/`PointsPaceChart` (your team in accent,
+  everyone else muted) except its rows come straight from the new
+  backend file rather than being reconstructed client-side — playoff odds
+  genuinely need the ingest-side simulation, unlike standings/scoring
+  pace. Takes `onlyTeamId`/`accentTeamId` so My Team's single-line version
+  and the League page's full 10-team overlay share one component.
+- `LeaguePage.tsx`: new "Playoff odds by week" section, same
+  `ScreenshotButton`/`useForceDesktopCapture` pattern as every other chart
+  on the page. `MyTeamPage.tsx`: swaps to the new chart only when
+  `!meta.season_over`; a past season's page is byte-for-byte unchanged
+  (still the regret chart).
+- **Nav pivot**: new `team/:teamId` route (`App.tsx`) renders the same
+  `MyTeamPage` — confirmed via exploration that every one of its data
+  fetches is already season-keyed with the specific team's slice picked
+  out client-side, so this needed zero new data fetches, just resolving
+  `teamId` from the route param (falling back to the global `myTeamId` on
+  the plain `/team` route, which keeps its exact original behavior) and
+  swapping about a dozen `myTeamId` references. New "Team not found" state
+  for a bogus id, distinct from the existing "pick your team" empty state.
+  `Layout.tsx`'s Franchises dropdown now points at `/team/{id}`; the
+  existing "View full franchise history →" link (already on the page)
+  generalized to the resolved `teamId` — that's the click-through back to
+  `/franchise/:teamId`.
+- Verified live: Franchises menu correctly lands on another team's
+  current-season page without touching the globally-selected team
+  selector (confirmed the header dropdown still reads the original team
+  after navigating); the "View full franchise history" link resolves to
+  the right team; `/team/999` (bogus id) shows "Team not found" instead of
+  crashing; `/team` (no param) is unchanged. New chart verified visually
+  with real data (temporary test data generated the same way the engine
+  was verified above, removed before shipping — 2026 itself has zero
+  completed weeks yet this preseason, so nothing to show live there until
+  real games are played): 10 lines rendered, the selected team correctly
+  accent-colored, real non-trivial week-to-week variation in the path
+  data. `npx tsc --noEmit` and production build both clean, no console
+  errors.
+
 ## Real historical KTC values for trade & draft grades (2026-08-31)
 
 Tommy found a real resource: a community-maintained Google Sheet

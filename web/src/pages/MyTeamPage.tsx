@@ -1,5 +1,5 @@
 import { useMemo, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
 import { MISSING, pct, pts, signed } from "../lib/format";
@@ -11,8 +11,9 @@ import PlayerHeadshot from "../components/PlayerHeadshot";
 import RosterTable from "../components/RosterTable";
 import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
+import { PlayoffOddsChart } from "../components/HistoryCharts";
 import { BenchChart, CoachChart, ScoringChart } from "../components/TeamCharts";
-import type { Badges, ProjectionReportRow, Roster, Sim, Teams, TopScorer } from "../types/data";
+import type { Badges, ProjectionReportRow, Roster, Sim, SimByWeek, Teams, TopScorer } from "../types/data";
 
 interface ScheduleRow {
   week: number;
@@ -46,14 +47,23 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 
 export default function MyTeamPage() {
   const { season, meta, myTeamId, teamsById, teamName } = useApp();
+  // A team id in the URL (the Franchises-menu nav pivot: "that team's
+  // current-season page," reachable for ANY team without touching the
+  // globally-selected myTeamId) wins over the global selection. The
+  // no-param /team route keeps its exact original behavior — always the
+  // globally-selected team, still the "Pick your team" gate below when
+  // nothing's picked yet.
+  const { teamId: teamIdParam } = useParams<{ teamId: string }>();
+  const teamId = teamIdParam ? Number(teamIdParam) : myTeamId;
   const rosterTableRef = useRef<HTMLTableElement>(null);
   const base = season !== null ? `${season}` : null;
   const teams = useJson<Teams>(base ? `${base}/teams.json` : null);
   const badges = useJson<Badges>("badges.json");
   const sim = useOptionalJson<Sim>(base ? `${base}/sim.json` : null);
+  const simByWeek = useOptionalJson<SimByWeek>(base ? `${base}/sim_by_week.json` : null);
   const roster = useOptionalJson<Roster>(base ? `${base}/roster.json` : null);
 
-  const my = teams.data?.teams.find((t) => t.team_id === myTeamId) ?? null;
+  const my = teams.data?.teams.find((t) => t.team_id === teamId) ?? null;
   const projSort = useSort<ProjectionReportRow>("diff", -1, (r, key) =>
     key === "player" ? r.name : (r[key as keyof ProjectionReportRow] as number | string),
   );
@@ -78,7 +88,10 @@ export default function MyTeamPage() {
 
   if (!meta) return null;
 
-  if (myTeamId === null) {
+  if (teamId === null) {
+    // Only reachable via the no-param /team route — the parameterized
+    // team/:teamId route always has a real (if possibly bogus) id from
+    // the URL, handled by the "Team not found" branch below instead.
     return (
       <section className="section">
         <div className="section-head"><h2>My Team</h2></div>
@@ -87,8 +100,17 @@ export default function MyTeamPage() {
     );
   }
 
-  const info = teamsById.get(myTeamId);
-  const myBadges = badges.data?.teams[String(myTeamId)] ?? [];
+  if (teamIdParam && !teamsById.has(teamId)) {
+    return (
+      <section className="section">
+        <div className="section-head"><h2>Team not found</h2></div>
+        <EmptyState>No team with that id in {meta.season}.</EmptyState>
+      </section>
+    );
+  }
+
+  const info = teamsById.get(teamId);
+  const myBadges = badges.data?.teams[String(teamId)] ?? [];
 
   const scoring = my?.weekly.map((w) => ({ week: w.week, points: w.points, avg: avgByWeek.get(w.week) ?? null })) ?? [];
   let running = 0;
@@ -115,9 +137,9 @@ export default function MyTeamPage() {
       <section className="team-head">
         <div>
           <p className="label">{meta.season} · {info?.nickname ?? info?.owner ?? "unclaimed"}</p>
-          <h2 className="team-title">{info?.name ?? `Team ${myTeamId}`}</h2>
+          <h2 className="team-title">{info?.name ?? `Team ${teamId}`}</h2>
           {badges.error ? <div className="error-state">{badges.error}</div> : <BadgeShelf badges={myBadges} />}
-          <Link to={`/franchise/${myTeamId}`} className="muted" style={{ fontSize: "0.8rem" }}>
+          <Link to={`/franchise/${teamId}`} className="muted" style={{ fontSize: "0.8rem" }}>
             View full franchise history →
           </Link>
         </div>
@@ -126,7 +148,7 @@ export default function MyTeamPage() {
       {teams.error && <div className="error-state">{teams.error}</div>}
 
       {(() => {
-        const myRoster = roster.data?.teams[String(myTeamId)];
+        const myRoster = roster.data?.teams[String(teamId)];
         if (!myRoster) return null;
         return (
           <section className="section">
@@ -193,11 +215,29 @@ export default function MyTeamPage() {
             </section>
 
             <div className="two-col">
-              <section className="section">
-                <div className="section-head"><h2>The regret chart</h2>
-                  <span className="label">cumulative points benched</span></div>
-                <BenchChart data={bench} />
-              </section>
+              {meta.season_over ? (
+                <section className="section">
+                  <div className="section-head"><h2>The regret chart</h2>
+                    <span className="label">cumulative points benched</span></div>
+                  <BenchChart data={bench} />
+                </section>
+              ) : (
+                // Playoff-odds-by-week only exists for the CURRENT season
+                // (sim_by_week.json isn't backfilled for past ones — see
+                // that file's DATA.md section for why) — a past season
+                // keeps the regret chart above, unchanged.
+                <section className="section">
+                  <div className="section-head"><h2>Playoff odds by week</h2>
+                    <span className="label">{meta.season}</span></div>
+                  {simByWeek.data ? (
+                    <PlayoffOddsChart simByWeek={simByWeek.data} meta={meta} onlyTeamId={teamId} accentTeamId={teamId} />
+                  ) : (
+                    !simByWeek.loading && (
+                      <EmptyState>Not simulated yet — odds arrive with the first data refresh once a week's in the books.</EmptyState>
+                    )
+                  )}
+                </section>
+              )}
               <section className="section">
                 <div className="section-head"><h2>Coach rating trend</h2></div>
                 <CoachChart data={coachTrend} />
@@ -336,7 +376,7 @@ export default function MyTeamPage() {
       <section className="section">
         <div className="section-head"><h2>Playoff picture</h2></div>
         {(() => {
-          const s = sim.data?.teams.find((t) => t.team_id === myTeamId);
+          const s = sim.data?.teams.find((t) => t.team_id === teamId);
           if (!s) {
             return (
               !sim.loading && (

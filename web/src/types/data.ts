@@ -416,6 +416,11 @@ export interface Sim {
   this_week_matchups: SimMatchup[];
 }
 
+export interface SimByWeek {
+  generated_at: string;
+  weeks: Record<string, Record<string, number>>;
+}
+
 export interface SwapRecord {
   wins: number;
   losses: number;

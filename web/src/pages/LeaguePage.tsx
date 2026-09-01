@@ -11,9 +11,9 @@ import EmptyState from "../components/EmptyState";
 import PositionHeatmap from "../components/PositionHeatmap";
 import ContendRebuildTable from "../components/ContendRebuildTable";
 import ScreenshotButton from "../components/ScreenshotButton";
-import { BumpChart, PointsPaceChart, SwapMatrix } from "../components/HistoryCharts";
+import { BumpChart, PlayoffOddsChart, PointsPaceChart, SwapMatrix } from "../components/HistoryCharts";
 import type {
-  Activity, Positions, Schedule, ScheduleSwap, Sim, Spectrum, Standings, StandingsByWeek, Superlatives,
+  Activity, Positions, Schedule, ScheduleSwap, Sim, SimByWeek, Spectrum, Standings, StandingsByWeek, Superlatives,
 } from "../types/data";
 
 // Shared by every bar-chart-style block below (no border/header of its
@@ -47,10 +47,12 @@ export default function LeaguePage() {
   const positionHeatmapRef = useRef<HTMLTableElement>(null);
   const superlativesGridRef = useRef<HTMLDivElement>(null);
   const playoffTracksRef = useRef<HTMLDivElement>(null);
+  const playoffOddsChartRef = useRef<HTMLDivElement>(null);
   const bumpChartRef = useRef<HTMLDivElement>(null);
   const pointsChartRef = useRef<HTMLDivElement>(null);
 
   const odds = useForceDesktopCapture();
+  const oddsByWeek = useForceDesktopCapture(150);
   const bump = useForceDesktopCapture(150);
   const points = useForceDesktopCapture(150);
 
@@ -62,6 +64,7 @@ export default function LeaguePage() {
   const superlatives = useJson<Superlatives>(base ? `${base}/superlatives.json` : null);
   const activity = useJson<Activity>(base ? `${base}/activity.json` : null);
   const sim = useOptionalJson<Sim>(base ? `${base}/sim.json` : null);
+  const simByWeek = useOptionalJson<SimByWeek>(base ? `${base}/sim_by_week.json` : null);
   const positions = useOptionalJson<Positions>(base ? `${base}/positions.json` : null);
   const spectrum = useJson<Spectrum>("spectrum.json");
   const schedule = useOptionalJson<Schedule>(base ? `${base}/schedule.json` : null);
@@ -164,6 +167,35 @@ export default function LeaguePage() {
               {meta.season_over
                 ? "Season's over — no odds to simulate."
                 : "Not yet simulated — odds arrive with the first data refresh."}
+            </EmptyState>
+          )
+        )}
+      </section>
+
+      <section className="section" aria-labelledby="odds-week-h">
+        <div className="section-head">
+          <h2 id="odds-week-h">Playoff odds by week</h2>
+          <span className="label">
+            {meta.season} — your team in green
+            {simByWeek.data && (
+              <ScreenshotButton
+                targetRef={playoffOddsChartRef}
+                filename="playoff-odds-by-week"
+                prepareCapture={oddsByWeek.prepareCapture}
+                cleanupCapture={oddsByWeek.cleanupCapture}
+              />
+            )}
+          </span>
+        </div>
+        {simByWeek.data ? (
+          <PlayoffOddsChart ref={playoffOddsChartRef} simByWeek={simByWeek.data} meta={meta}
+            forceDesktop={oddsByWeek.forceDesktop} />
+        ) : (
+          !simByWeek.loading && (
+            <EmptyState>
+              {meta.season_over
+                ? "Season's over — no odds history for past seasons."
+                : "Not simulated yet — odds arrive with the first data refresh once a week's in the books."}
             </EmptyState>
           )
         )}

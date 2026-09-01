@@ -535,6 +535,29 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         sim = simulate.run(league, history, redraft_values)
         if sim:
             _write(out_dir / "sim.json", {"generated_at": generated_at, **sim})
+
+        # ---- sim_by_week.json: real playoff odds AS OF each completed
+        # week, current season only — the trend behind the League page's
+        # overlaid chart and My Team's single-team version. Expensive (a
+        # full Monte Carlo run per week), so read back whatever this file
+        # already has on disk first and only recompute what's actually new
+        # (simulate.playoff_pct_by_week() reuses every already-cached week
+        # except the latest — same "completed weeks are immutable, only
+        # the current one refreshes" rule fetch.py's own box-score fetch
+        # already follows). Confirmed live: a cold run across a real
+        # 14-week season took ~23s; a cached rerun (only the latest week
+        # recomputed) took ~1s.
+        by_week_path = out_dir / "sim_by_week.json"
+        cached_weeks: dict[int, dict[int, float]] = {}
+        if by_week_path.exists():
+            with open(by_week_path, encoding="utf-8") as f:
+                cached_weeks = {int(w): {int(tid): p for tid, p in row.items()}
+                                for w, row in json.load(f)["weeks"].items()}
+        by_week = simulate.playoff_pct_by_week(league, history, redraft_values, cached_weeks)
+        _write(by_week_path, {
+            "generated_at": generated_at,
+            "weeks": {str(w): {str(tid): p for tid, p in row.items()} for w, row in by_week.items()},
+        })
     else:
         # A finished season has no "playoff odds" left to show — and a
         # sim.json from back when this season was still live would just
@@ -542,6 +565,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         # block only ever regenerates it, never revisits an old one). Same
         # "stale file must not outlive its data source" rule as draft.json.
         (out_dir / "sim.json").unlink(missing_ok=True)
+        (out_dir / "sim_by_week.json").unlink(missing_ok=True)
 
     # ---- roster.json (live roster cards, current season only) -------------
     # "Current roster" only means something for the season still being

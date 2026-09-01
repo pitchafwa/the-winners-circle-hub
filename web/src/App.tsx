@@ -31,6 +31,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route index element={<LeaguePage />} />
           <Route path="team" element={<MyTeamPage />} />
+          <Route path="team/:teamId" element={<MyTeamPage />} />
           <Route path="matchups" element={<MatchupsPage />} />
           <Route path="history" element={<HistoryRecordsPage />} />
           <Route path="history/h2h" element={<HistoryH2HPage />} />

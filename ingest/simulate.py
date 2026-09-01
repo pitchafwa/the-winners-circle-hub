@@ -26,6 +26,7 @@ tells the reader how stale that is).
 """
 from __future__ import annotations
 
+import dataclasses
 import math
 import random
 import statistics
@@ -459,3 +460,64 @@ def run(league: LeagueData, history: LeagueData | None = None,
         "teams": teams_out,
         "this_week_matchups": this_week_matchups,
     }
+
+
+def _league_as_of_week(league: LeagueData, week: int) -> LeagueData:
+    """A shallow copy of `league` as if only weeks <= `week` had happened —
+    the same truncate-by-matchup_period idea metrics.standings_by_week()
+    already uses for the analogous "standings as of week N" feature.
+
+    Nothing in this module's Monte Carlo engine (run()/team_models()/
+    league_priors()) trusts league.current_matchup_period/scoring_period_id
+    as ground truth for "how much of the season has happened" — every one
+    of those infers it by inspecting league.weeks (dict keys) and
+    league.full_schedule (winner field) directly. That's what makes this
+    truncation sufficient to reuse run() completely unchanged for a past
+    week's odds, rather than needing a second simulation engine.
+
+    One known, accepted simplification: roster_strength_prior_shift()
+    always reads TODAY's live roster (parse.current_roster_players() reads
+    the live cache off disk directly, not anything week-scoped) — so a
+    reconstructed "as of week N" run reflects what was actually decided
+    through week N, but nudges its priors using today's roster
+    composition, not week N's. Only matters around a since-happened
+    trade, and only before real results dominate the shrinkage; not worth
+    reconstructing historical rosters to fix."""
+    weeks = {w: v for w, v in league.weeks.items() if w <= week}
+    full_schedule = [
+        e if e.matchup_period <= week else dataclasses.replace(e, winner="UNDECIDED")
+        for e in league.full_schedule
+    ]
+    return dataclasses.replace(league, weeks=weeks, full_schedule=full_schedule)
+
+
+def playoff_pct_by_week(league: LeagueData, history: LeagueData | None,
+                        redraft_values: dict[str, int] | None,
+                        cached_weeks: dict[int, dict[int, float]] | None = None,
+                        ) -> dict[int, dict[int, float]]:
+    """{week: {team_id: playoff_pct}} for every completed regular-season
+    week of the CURRENT season — the "as of week N" trend behind the
+    League page's overlaid chart and My Team's single-team version.
+
+    Expensive to compute (a full 10,000-sim Monte Carlo run PER week), so
+    this only ever recomputes what it has to: a week already present in
+    `cached_weeks` (the previous build's own output, read back by the
+    caller) is reused as-is UNLESS it's the single most-recently-completed
+    week — same "completed weeks are immutable, only the current one
+    refreshes" convention fetch.py's own module docstring already
+    establishes for box-score fetching. Every earlier week computes
+    exactly once, ever."""
+    cached_weeks = cached_weeks or {}
+    weeks = league.regular_weeks()
+    if not weeks:
+        return {}
+    latest = weeks[-1]
+
+    out: dict[int, dict[int, float]] = {}
+    for w in weeks:
+        if w != latest and w in cached_weeks:
+            out[w] = cached_weeks[w]
+            continue
+        result = run(_league_as_of_week(league, w), history, redraft_values)
+        out[w] = {t["team_id"]: t["playoff_pct"] for t in result["teams"]} if result else {}
+    return out

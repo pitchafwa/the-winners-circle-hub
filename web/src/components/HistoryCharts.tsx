@@ -9,12 +9,14 @@ import {
   YAxis,
 } from "recharts";
 import { useApp } from "../state/AppContext";
-import { pts, signed } from "../lib/format";
+import { pct, pts, signed } from "../lib/format";
 import EmptyState from "./EmptyState";
 import PlayerHeadshot from "./PlayerHeadshot";
 import TeamLink from "./TeamLink";
 import { ACCENT, FONT_MONO, INK_MUTED, PAPER_2, RULE } from "../lib/tokens";
-import type { Badges, Meta, Ownership, OwnershipStint, Schedule, ScheduleEntry, ScheduleSwap } from "../types/data";
+import type {
+  Badges, Meta, Ownership, OwnershipStint, Schedule, ScheduleEntry, ScheduleSwap, SimByWeek,
+} from "../types/data";
 import type { SeasonBundle } from "../lib/useAllSeasons";
 
 type BumpTooltipEntry = { dataKey?: string | number; value?: number };
@@ -223,6 +225,102 @@ export const PointsPaceChart = forwardRef<HTMLDivElement, { schedule: Schedule; 
           <Tooltip content={<PaceTooltip teamName={teamName} myTeamId={myTeamId} />} />
           {teamIds.map((id) => {
             const mine = id === myTeamId;
+            return (
+              <Line key={id} type="monotone" dataKey={`t${id}`}
+                stroke={mine ? ACCENT : INK_MUTED} strokeWidth={mine ? 2.4 : 1}
+                strokeOpacity={mine ? 1 : 0.45} dot={false} connectNulls />
+            );
+          })}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+/** Same idea as PaceTooltip above, but for playoff-odds percentages
+ * instead of PPG — sorted descending, bigger is what's good. */
+function PlayoffOddsTooltip({
+  active, payload, label, teamName, accentTeamId,
+}: {
+  active?: boolean;
+  payload?: BumpTooltipEntry[];
+  label?: string | number;
+  teamName: (id: number | null | undefined) => string;
+  accentTeamId: number | null;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const sorted = [...payload].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  return (
+    <div style={{
+      background: PAPER_2, border: `1px solid ${RULE}`,
+      fontFamily: FONT_MONO, fontSize: "0.72rem", padding: "0.5rem 0.65rem",
+    }}>
+      <div style={{ marginBottom: "0.3rem", fontWeight: 600 }}>Week {label}</div>
+      {sorted.map((p) => {
+        const id = Number(String(p.dataKey).slice(1));
+        return (
+          <div key={p.dataKey} style={id === accentTeamId ? { color: ACCENT } : undefined}>
+            {pct(p.value ?? 0, 0)} {teamName(id)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Real playoff odds as of each completed week of the CURRENT season only
+ * (`{season}/sim_by_week.json` — see that file's DATA.md section for why
+ * this can't be backfilled for past seasons). Same shape as BumpChart/
+ * PointsPaceChart above, except the rows come straight off the backend's
+ * own Monte Carlo output rather than being reconstructed client-side from
+ * schedule.json — playoff odds genuinely need the ingest-side simulation,
+ * there's no way to derive them from raw scores in the browser.
+ *
+ * `onlyTeamId` renders a single team's line (My Team's use — that page's
+ * own team, always accented, regardless of which team happens to be
+ * globally selected). `accentTeamId` defaults to the globally-selected
+ * team (`myTeamId`) for the League page's full overlay, or should be
+ * passed explicitly alongside `onlyTeamId` so a specific team's own page
+ * highlights ITS line even when viewed without that team being the
+ * global selection (the Franchises-menu nav pivot's use case). */
+export const PlayoffOddsChart = forwardRef<HTMLDivElement, {
+  simByWeek: SimByWeek; meta: Meta; forceDesktop?: boolean; onlyTeamId?: number; accentTeamId?: number;
+}>(function PlayoffOddsChart({ simByWeek, meta, forceDesktop, onlyTeamId, accentTeamId }, ref) {
+  const { myTeamId, teamName } = useApp();
+  const accent = accentTeamId ?? myTeamId;
+
+  const { data, teamIds } = useMemo(() => {
+    const weeks = Object.keys(simByWeek.weeks).map(Number).sort((a, b) => a - b);
+    const allIds = meta.teams.map((t) => t.id);
+    const ids = onlyTeamId !== undefined ? allIds.filter((id) => id === onlyTeamId) : allIds;
+    const rows = weeks.map((w) => {
+      const row: Record<string, number> = { week: w };
+      const weekRow = simByWeek.weeks[String(w)] ?? {};
+      ids.forEach((id) => {
+        const v = weekRow[String(id)];
+        if (v !== undefined) row[`t${id}`] = v;
+      });
+      return row;
+    });
+    return { data: rows, teamIds: ids };
+  }, [simByWeek, meta, onlyTeamId]);
+
+  if (data.length === 0) {
+    return <EmptyState>Not simulated yet — odds arrive with the first data refresh once a week's in the books.</EmptyState>;
+  }
+
+  return (
+    <div ref={ref} style={forceDesktop ? { width: "650px" } : undefined}>
+      <ResponsiveContainer width="100%" height={280}>
+        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid stroke={RULE} vertical={false} strokeWidth={0.5} />
+          <XAxis dataKey="week" tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }}
+            tickLine={false} axisLine={{ stroke: RULE }} />
+          <YAxis width={40} domain={[0, 1]} tickFormatter={(v: number) => pct(v, 0)}
+            tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }} tickLine={false} axisLine={false} />
+          <Tooltip content={<PlayoffOddsTooltip teamName={teamName} accentTeamId={accent} />} />
+          {teamIds.map((id) => {
+            const mine = id === accent;
             return (
               <Line key={id} type="monotone" dataKey={`t${id}`}
                 stroke={mine ? ACCENT : INK_MUTED} strokeWidth={mine ? 2.4 : 1}

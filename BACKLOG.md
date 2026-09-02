@@ -3,6 +3,39 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: the live site had been stuck one refresh behind, always (2026-09-02)
+
+Tommy caught it live: "localhost version is showing the full projections,
+just not the github page" — right after the FantasyPros fix above had
+already gone out in a real data refresh. Turned out to be a much bigger,
+pre-existing bug, not anything specific to that fix.
+
+- **Root cause**: `refresh.yml` (the data-refresh workflow, runs every
+  6h+ during the season) commits and pushes its data changes using the
+  default `GITHUB_TOKEN`. GitHub deliberately does not let a push
+  authenticated with the default `GITHUB_TOKEN` trigger other workflows'
+  `on: push` — an anti-recursion safeguard — so every one of those pushes
+  silently failed to fire `deploy-pages.yml`. Confirmed directly against
+  the Actions history: 72/72 "Refresh league data" runs, zero matching
+  "Deploy to GitHub Pages" runs. The live site only ever redeployed on a
+  real code push (a Claude Code commit), and sat on whatever data existed
+  at that moment until the next one — potentially many refresh cycles
+  behind, worst case during an active game window (every 15 min) with no
+  code push for days.
+- **Fix**: `refresh.yml` now checks out and pushes with `WORKFLOW_PAT` (a
+  real PAT, already a repo secret and already used by
+  `update-refresh-schedule.yml` for the identical reason) instead of the
+  default `GITHUB_TOKEN` — same one-line pattern that workflow already
+  established. A push authenticated as a real token isn't subject to the
+  anti-recursion rule, so it correctly triggers `deploy-pages.yml` same
+  as any human push would.
+- **Not yet verified against a real post-fix refresh run** — the next
+  scheduled `refresh.yml` run (every-6h fallback, since no game window is
+  active this week) should be the first real test; confirm a matching
+  "Deploy to GitHub Pages" run appears right after it, and that the live
+  site's `roster.json` `generated_at` matches the refresh's own instead
+  of lagging behind it.
+
 ## Fix: FantasyPros WR/K/D-ST projections were silently stuck at 0% (2026-09-02)
 
 Tommy caught it live: "I'm starting to see the fantasy pros projections

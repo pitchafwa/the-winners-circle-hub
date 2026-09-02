@@ -145,7 +145,19 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
+      # A push made with the default GITHUB_TOKEN does NOT trigger other
+      # workflows' `on: push` — a GitHub anti-recursion safeguard. That
+      # silently broke deploy-pages.yml for every single refresh run since
+      # it started (confirmed 2026-09-02: 72/72 "Refresh league data" runs,
+      # zero matching "Deploy to GitHub Pages" runs — the live site was
+      # stuck on whatever data existed at the last real code push, not the
+      # latest refresh, this whole time). Fix: check out and push with the
+      # same WORKFLOW_PAT update-refresh-schedule.yml already uses — a
+      # push authenticated as a real token does trigger downstream
+      # workflows normally.
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.WORKFLOW_PAT }}
 
       # ingest/.cache/ is gitignored (it's raw ESPN/KTC API responses, not
       # something that belongs in the repo) — but a fresh checkout with an

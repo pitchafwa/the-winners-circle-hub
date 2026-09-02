@@ -65,10 +65,23 @@ that same week).
 ## `{season}/standings.json`
 
 `rows[]`, pre-sorted by `standing_rank`; every column the standings table can sort on:
-`team_id, seed, final_rank, standing_rank, wins/losses/ties, record, win_pct, points_for,
+`team_id, power_score, seed, final_rank, standing_rank, wins/losses/ties, record, win_pct, points_for,
 points_against, division_id, division_record, division_rank, games_back, cushion, streak,
 all_play_wins/losses/ties, all_play_record, all_play_pct, expected_wins, luck,
 lineup_points, optimal_points, coach_rating, bench_points_lost`.
+
+`power_score` (added 2026-09-02, `metrics.power_score_1_100()`): same
+1-100 number as `sim.json`/`spectrum.json` (see those sections) — a
+"right now" market snapshot of the CURRENT roster, so it's only ever
+real for whichever season is actually `config.SEASON` right now; every
+other season's rows (including `standings_by_week.json`'s below) get
+`null`, same "missing looks missing" convention as everything else on
+this table. A real bug caught in browser-verification before shipping:
+`standings_by_week.json`'s row-builder in `build.py` didn't include this
+key at all at first, so a JS `undefined` (not `null`) reached
+`StandingsTable.tsx`'s `r.power_score.toFixed(1)` and crashed the whole
+"as of week N" picker — fixed by explicitly writing `power_score: None`
+there too.
 
 `standing_rank` (`metrics.compute_playoff_standing()`, new 2026-08-29) is the
 table's real default order and its leftmost "Rank" column — 1 = champion, 2 =
@@ -421,12 +434,28 @@ the normal-CDF calc.
 
 `home_lineup`/`away_lineup` are `optimal_week_projection()`'s real-first
 lineup, in the league's real slot order: `{player_id, name, position,
-pro_team, slot, actual, projected, played, on_fire, on_ice}` (`on_fire`/
-`on_ice` merged in at the `simulate.py` call site — see
-`matchups/week-N.json`'s section above for
-the full rule). Each slot holds the manager's real
-ESPN-entered player when one exists; only a genuinely blank slot gets the
-best available bench player instead. ALWAYS one entry per real starting
+pro_team, slot, actual, projected, played, on_fire, on_ice, assumed_start,
+replaced_name}` (`on_fire`/`on_ice` merged in at the `simulate.py` call
+site — see `matchups/week-N.json`'s section above for the full rule).
+Each slot holds the manager's real ESPN-entered player when one exists;
+only a genuinely blank slot gets the best available bench player instead
+— **except** a "joke lineup" swap (added 2026-09-02,
+`parse.JOKE_LINEUP_GAP`): a real started player who hasn't played yet
+this week and projects (or, once their game's started, actually scored)
+at least 10 points below the best eligible bench alternative gets
+swapped for that bench player too. Real incident this fixed: a team
+started Tank Dell (projected 0.0) over a benched A.J. Brown (14.02) and
+Omar Cooper Jr. (5.04) over a benched Jahmyr Gibbs (21.0) — a stale
+preseason/practice lineup nobody had touched, not a real decision, that
+was silently understating that team's real win probability on the
+matchup card. Deliberately a large, absolute-point gap rather than any
+relative or percentile threshold, so an ordinary "I think X scores more
+than the model thinks" judgment call (a real, common, small-gap
+decision) is never second-guessed — only a gap this size, which isn't a
+real lineup at all. `assumed_start` is true on any slot this happened
+to, `replaced_name` names the real (unplayed) starter that got swapped
+out, so the card can show the substitution transparently instead of
+silently overriding it. ALWAYS one entry per real starting
 slot (`league.starting_slots`), even for a slot nobody on the roster (real
 or bench) can currently fill (e.g. a team with no D/ST rostered at all) —
 that slot gets a `player_id: null` placeholder rather than being silently

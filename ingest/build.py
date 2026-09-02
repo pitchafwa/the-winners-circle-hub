@@ -107,6 +107,29 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     power = metrics.compute_power_rankings(league, all_play)
     trades = metrics.compute_trades(league)
     consistency = metrics.compute_consistency(league)
+
+    # power_score (metrics.power_score_1_100(), 1-100): same all-in-one
+    # roster-strength number the standings table and matchup-card upset
+    # alert both use (see simulate.py's sim.json section for the shared
+    # computation) — "right now" market value, priced against THIS
+    # roster read straight off the live league.json. Only meaningful for
+    # the season actually being played: a finished season's cached
+    # roster is a stale snapshot from whenever it was last fetched, and
+    # today's redraft market has no real opinion on players who've since
+    # retired, so pricing it here would silently read as "this team was
+    # bad" when it's really "these players aren't in today's market at
+    # all." None (not a misleadingly-low real number) for every other
+    # season, same "missing should look missing" convention as
+    # ages_by_pid()/fp_projections.py.
+    power_score_by_team: dict[int, float | None] = {tid: None for tid in league.teams}
+    if not league.season_over and redraft_values:
+        redraft_by_pid = parse.values_by_pid(season, redraft_values)
+        rosters = parse.current_roster_players(season)
+        power_score_by_team = {
+            tid: metrics.power_score_1_100(
+                metrics.redraft_lineup_value(rosters.get(tid, []), redraft_by_pid, league.starting_slots))
+            for tid in league.teams
+        }
     # name resolution: global NFL list < current rosters < box scores
     names = {**parse.global_player_names(),
              **parse.roster_player_names(season),
@@ -164,6 +187,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         team_race = race.get(t.team_id, {})
         rows.append({
             "team_id": t.team_id,
+            "power_score": power_score_by_team.get(t.team_id),
             "seed": t.playoff_seed,
             "final_rank": t.final_rank,
             # real, progressive playoff-adjusted standing — see
@@ -230,6 +254,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             t = league.teams[tid]
             week_rows.append({
                 "team_id": tid,
+                "power_score": None,  # not tracked as-of-week (a "right now" market snapshot, not historical)
                 "seed": r["standing_rank"], "final_rank": r["standing_rank"],
                 "standing_rank": r["standing_rank"],
                 "wins": r["wins"], "losses": r["losses"], "ties": r["ties"],

@@ -54,6 +54,7 @@ export interface Meta {
 
 export interface StandingsRow {
   team_id: number;
+  power_score: number | null;
   seed: number;
   final_rank: number;
   standing_rank: number;
@@ -383,6 +384,8 @@ export interface WeekLineupPlayer {
   played: boolean;
   on_fire: boolean;
   on_ice: boolean;
+  assumed_start: boolean;
+  replaced_name: string | null;
 }
 
 export interface SimMatchup {

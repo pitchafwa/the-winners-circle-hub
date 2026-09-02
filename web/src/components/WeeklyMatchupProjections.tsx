@@ -40,14 +40,16 @@ const PLAYOFF_IMPACT_STAKES = 0.12;
 // power_score (1-100, see metrics.power_score_1_100 — same redraft
 // roster-value signal that nudges the playoff-odds prior): an "upset"
 // needs a team that's genuinely worse by roster quality (a real gap,
-// not a coin flip) that still has a live shot at winning THIS specific
-// game. POWER_GAP_THRESHOLD is a meaningful chunk of this season's real
-// observed spread (~30-75 as of 2026-09-02, so 15 points is a clearly-
-// worse-roster gap, not noise); UPSET_WIN_PROB_THRESHOLD keeps the
-// "still expected to lose, but has a real shot" framing intact — a team
-// that's already favored despite the power gap is a different story
-// (recent form beating preseason reputation), not an upset alert.
-const POWER_GAP_THRESHOLD = 15;
+// not a coin flip) with a real (40%+) chance of winning THIS specific
+// game — no upper cap on that win probability (Tommy: "power rankings
+// underdog could even have a HIGHER than 50% chance to win, so it
+// should be 40+ not just 40-50"): a clearly-worse roster that's
+// actually favored this week despite the gap is just as much an upset
+// story, maybe more so. POWER_GAP_THRESHOLD (lowered from 15 to 10,
+// Tommy, 2026-09-02) is still a real chunk of this season's observed
+// spread (~30-75 as of 2026-09-02) without being so strict the badge
+// almost never fires.
+const POWER_GAP_THRESHOLD = 10;
 const UPSET_WIN_PROB_THRESHOLD = 0.4;
 
 interface MatchupFlag {
@@ -55,6 +57,7 @@ interface MatchupFlag {
   teamId: number | null;
   label: string;
   tone: AwardTone;
+  detail?: string;
 }
 
 /** Elimination/clinch read off the SAME playoff_pct_if_win_next/
@@ -77,20 +80,32 @@ function matchupFlags(m: SimMatchup, simTeams: Map<number, SimTeam>, teamName: (
       if (!s) continue;
       if (s.playoff_pct_if_lose_next !== null && s.playoff_pct_if_lose_next < ELIMINATION_THRESHOLD
           && s.playoff_pct >= ELIMINATION_THRESHOLD) {
-        flags.push({ key: `elim-${id}`, teamId: id, label: `${teamName(id)}: must win`, tone: "negative" });
+        flags.push({
+          key: `elim-${id}`, teamId: id, label: `${teamName(id)}: Must Win`, tone: "negative",
+          detail: `A loss this week drops ${teamName(id)}'s playoff odds below ${pct(ELIMINATION_THRESHOLD, 0)} (currently ${pct(s.playoff_pct, 0)}).`,
+        });
       }
       if (s.playoff_pct_if_win_next !== null && s.playoff_pct_if_win_next >= CLINCH_THRESHOLD
           && s.playoff_pct < CLINCH_THRESHOLD) {
-        flags.push({ key: `clinch-${id}`, teamId: id, label: `${teamName(id)}: clinches with a win`, tone: "positive" });
+        flags.push({
+          key: `clinch-${id}`, teamId: id, label: `${teamName(id)}: Clinches`, tone: "positive",
+          detail: `A win this week pushes ${teamName(id)}'s playoff odds above ${pct(CLINCH_THRESHOLD, 0)} (currently ${pct(s.playoff_pct, 0)}).`,
+        });
       }
     }
   }
 
   if (m.matchup_period >= Math.ceil(regSeasonWeeks / 2)) {
     if (m.playoff_impact_score >= PLAYOFF_IMPACT_HUGE_SWING) {
-      flags.push({ key: "impact", teamId: null, label: "🔥 huge swing game", tone: "gold" });
+      flags.push({
+        key: "impact", teamId: null, label: "🔥 Huge Swing", tone: "gold",
+        detail: "This game swings both teams' combined playoff odds by a lot depending on who wins.",
+      });
     } else if (m.playoff_impact_score >= PLAYOFF_IMPACT_STAKES) {
-      flags.push({ key: "impact", teamId: null, label: "Playoff stakes", tone: "positive" });
+      flags.push({
+        key: "impact", teamId: null, label: "Playoff Stakes", tone: "positive",
+        detail: "This game meaningfully moves both teams' playoff odds depending on who wins.",
+      });
     }
   }
 
@@ -102,11 +117,11 @@ function matchupFlags(m: SimMatchup, simTeams: Map<number, SimTeam>, teamName: (
       ? [m.away_id, awaySide.power_score, awayWinPct, homeSide.power_score]
       : [m.home_id, homeSide.power_score, m.home_win_pct, awaySide.power_score];
     const powerGap = favPower - dogPower;
-    if (powerGap >= POWER_GAP_THRESHOLD && dogWinPct >= UPSET_WIN_PROB_THRESHOLD && dogWinPct < 0.5) {
+    if (powerGap >= POWER_GAP_THRESHOLD && dogWinPct >= UPSET_WIN_PROB_THRESHOLD) {
+      const shot = dogWinPct >= 0.5 ? "is actually favored" : "has a real shot";
       flags.push({
-        key: "upset", teamId: dogId,
-        label: `Upset alert: ${teamName(dogId)} has a real shot (${pct(dogWinPct, 0)}) despite the roster gap`,
-        tone: "gold",
+        key: "upset", teamId: dogId, label: `Upset Alert: ${teamName(dogId)}`, tone: "gold",
+        detail: `${teamName(dogId)} is a clearly weaker roster by power score (${powerGap.toFixed(0)}-point gap) but ${shot} to win this week (${pct(dogWinPct, 0)}).`,
       });
     }
   }
@@ -119,7 +134,7 @@ function MatchupFlags({ flags }: { flags: MatchupFlag[] }) {
   return (
     <div className="mu-ribbons" style={{ marginBottom: "0.6rem" }}>
       {flags.map((f) => (
-        <span key={f.key} className="badge-chip mu-ribbon" data-tone={f.tone}>
+        <span key={f.key} className="badge-chip mu-ribbon" data-tone={f.tone} title={f.detail}>
           {f.teamId !== null ? <TeamLink id={f.teamId} className="team-link">{f.label}</TeamLink> : f.label}
         </span>
       ))}
@@ -208,6 +223,11 @@ function LineupRow({ p }: { p: WeekLineupPlayer | undefined }) {
         </span>
         {p.on_fire && <span className="on-fire-flame" title="On fire — well ahead of projection">🔥</span>}
         {p.on_ice && <span className="on-fire-flame" title="Ice cold — well behind projection">🧊</span>}
+        {p.assumed_start && (
+          <span className="on-fire-flame" title={`Assumed start — ${p.replaced_name} is projected far behind the bench and hasn't played yet, so this projection assumes a real lineup gets set before kickoff`}>
+            🎭
+          </span>
+        )}
       </span>
       <span className="num mu-pts">
         {p.played ? pts(p.actual) : <span className="muted">{MISSING}</span>}
@@ -248,16 +268,17 @@ export default function WeeklyMatchupProjections({
         return (
           <article key={`${m.home_id}-${m.away_id}`} className="mu-card"
             style={mine ? { borderColor: "var(--accent)" } : undefined}>
-            <div className="label" style={{ marginBottom: "0.4rem" }}>
-              Week {m.matchup_period}{mine ? " · your game" : ""}
-              {m.projection_source === "model" && (
-                <span className="muted" style={{ textTransform: "none", fontStyle: "italic" }}>
-                  {" "}· ESPN projections not available yet, estimated
-                </span>
-              )}
+            <div className="mu-card-head" style={{ marginBottom: "0.4rem" }}>
+              <div className="label">
+                Week {m.matchup_period}{mine ? " · your game" : ""}
+                {m.projection_source === "model" && (
+                  <span className="muted" style={{ textTransform: "none", fontStyle: "italic" }}>
+                    {" "}· ESPN projections not available yet, estimated
+                  </span>
+                )}
+              </div>
+              <MatchupFlags flags={flags} />
             </div>
-
-            <MatchupFlags flags={flags} />
 
             {/* Away on the left, home on the right — same convention as the
                real box-score cards, so "who's home" reads the same everywhere. */}

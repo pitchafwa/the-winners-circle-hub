@@ -3,6 +3,79 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Power score on standings + joke-lineup detection + tag polish (2026-09-02)
+
+Same-day follow-ups to the power score / matchup tag work above, all
+from Tommy in one message plus a quick follow-up.
+
+- **Power score added to `standings.json`** (and `standings_by_week.json`):
+  `power_score` column, positioned right before All-Play (moved there per
+  Tommy's follow-up; originally shipped right after Team). Only real for
+  whichever season is `config.SEASON` right now — every other season
+  (including every week of `standings_by_week.json`'s "as of week N"
+  picker) gets `null`, since this is fundamentally a "right now" market
+  snapshot, not something that ever existed historically. **Real bug
+  caught in browser-verification before shipping**: the first version
+  left `power_score` out of `standings_by_week.json`'s row-builder
+  entirely, so a JS `undefined` (not `null`) reached
+  `StandingsTable.tsx`'s `.toFixed(1)` call and crashed the whole "as of
+  week N" picker — reproduced live (selecting "As of week 5" on a real
+  past season threw `Cannot read properties of undefined`), fixed by
+  writing `power_score: None` there too, re-verified crash-free.
+- **Upset alert**: dropped the `< 0.5` upper cap on this-week win
+  probability (Tommy: "power rankings underdog could even have a HIGHER
+  than 50% chance to win, so it should be 40+ not just 40-50") — a
+  clearly-worse roster that's actually favored this week is still an
+  upset story. Also lowered `POWER_GAP_THRESHOLD` 15 → 10 per Tommy's
+  follow-up.
+- **Team name links app-wide** (`TeamLink.tsx`, used everywhere a team
+  name renders as a link — matchup cards, standings, etc.) now go to
+  that team's current-season page (`/team/:id`) instead of its
+  cross-season franchise history page (`/franchise/:id`) — matching the
+  Franchises nav menu's own pivot from 2026-09-01. The historical page
+  is still one click away (MyTeamPage's "View full franchise history →").
+- **Matchup tags shortened**: Tommy's follow-up — "no need to explain
+  what they mean (maybe do so in a hover tooltip). Just put 'Upset
+  Alert' or whatever the tag is." Every ribbon badge (must-win, clinch,
+  playoff-stakes/huge-swing, upset alert) now shows a short label with
+  the full explanation (percentages, thresholds, real numbers) moved
+  into a hover `title` tooltip instead of being spelled out in the badge
+  text itself.
+- **Joke-lineup detection** (`parse.optimal_week_projection()`, new
+  `JOKE_LINEUP_GAP`): the existing "blank slot gets auto-filled from the
+  bench" system now also catches a REAL started player who hasn't played
+  yet and projects (or, once their game's live, actually scored) at
+  least 10 points below the best eligible bench alternative — a gap that
+  large isn't a real start/sit decision, it's a stale preseason/practice
+  lineup. Real case that prompted this (Tommy): a team started Tank Dell
+  (projected 0.0) over a benched A.J. Brown (14.02) and Omar Cooper Jr.
+  (5.04) over a benched Jahmyr Gibbs (21.0). Deliberately a large
+  absolute-point gap only, no relative/percentile threshold, so an
+  ordinary "I think this guy scores more than the model thinks" call
+  (Tommy: "sometimes a team owner genuinely believes a player projected
+  for a little less will score more") is never touched. Each swapped
+  lineup entry carries `assumed_start`/`replaced_name` so the matchup
+  card shows it transparently (🎭 icon, hover tooltip naming who got
+  replaced) rather than silently overriding a real decision. Verified
+  live against the real case: A.J. Brown/De'Von Achane correctly swapped
+  in for Tank Dell/Omar Cooper Jr. on the actual matchup card, plus 3
+  more real swaps caught league-wide the same run.
+- Verified: `tsc --noEmit` clean, production build clean, full local
+  rebuild, and browser-verified every change above end to end (including
+  deliberately reproducing and then re-verifying the standings_by_week
+  crash).
+- **Matchup card tag row, follow-up**: Tommy — "put the matchup tags on
+  the same line as the week 1 marker so the rest of the content stays
+  vertically level with other matchup cards whether there's a tag or
+  not." The ribbon badges (`MatchupFlags`) used to render in their own
+  block below the "Week N" label, adding real height only on cards that
+  had a tag — a two-up row of cards misaligned below that point whenever
+  one card had a tag and its neighbor didn't. New `.mu-card-head` flex
+  row holds both the label and the tags on one line
+  (`justify-content: space-between`, wraps to a second line only if
+  there's genuinely no room), so a tagged and untagged card's team
+  rows/scores/lineups line up again. Browser-verified side by side.
+
 ## All-in-one power score (1-100) + matchup card tag redesign (2026-09-02)
 
 Tommy: "I want us to develop an all-in-one power ranking metric. I think

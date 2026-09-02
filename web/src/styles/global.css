@@ -1105,7 +1105,15 @@ select.control {
 .mu-total { font-size: 1.7rem; font-weight: 600; }
 .mu-at { font-size: 0.8rem; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
 
-.mu-ribbons { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
+/* Sits on the same line as the "Week N" label (WeeklyMatchupProjections'
+ * card header) so a card with no tags and a card with several stay
+ * vertically level below this row — the tags don't get their own block
+ * that only takes up height when present. Wraps onto a second line only
+ * if there genuinely isn't room for both, same as any other flex-wrap
+ * row. */
+.mu-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.3rem 0.5rem; }
+
+.mu-ribbons { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .mu-head .mu-team:last-child .mu-ribbons { justify-content: flex-end; }
 .mu-ribbon {
   font-size: 0.62rem;

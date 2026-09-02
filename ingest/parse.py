@@ -599,21 +599,45 @@ def ages_by_pid(market_ages: dict[str, float]) -> dict[int, float]:
     return result
 
 
+# A started player is "joke lineup" swapped for the best eligible bench
+# alternative when the bench player's value (actual-if-played-else-
+# projected, same convention the blank-slot fill already uses) beats the
+# real starter's by at least this many points — a gap this large isn't a
+# normal start/sit judgment call (Tommy, 2026-09-02: "sometimes a team
+# owner genuinely believes a player projected for a little less will
+# score more" — small gaps are exactly that, left alone on purpose), it's
+# the signature of a stale preseason/practice lineup nobody's touched
+# since. Calibrated against the real case that prompted this: Tank Dell
+# started at WR (projected 0.0) over a benched A.J. Brown (14.02) and
+# Omar Cooper Jr. started at FLEX (5.04) over a benched Jahmyr Gibbs
+# (21.0) — both real gaps well clear of 10.
+JOKE_LINEUP_GAP = 10.0
+
+
 def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -> dict[int, dict]:
     """team_id -> {current, projected_final, started, remaining,
     total_starters, lineup} for a week that hasn't been played yet, or is
     only partially played.
 
     The lineup itself reflects REALITY first: whoever the manager actually
-    has entered in each starting slot on ESPN right now. Only a slot the
+    has entered in each starting slot on ESPN right now. A slot the
     manager has genuinely left BLANK gets auto-filled — with the best
     available bench player for that slot (via `metrics.best_lineup`, same
     matching every other optimal-lineup feature uses), so an unset lineup
     still reads as a real projection instead of "0" (a common state right
-    up until kickoff), while a lineup the manager HAS set is shown exactly
-    as set, never second-guessed even if a bench player would technically
-    score more — this is meant to track what's actually being scored, not
-    to suggest a better lineup.
+    up until kickoff). A lineup the manager HAS set is otherwise shown
+    exactly as set, never second-guessed over an ordinary start/sit call —
+    EXCEPT a "joke lineup" swap (added 2026-09-02, see `JOKE_LINEUP_GAP`):
+    a real started player who hasn't played yet this week and projects
+    (or, once their game's kicked off, actually scored) at least
+    `JOKE_LINEUP_GAP` points below the best eligible bench alternative
+    gets swapped for that bench player too, the same way a blank slot
+    already is — a gap that large isn't a real lineup decision, it's a
+    stale preseason/practice lineup nobody's touched, and leaving it in
+    would understate that team's real chance of winning on the matchup
+    card. `assumed_start`/`replaced_name` on each lineup entry below mark
+    which slots this happened to and who the real starter was, so the
+    card can show it transparently rather than silently overriding it.
 
     Each player's value (real or bench-filled) is their ACTUAL score
     (`statSourceId: 0`) if they've already played this week, else their
@@ -698,6 +722,8 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
                 else:
                     empty_indices.append(i)
 
+            bench_by_pid = {b["player_id"]: b for b in bench}
+            used_bench_pids: set[int] = set()
             if empty_indices and bench:
                 empty_slot_ids = [starting_slots[i] for i in empty_indices]
                 candidates = [
@@ -705,9 +731,32 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
                     for b in bench
                 ]
                 _, _assigned, rel_index_by_player = best_lineup(candidates, empty_slot_ids)
-                bench_by_pid = {b["player_id"]: b for b in bench}
                 for pid, rel_i in rel_index_by_player.items():
                     lineup_by_index[empty_indices[rel_i]] = bench_by_pid[pid]
+                    used_bench_pids.add(pid)
+
+            # Joke-lineup swap — see JOKE_LINEUP_GAP's comment. Only a real
+            # started player who hasn't played yet (a completed game is a
+            # real result, not up for debate) and only against bench
+            # players not already spent filling a genuinely blank slot
+            # above.
+            assumed_by_index: dict[int, str] = {}
+            for i, slot_id in enumerate(starting_slots):
+                entry = lineup_by_index[i]
+                if entry is None or entry["played"]:
+                    continue
+                entry_value = entry["actual"] if entry["actual"] is not None else entry["projected"]
+                best_pid, best_value = None, entry_value
+                for b in bench:
+                    if b["player_id"] in used_bench_pids or slot_id not in b["eligible"]:
+                        continue
+                    b_value = b["actual"] if b["actual"] is not None else b["projected"]
+                    if b_value > best_value:
+                        best_pid, best_value = b["player_id"], b_value
+                if best_pid is not None and best_value - entry_value >= JOKE_LINEUP_GAP:
+                    assumed_by_index[i] = entry["name"]
+                    lineup_by_index[i] = bench_by_pid[best_pid]
+                    used_bench_pids.add(best_pid)
 
             # Always one entry per real starting slot, even when nobody at
             # all (real or bench) is eligible to fill it (e.g. a team with
@@ -725,10 +774,13 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
                     "actual": round(entry["actual"], 2) if entry["actual"] is not None else None,
                     "projected": round(entry["projected"], 2),
                     "played": entry["played"],
+                    "assumed_start": i in assumed_by_index,
+                    "replaced_name": assumed_by_index.get(i),
                 }
                 if (entry := lineup_by_index[i]) else
                 {"player_id": None, "name": None, "position": None, "pro_team": None,
-                 "slot": SLOT_NAMES.get(slot_id, ""), "actual": None, "projected": None, "played": False}
+                 "slot": SLOT_NAMES.get(slot_id, ""), "actual": None, "projected": None, "played": False,
+                 "assumed_start": False, "replaced_name": None}
                 for i, slot_id in enumerate(starting_slots)
             ]
             current = sum(p["actual"] for p in lineup if p["played"])

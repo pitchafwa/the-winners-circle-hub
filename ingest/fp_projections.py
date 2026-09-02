@@ -86,50 +86,48 @@ def _fetch_chunk(season: int, week: int, position: str, ids: list[int]) -> list[
     return r.json().get("players", [])
 
 
-def _fetch_all(season: int, week: int, ids_by_position: dict[str, list[int]]) -> dict[str, float]:
-    """fpid (as string) -> points_ppr, fetched in <=10-id chunks per
-    position — see module docstring for why one request per position
-    alone isn't enough. Each chunk fails independently (a bad chunk
-    doesn't cost the whole fetch whatever earlier chunks already got),
-    and MAX_CALLS_PER_FETCH hard-stops well short of the account's real
-    50/day cap regardless of how many ids were actually passed in."""
-    all_chunks = [
-        (position, ids[i:i + CHUNK_SIZE])
-        for position, ids in ids_by_position.items()
-        for i in range(0, len(ids), CHUNK_SIZE)
-    ]
-    if len(all_chunks) > MAX_CALLS_PER_FETCH:
-        print(f"  FantasyPros projections: {len(all_chunks)} chunks needed, "
-              f"capping at {MAX_CALLS_PER_FETCH} to stay well inside the daily request limit")
-        all_chunks = all_chunks[:MAX_CALLS_PER_FETCH]
-
+def _fetch_position(season: int, week: int, position: str, ids: list[int]) -> dict[str, float]:
+    """fpid (as string) -> points_ppr for every id in this ONE position,
+    fetched in <=10-id chunks — see module docstring for why one request
+    per position alone isn't enough. Raises if ANY chunk fails, rather
+    than returning a silently-partial result for the position: the
+    caller only updates that position's cache entry (and its freshness
+    timestamp) on a real, complete success, so a mid-position failure
+    gets retried in full next run instead of a partial result looking
+    "done" for the next MIN_REFETCH_INTERVAL."""
     out: dict[str, float] = {}
-    for i, (position, chunk) in enumerate(all_chunks):
-        if i > 0:
-            time.sleep(0.5)  # a burst of ~15-18 calls in a row tripped a short-window rate limit once
-        try:
-            for p in _fetch_chunk(season, week, position, chunk):
-                pts = (p.get("stats") or {}).get("points_ppr")
-                if pts is not None:
-                    out[str(p["fpid"])] = pts
-        except Exception as e:  # noqa: BLE001 — one bad chunk shouldn't cost every other chunk's results
-            print(f"  FantasyPros projections chunk failed ({position}, {len(chunk)} players): {e}")
+    for i in range(0, len(ids), CHUNK_SIZE):
+        out.update({
+            str(p["fpid"]): pts
+            for p in _fetch_chunk(season, week, position, ids[i:i + CHUNK_SIZE])
+            if (pts := (p.get("stats") or {}).get("points_ppr")) is not None
+        })
     return out
 
 
-def _read_cache(path: Path) -> tuple[dict[str, float], datetime] | None:
+def _read_cache(path: Path) -> dict[str, dict]:
+    """{position: {"fetched_at": iso, "points": {fpid_str: pts}}} — per-
+    POSITION freshness, not one all-or-nothing blob for the whole fetch.
+    Real incident this fixed, 2026-09-02: FantasyPros' daily quota ran
+    out partway through a run (QB/RB/TE chunks succeeded, WR/K/DST
+    never got attempted), and the old single-blob cache treated that
+    PARTIAL result as fully fetched — WR/K/DST stayed silently blank for
+    the whole MIN_REFETCH_INTERVAL regardless, since nothing distinguished
+    "these positions failed" from "these players have no projection."
+    Per-position tracking means a position that didn't get a fresh
+    success this run keeps whatever it had before (stale-but-real beats
+    nothing) and is simply tried again next run, no fixed wait."""
     if not path.exists():
-        return None
+        return {}
     with open(path, encoding="utf-8") as f:
-        envelope = json.load(f)
-    return envelope["points"], datetime.fromisoformat(envelope["fetched_at"])
+        return json.load(f).get("positions", {})
 
 
-def _write_cache(path: Path, points: dict[str, float], fetched_at: datetime) -> None:
+def _write_cache(path: Path, positions: dict[str, dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump({"fetched_at": fetched_at.isoformat(), "points": points}, f)
+        json.dump({"positions": positions}, f)
     tmp.replace(path)
 
 
@@ -174,26 +172,45 @@ def points_by_pid(season: int, week: int, league_names: dict[int, str], offline:
     print(f"  FantasyPros crosswalk: {len(espn_to_fpid)}/{len(league_names)} rostered players matched an id")
 
     path = _cache_path(season, week)
-    cached = _read_cache(path)
+    cached_positions = _read_cache(path)
+    now = datetime.now(timezone.utc)
     points_by_fpid: dict[str, float] = {}
-    if cached and (cached[1] and (datetime.now(timezone.utc) - cached[1]) <= MIN_REFETCH_INTERVAL):
-        print(f"  FantasyPros projections: using cache from {cached[1].isoformat()} "
-              f"({len(cached[0])} players) — within the {MIN_REFETCH_INTERVAL} refetch interval")
-        points_by_fpid = cached[0]
-    elif not offline and config.FANTASYPROS_API_KEY:
-        print(f"  FantasyPros projections: fetching fresh (cache "
-              f"{'absent' if cached is None else 'stale, last ' + cached[1].isoformat()})")
-        try:
-            points_by_fpid = _fetch_all(season, week, ids_by_position)
-            _write_cache(path, points_by_fpid, datetime.now(timezone.utc))
-            print(f"  FantasyPros projections: fetched {len(points_by_fpid)} players' worth of data")
-        except Exception as e:  # noqa: BLE001 — network failure: fall back, don't crash the build
-            print(f"  FantasyPros projections fetch failed ({e}); "
-                  f"using cached values" if cached else
-                  f"  FantasyPros projections fetch failed ({e}); no cache available")
-            points_by_fpid = cached[0] if cached else {}
-    elif cached:
-        points_by_fpid = cached[0]
+
+    if not offline and config.FANTASYPROS_API_KEY:
+        updated = dict(cached_positions)
+        chunks_used = 0
+        for position, ids in ids_by_position.items():
+            entry = cached_positions.get(position)
+            fresh = entry and (now - datetime.fromisoformat(entry["fetched_at"])) <= MIN_REFETCH_INTERVAL
+            if fresh:
+                points_by_fpid.update(entry["points"])
+                continue
+
+            n_chunks = (len(ids) + CHUNK_SIZE - 1) // CHUNK_SIZE
+            if chunks_used + n_chunks > MAX_CALLS_PER_FETCH:
+                print(f"  FantasyPros projections: skipping {position} this run "
+                      f"({n_chunks} chunks would exceed the {MAX_CALLS_PER_FETCH}-call ceiling)")
+                if entry:
+                    points_by_fpid.update(entry["points"])  # stale-but-real beats nothing
+                continue
+
+            try:
+                fresh_points = _fetch_position(season, week, position, ids)
+                points_by_fpid.update(fresh_points)
+                updated[position] = {"fetched_at": now.isoformat(), "points": fresh_points}
+                print(f"  FantasyPros projections: fetched {position} "
+                      f"({len(fresh_points)}/{len(ids)} players, {n_chunks} calls)")
+            except Exception as e:  # noqa: BLE001 — one bad position shouldn't cost every other position's results
+                print(f"  FantasyPros projections: {position} fetch failed ({e}); "
+                      f"{'using stale cache, ' if entry else ''}will retry next run")
+                if entry:
+                    points_by_fpid.update(entry["points"])
+            chunks_used += n_chunks
+            time.sleep(0.5)  # a burst of ~15-18 calls in a row tripped a short-window rate limit once
+        _write_cache(path, updated)
+    elif cached_positions:
+        for entry in cached_positions.values():
+            points_by_fpid.update(entry["points"])
     else:
         print(f"  FantasyPros projections: skipped (offline={offline}, "
               f"key {'set' if config.FANTASYPROS_API_KEY else 'missing'}, no cache)")

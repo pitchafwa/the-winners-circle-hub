@@ -3,6 +3,50 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: FantasyPros WR/K/D-ST projections were silently stuck at 0% (2026-09-02)
+
+Tommy caught it live: "I'm starting to see the fantasy pros projections
+population now but only a handful of them." Real bug, confirmed and fixed.
+
+- **What was actually happening**: league-wide match rate was 88/180
+  (49%), but broken down by position it was a clean cliff, not scattered
+  gaps — QB 21/21, RB 48/48, TE 19/19 (100% each) vs. WR 0/70, K 0/10,
+  D/ST 0/12 (0% each). On Tommy's own team every RB/QB/TE had a
+  projection and every WR (including Justin Jefferson) had none.
+- **Root cause**: `fp_projections.py`'s `_fetch_all()` iterates
+  `ids_by_position.items()`, issuing one FantasyPros API call per <=10-id
+  chunk. FantasyPros' daily quota (or a burst rate limit) was running out
+  partway through that iteration — the chunks for whichever positions
+  came first (QB/RB/TE) succeeded, the rest (WR/K/D-ST) all failed and
+  were silently dropped by the per-chunk try/except. The real bug: the
+  cache was one blob with a single `fetched_at` timestamp for the WHOLE
+  fetch, so that partial result got written to disk and treated as fully
+  fresh for the next `MIN_REFETCH_INTERVAL` (12h) — nothing distinguished
+  "this position failed" from "these players just have no projection,"
+  so WR/K/D-ST stayed silently blank until the whole cache aged out, with
+  no guarantee the retry wouldn't just fail on a different set of
+  positions depending on where the quota ran out that time.
+- **Fix**: restructured the cache to track freshness per POSITION —
+  `{"positions": {"QB": {"fetched_at": ..., "points": {...}}, "RB": {...},
+  ...}}` instead of one blob. `_fetch_position()` now fetches all of one
+  position's chunks and raises if any fail, so the caller only stamps
+  that position's cache entry on a real, complete success; a position
+  that fails keeps whatever it had before (stale-but-real beats nothing)
+  and is retried in full on the very next build — no fixed wait, and
+  positions that already succeeded aren't wastefully refetched either
+  (skipped once fresh, freeing quota for whatever's still missing).
+  Self-correcting regardless of iteration order: whichever positions
+  failed last time get first crack at the budget next time, since the
+  ones that succeeded are now skipped for free.
+- **Verified live, not just by the diff**: ran a real build twice in a
+  row. First run: `RB (48/48)`, `TE (19/19)`, `QB (21/21)`, `WR (66/69)`,
+  `K (10/10)`, `DST (12/12)` — all six positions fetched fresh in one
+  run, league-wide match rate 88/180 → 176/180 (98%, matching the
+  crosswalk's own 179/180 ceiling — the 4 remaining misses are real
+  crosswalk gaps, not projection gaps). Second run: zero fetch calls
+  logged, all six positions correctly reused from the now-per-position
+  cache, same 176/180 result.
+
 ## Fix: draft grades' historical pricing was silently never running (2026-09-02)
 
 Tommy caught it live: 2024's draft board showed Raheem Mostert at 0

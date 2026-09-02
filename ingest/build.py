@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 
 import config
 import fp_projections
+import frozen_history
 import ktc_history
 import metrics
 import ownership
@@ -643,84 +644,148 @@ BADGE_META = {
 }
 
 
-def build_badges(seasons: list[int]) -> None:
+def _season_badge_facts(league: "parse.LeagueData") -> tuple[list[dict], dict | None]:
+    """One season's badge-worthy facts, self-contained (team_id-tagged
+    dicts, no shared closures) so they can be frozen to disk and replayed
+    later without ever reloading that season's raw ESPN cache — see
+    frozen_history.py. `record_candidate` is populated even for a season
+    still in progress (needed for the live current-season record-week
+    comparison); the badges list itself only once `season_over`."""
+    season = league.season
+    facts: list[dict] = []
+
+    def award(team_id, btype, detail):
+        facts.append({
+            "team_id": team_id, "type": btype, "detail": detail,
+            "team_name_then": league.teams[team_id].name if team_id in league.teams else "",
+        })
+
+    cand_high = cand_low = None  # [score, team_id, matchup_period, team_name_then]
+    for s in league.full_schedule:
+        if s.winner == "UNDECIDED" or s.away_id is None:
+            continue
+        # regular season only — playoff teams play strictly more real
+        # games than the field did all year, so letting a playoff week
+        # set the all-time single-week record would be an unfair extra
+        # shot at it purely for having stayed alive
+        if s.matchup_period > league.reg_season_weeks:
+            continue
+        for score, tid in ((s.home_score, s.home_id), (s.away_score, s.away_id)):
+            if score <= 0:
+                continue  # missing data, not a real shutout
+            name = league.teams[tid].name if tid in league.teams else ""
+            if cand_high is None or score > cand_high[0]:
+                cand_high = [score, tid, s.matchup_period, name]
+            if cand_low is None or score < cand_low[0]:
+                cand_low = [score, tid, s.matchup_period, name]
+    record_candidate = {"high": cand_high, "low": cand_low} if (cand_high or cand_low) else None
+
+    if not league.season_over:
+        return facts, record_candidate
+
+    for t in league.teams.values():
+        if t.final_rank == 1:
+            award(t.team_id, "champion", f"Won the {season} championship")
+        elif t.final_rank == 2:
+            award(t.team_id, "runner_up", f"Lost the {season} final")
+        if t.final_rank == league.team_count and league.team_count > 0:
+            award(t.team_id, "last_place", f"Finished last in {season}")
+        if t.playoff_seed == 1:
+            award(t.team_id, "reg_season_title", f"#1 seed in {season}")
+
+    by_pf = max(league.teams.values(), key=lambda t: t.points_for)
+    if by_pf.points_for > 0:
+        award(by_pf.team_id, "points_title", f"Most points in {season} ({by_pf.points_for:g})")
+
+    coach = metrics.compute_coach(league)
+    rated = [(tid, c["season"]) for tid, c in coach.items() if c["season"].get("rating")]
+    if rated:
+        tid, c = max(rated, key=lambda kv: kv[1]["rating"])
+        award(tid, "best_coach_season", f"Best coach of {season} ({c['rating']:.1%} of optimal)")
+        tid, c = max(rated, key=lambda kv: kv[1]["bench_lost"])
+        award(tid, "bench_king", f"Left {c['bench_lost']:g} points on the bench in {season}")
+
+        awards_list = metrics.compute_superlatives(league, coach)
+        points: dict[int, int] = {}
+        for a in awards_list:
+            points[a.team_id] = points.get(a.team_id, 0) + metrics.AWARD_META[a.award_key]["points"]
+        if points:
+            champ = max(points, key=lambda t: points[t])
+            award(champ, "superlative_champion",
+                  f"{season} Superlative Champion ({points[champ]:+d} pts)")
+
+    return facts, record_candidate
+
+
+def _season_h2h_facts(league: "parse.LeagueData") -> list[dict]:
+    """One season's team-pair W/L/T contribution, additive across seasons
+    — see _season_badge_facts' docstring for why this is split out."""
+    pairs: dict[tuple[int, int], dict[str, int]] = {}
+    for e in league.full_schedule:
+        if e.winner == "UNDECIDED" or e.away_id is None:
+            continue
+        a, b = sorted((e.home_id, e.away_id))
+        rec = pairs.setdefault((a, b), {"a_wins": 0, "b_wins": 0, "ties": 0})
+        a_is_home = e.home_id == a
+        if e.winner == "TIE":
+            rec["ties"] += 1
+        elif (e.winner == "HOME") == a_is_home:
+            rec["a_wins"] += 1
+        else:
+            rec["b_wins"] += 1
+    return [{"team_a": a, "team_b": b, **v} for (a, b), v in sorted(pairs.items())]
+
+
+def _season_facts(season: int, frozen: dict) -> tuple[list[dict], dict | None, list[dict]]:
+    """(badges, record_candidate, h2h) for one season — replayed from the
+    frozen snapshot when one exists and this isn't the live current
+    season (so a real change is never possible), otherwise computed
+    fresh from cache and, the moment it turns out to be a genuinely done
+    season, frozen into `frozen` in place (persisted by the caller)."""
+    key = str(season)
+    if season != config.SEASON and key in frozen:
+        e = frozen[key]
+        return e["badges"], e.get("record_candidate"), e.get("h2h", [])
+    league = parse.load_league(season)
+    badges, record_candidate = _season_badge_facts(league)
+    h2h = _season_h2h_facts(league)
+    if season != config.SEASON and league.season_over:
+        frozen_history.freeze_season(frozen, season, badges, record_candidate, h2h)
+    return badges, record_candidate, h2h
+
+
+def build_badges(seasons: list[int], frozen: dict) -> None:
     """Cross-season badge ledger, keyed by franchise (ESPN team id — owner
     changes travel with the slot). Rank-based badges only for finished
     seasons; single-week records span every scored matchup we have."""
     badges: dict[int, list[dict]] = {}
-    names_by_season: dict[int, dict[int, str]] = {}
+    high = low = None  # (score, team_id, season, matchup_period, team_name_then)
 
-    def award(team_id, btype, season, detail):
-        badges.setdefault(team_id, []).append({
-            "type": btype, "season": season, "detail": detail,
-            "team_name_then": names_by_season.get(season, {}).get(team_id, ""),
-        })
-
-    high = low = None  # (score, team_id, season, matchup_period)
     for season in sorted(seasons):
-        league = parse.load_league(season)
-        names_by_season[season] = {tid: t.name for tid, t in league.teams.items()}
-
-        for s in league.full_schedule:
-            if s.winner == "UNDECIDED" or s.away_id is None:
-                continue
-            # regular season only — playoff teams play strictly more real
-            # games than the field did all year, so letting a playoff week
-            # set the all-time single-week record would be an unfair extra
-            # shot at it purely for having stayed alive
-            if s.matchup_period > league.reg_season_weeks:
-                continue
-            for score, tid in ((s.home_score, s.home_id), (s.away_score, s.away_id)):
-                if score <= 0:
-                    continue  # missing data, not a real shutout
-                if high is None or score > high[0]:
-                    high = (score, tid, season, s.matchup_period)
-                if low is None or score < low[0]:
-                    low = (score, tid, season, s.matchup_period)
-
-        if not league.season_over:
-            continue
-
-        for t in league.teams.values():
-            if t.final_rank == 1:
-                award(t.team_id, "champion", season, f"Won the {season} championship")
-            elif t.final_rank == 2:
-                award(t.team_id, "runner_up", season, f"Lost the {season} final")
-            if t.final_rank == league.team_count and league.team_count > 0:
-                award(t.team_id, "last_place", season, f"Finished last in {season}")
-            if t.playoff_seed == 1:
-                award(t.team_id, "reg_season_title", season, f"#1 seed in {season}")
-
-        by_pf = max(league.teams.values(), key=lambda t: t.points_for)
-        if by_pf.points_for > 0:
-            award(by_pf.team_id, "points_title", season,
-                  f"Most points in {season} ({by_pf.points_for:g})")
-
-        coach = metrics.compute_coach(league)
-        rated = [(tid, c["season"]) for tid, c in coach.items() if c["season"].get("rating")]
-        if rated:
-            tid, c = max(rated, key=lambda kv: kv[1]["rating"])
-            award(tid, "best_coach_season", season,
-                  f"Best coach of {season} ({c['rating']:.1%} of optimal)")
-            tid, c = max(rated, key=lambda kv: kv[1]["bench_lost"])
-            award(tid, "bench_king", season,
-                  f"Left {c['bench_lost']:g} points on the bench in {season}")
-
-            awards_list = metrics.compute_superlatives(league, coach)
-            points: dict[int, int] = {}
-            for a in awards_list:
-                points[a.team_id] = points.get(a.team_id, 0) + metrics.AWARD_META[a.award_key]["points"]
-            if points:
-                champ = max(points, key=lambda t: points[t])
-                award(champ, "superlative_champion", season,
-                      f"{season} Superlative Champion ({points[champ]:+d} pts)")
+        facts, record_candidate, _h2h = _season_facts(season, frozen)
+        for b in facts:
+            entry = dict(b)
+            tid = entry.pop("team_id")
+            badges.setdefault(tid, []).append({**entry, "season": season})
+        if record_candidate:
+            h, l = record_candidate.get("high"), record_candidate.get("low")
+            if h and (high is None or h[0] > high[0]):
+                high = (h[0], h[1], season, h[2], h[3])
+            if l and (low is None or l[0] < low[0]):
+                low = (l[0], l[1], season, l[2], l[3])
 
     if high:
-        award(high[1], "record_high_week", high[2],
-              f"League-record {high[0]:g} points (week {high[3]}, {high[2]})")
+        score, tid, season, mp, name = high
+        badges.setdefault(tid, []).append({
+            "type": "record_high_week", "season": season, "team_name_then": name,
+            "detail": f"League-record {score:g} points (week {mp}, {season})",
+        })
     if low:
-        award(low[1], "record_low_week", low[2],
-              f"League-record low {low[0]:g} points (week {low[3]}, {low[2]})")
+        score, tid, season, mp, name = low
+        badges.setdefault(tid, []).append({
+            "type": "record_low_week", "season": season, "team_name_then": name,
+            "detail": f"League-record low {score:g} points (week {mp}, {season})",
+        })
 
     # Hand-entered badges: seasons ESPN no longer serves (2012-2017), plus
     # corrections to auto-computed badges for real-world facts ESPN's own
@@ -828,35 +893,24 @@ def _season_summary(season: int) -> dict:
     }
 
 
-def _all_time_h2h(all_seasons: list[int]) -> list[dict]:
+def _all_time_h2h(all_seasons: list[int], frozen: dict) -> list[dict]:
     """Every team pair's real all-time head-to-head record, aggregated
-    across every cached season — regular season AND playoffs (a playoff
-    meeting is still real history, no reason to exclude it). Keyed by
-    team_id, which is stable across seasons for this league's real
-    franchises. Reads straight from `parse.load_league()` (cache-backed,
-    no network) rather than the just-written per-season JSON files, so
-    this works the same whether it runs after a full rebuild or a
-    single-season admin-tool rebuild — same convention `build_badges` and
-    the ownership timeline already use for the same reason."""
-    pairs: dict[tuple[int, int], dict[str, int]] = {}
+    across every season — regular season AND playoffs (a playoff meeting
+    is still real history, no reason to exclude it). Keyed by team_id,
+    which is stable across seasons for this league's real franchises.
+    Shares `_season_facts()` (and its frozen-snapshot replay) with
+    build_badges() — see frozen_history.py for why a season's raw ESPN
+    cache being evicted must not silently drop its contribution here."""
+    total: dict[tuple[int, int], dict[str, int]] = {}
     for season in all_seasons:
-        league = parse.load_league(season)
-        for e in league.full_schedule:
-            if e.winner == "UNDECIDED" or e.away_id is None:
-                continue
-            a, b = sorted((e.home_id, e.away_id))
-            rec = pairs.setdefault((a, b), {"a_wins": 0, "b_wins": 0, "ties": 0})
-            a_is_home = e.home_id == a
-            if e.winner == "TIE":
-                rec["ties"] += 1
-            elif (e.winner == "HOME") == a_is_home:
-                rec["a_wins"] += 1
-            else:
-                rec["b_wins"] += 1
-    return [
-        {"team_a": a, "team_b": b, "a_wins": v["a_wins"], "b_wins": v["b_wins"], "ties": v["ties"]}
-        for (a, b), v in sorted(pairs.items())
-    ]
+        _badges, _record_candidate, h2h = _season_facts(season, frozen)
+        for p in h2h:
+            key = (p["team_a"], p["team_b"])
+            rec = total.setdefault(key, {"a_wins": 0, "b_wins": 0, "ties": 0})
+            rec["a_wins"] += p["a_wins"]
+            rec["b_wins"] += p["b_wins"]
+            rec["ties"] += p["ties"]
+    return [{"team_a": a, "team_b": b, **v} for (a, b), v in sorted(total.items())]
 
 
 def main():
@@ -867,6 +921,8 @@ def main():
 
     if ktc_history.ensure_fetched(offline=args.offline):
         print("Fetched the real historical KTC value archive (one-time, cached forever).")
+
+    frozen_ledger = frozen_history.load()
 
     if not args.offline:
         import fetch
@@ -880,26 +936,24 @@ def main():
 
         # One-time backfill of past seasons (immutable, cached forever) —
         # skip any year already_built (real meta.json already on disk and
-        # committed) rather than checking ingest/.cache/ alone. That cache
-        # is CI-ephemeral (actions/cache, evictable — see built_seasons()'s
-        # docstring for the full story) and this loop used to run
-        # unconditionally every single time regardless of whether that
-        # cache was actually intact: on a run with a thin/evicted cache,
-        # this silently attempted a full live refetch of ALL 2012-2023
-        # history every run, even though not one of those years would
-        # even get rebuilt this run (a year missing from cached_seasons()
-        # below never enters the per-season build loop either) — pure
-        # wasted request volume against ESPN for years that never
-        # actually change, and very plausibly a real contributor to the
-        # 429 flooding seen 2026-08-31 on the SAME run's later, real
-        # current-season fetches. A genuinely new past season (last
-        # year's, freshly concluded) still gets picked up here exactly
-        # once, the first run after it's not "current" anymore — it just
-        # won't be re-attempted every run after that like it used to.
+        # committed) AND already_frozen (its badges/h2h contribution is
+        # also safely persisted in frozen_history.json, so its raw cache
+        # is genuinely never needed again). Checking built alone used to
+        # be enough, until 2026-09-02: built_seasons() protects the
+        # per-season page files, but badges.json/h2h.json read straight
+        # from ingest/.cache/ every run (see frozen_history.py) — a year
+        # that's built but whose cache got evicted before it was ever
+        # frozen would skip refetching here forever, permanently losing
+        # that year's badges/h2h contribution with no way back. Gating on
+        # frozen too means this only ever fetches a given year an extra
+        # time ONCE (whichever run first freezes it) rather than
+        # unconditionally every run — still avoids the 429-flooding
+        # pattern that caused the original already_built guard.
         already_built = set(built_seasons())
+        already_frozen = {int(y) for y in frozen_ledger}
         previous = league.previousSeasons if league else []
         for year in previous:
-            if year in already_built:
+            if year in already_built and year in already_frozen:
                 continue
             try:
                 if fetch.fetch_history_raw(year) is not None:
@@ -912,7 +966,7 @@ def main():
         # web page stops displaying it — everything from 2024 on already comes
         # through fetch_season() above as the "current" season of its year.
         for year in HISTORICAL_BOXSCORE_YEARS:
-            if year in already_built:
+            if year in already_built and year in already_frozen:
                 continue
             try:
                 n = fetch.fetch_history_boxscores(year)
@@ -932,6 +986,14 @@ def main():
     if not seasons:
         print("No cached seasons found — nothing to build.", file=sys.stderr)
         sys.exit(1)
+
+    # badges/h2h need every season we have EITHER a live cache OR a frozen
+    # snapshot for — cached_seasons() alone would silently drop a season
+    # whose raw cache got evicted before ever being frozen (or, as tested
+    # locally, evicted after — this union is what makes frozen replay in
+    # _season_facts() actually reachable instead of the season just never
+    # entering the loop at all). See frozen_history.py.
+    badge_seasons = sorted(set(all_seasons) | {int(s) for s in frozen_ledger})
 
     import valuation
     print("Fetching dynasty valuation data..." if not args.offline else "Using cached dynasty valuation data...")
@@ -969,7 +1031,7 @@ def main():
     # --season restricted the per-season build loop above (e.g. the trade/
     # draft admin tools rebuild a single season on each submit) — otherwise
     # a one-season build would silently wipe every other season's badges
-    build_badges(all_seasons)
+    build_badges(badge_seasons, frozen_ledger)
 
     print("Building roster ownership timeline...")
     ownership_data = ownership.build_ownership(all_seasons)
@@ -1060,8 +1122,14 @@ def main():
     print("Building all-time head-to-head...")
     _write(config.DATA_DIR / "h2h.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "pairs": _all_time_h2h(all_seasons),
+        "pairs": _all_time_h2h(badge_seasons, frozen_ledger),
     })
+
+    # build_badges()/_all_time_h2h() above may have just frozen a newly-
+    # done season into frozen_ledger in place (see frozen_history.py) —
+    # persist once here rather than after each call, so a run that
+    # freezes several seasons only writes the file once.
+    frozen_history.save(frozen_ledger)
 
     # Always cover every cached season here, never just `seasons` (which is
     # only the current run's scope — a single season when --season was

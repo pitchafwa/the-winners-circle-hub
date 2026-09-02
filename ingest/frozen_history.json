@@ -1,0 +1,5256 @@
+{
+  "2012": {
+    "badges": [
+      {
+        "detail": "Finished last in 2012",
+        "team_id": 2,
+        "team_name_then": "Team Lil B",
+        "type": "last_place"
+      },
+      {
+        "detail": "Lost the 2012 final",
+        "team_id": 4,
+        "team_name_then": "Dream Team",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Won the 2012 championship",
+        "team_id": 5,
+        "team_name_then": "The REAL  Fantasy Guru",
+        "type": "champion"
+      },
+      {
+        "detail": "#1 seed in 2012",
+        "team_id": 5,
+        "team_name_then": "The REAL  Fantasy Guru",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Most points in 2012 (1473)",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "points_title"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        161.0,
+        5,
+        9,
+        "The REAL  Fantasy Guru"
+      ],
+      "low": [
+        45.0,
+        2,
+        14,
+        "Team Lil B"
+      ]
+    }
+  },
+  "2013": {
+    "badges": [
+      {
+        "detail": "Won the 2013 championship",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "champion"
+      },
+      {
+        "detail": "#1 seed in 2013",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Finished last in 2013",
+        "team_id": 6,
+        "team_name_then": "Team Bokure",
+        "type": "last_place"
+      },
+      {
+        "detail": "Lost the 2013 final",
+        "team_id": 9,
+        "team_name_then": "King Ding-A-Ling",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Most points in 2013 (1699)",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "points_title"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 3,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 3,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        159.0,
+        1,
+        14,
+        "Rodger Goodell Jr."
+      ],
+      "low": [
+        37.0,
+        2,
+        12,
+        "2livee Brody"
+      ]
+    }
+  },
+  "2014": {
+    "badges": [
+      {
+        "detail": "Won the 2014 championship",
+        "team_id": 3,
+        "team_name_then": "Team ScHoolboy",
+        "type": "champion"
+      },
+      {
+        "detail": "#1 seed in 2014",
+        "team_id": 3,
+        "team_name_then": "Team ScHoolboy",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Lost the 2014 final",
+        "team_id": 8,
+        "team_name_then": "The Black Hokage",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Finished last in 2014",
+        "team_id": 9,
+        "team_name_then": "King Ding-A-Ling",
+        "type": "last_place"
+      },
+      {
+        "detail": "Most points in 2014 (1396)",
+        "team_id": 8,
+        "team_name_then": "The Black Hokage",
+        "type": "points_title"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 3,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        154.0,
+        8,
+        4,
+        "The Black Hokage"
+      ],
+      "low": [
+        49.0,
+        2,
+        2,
+        "2livee Brody"
+      ]
+    }
+  },
+  "2015": {
+    "badges": [
+      {
+        "detail": "Finished last in 2015",
+        "team_id": 5,
+        "team_name_then": "The  Fantasy Guru",
+        "type": "last_place"
+      },
+      {
+        "detail": "Won the 2015 championship",
+        "team_id": 7,
+        "team_name_then": "$tar YSL",
+        "type": "champion"
+      },
+      {
+        "detail": "#1 seed in 2015",
+        "team_id": 7,
+        "team_name_then": "$tar YSL",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Lost the 2015 final",
+        "team_id": 8,
+        "team_name_then": "The Black Hokage",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Most points in 2015 (1281)",
+        "team_id": 5,
+        "team_name_then": "The  Fantasy Guru",
+        "type": "points_title"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 4,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        159.0,
+        5,
+        3,
+        "The  Fantasy Guru"
+      ],
+      "low": [
+        36.0,
+        3,
+        4,
+        "Team ScHoolboy"
+      ]
+    }
+  },
+  "2016": {
+    "badges": [
+      {
+        "detail": "Lost the 2016 final",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "runner_up"
+      },
+      {
+        "detail": "#1 seed in 2016",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Won the 2016 championship",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "champion"
+      },
+      {
+        "detail": "Finished last in 2016",
+        "team_id": 10,
+        "team_name_then": "TrayLew 2Smoove",
+        "type": "last_place"
+      },
+      {
+        "detail": "Most points in 2016 (1298)",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "points_title"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 3,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 3,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        153.0,
+        1,
+        6,
+        "Rodger Goodell Jr."
+      ],
+      "low": [
+        46.0,
+        4,
+        6,
+        "Black Mamba"
+      ]
+    }
+  },
+  "2017": {
+    "badges": [
+      {
+        "detail": "Finished last in 2017",
+        "team_id": 3,
+        "team_name_then": "1021 Bricksquad ",
+        "type": "last_place"
+      },
+      {
+        "detail": "Lost the 2017 final",
+        "team_id": 5,
+        "team_name_then": "The Dark Knight",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Won the 2017 championship",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "champion"
+      },
+      {
+        "detail": "#1 seed in 2017",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Most points in 2017 (1287)",
+        "team_id": 5,
+        "team_name_then": "The Dark Knight",
+        "type": "points_title"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        146.0,
+        5,
+        12,
+        "The Dark Knight"
+      ],
+      "low": [
+        27.0,
+        10,
+        9,
+        "Trust The Process"
+      ]
+    }
+  },
+  "2018": {
+    "badges": [
+      {
+        "detail": "#1 seed in 2018",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Lost the 2018 final",
+        "team_id": 5,
+        "team_name_then": "The Dark Knight",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Finished last in 2018",
+        "team_id": 7,
+        "team_name_then": "VLone Supreme",
+        "type": "last_place"
+      },
+      {
+        "detail": "Won the 2018 championship",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "champion"
+      },
+      {
+        "detail": "Most points in 2018 (1415)",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "points_title"
+      },
+      {
+        "detail": "Best coach of 2018 (86.9% of optimal)",
+        "team_id": 6,
+        "team_name_then": "Team Fantasy ",
+        "type": "best_coach_season"
+      },
+      {
+        "detail": "Left 517 points on the bench in 2018",
+        "team_id": 4,
+        "team_name_then": "Fraudulent Schemes",
+        "type": "bench_king"
+      },
+      {
+        "detail": "2018 Superlative Champion (+22 pts)",
+        "team_id": 9,
+        "team_name_then": "King Yoyo !",
+        "type": "superlative_champion"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 3,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 3,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        143.0,
+        5,
+        9,
+        "The Dark Knight"
+      ],
+      "low": [
+        37.0,
+        3,
+        6,
+        "Stoned Immaculates"
+      ]
+    }
+  },
+  "2019": {
+    "badges": [
+      {
+        "detail": "Lost the 2019 final",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Finished last in 2019",
+        "team_id": 2,
+        "team_name_then": "The BroMaster",
+        "type": "last_place"
+      },
+      {
+        "detail": "#1 seed in 2019",
+        "team_id": 4,
+        "team_name_then": "Rikers Island Retirement Home",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Won the 2019 championship",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "champion"
+      },
+      {
+        "detail": "Most points in 2019 (1311)",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "points_title"
+      },
+      {
+        "detail": "Best coach of 2019 (85.5% of optimal)",
+        "team_id": 7,
+        "team_name_then": "Comeback Year  2020",
+        "type": "best_coach_season"
+      },
+      {
+        "detail": "Left 505 points on the bench in 2019",
+        "team_id": 5,
+        "team_name_then": "The Dark Knight",
+        "type": "bench_king"
+      },
+      {
+        "detail": "2019 Superlative Champion (+28 pts)",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "superlative_champion"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 3,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        160.0,
+        7,
+        5,
+        "Comeback Year  2020"
+      ],
+      "low": [
+        35.0,
+        4,
+        11,
+        "Rikers Island Retirement Home"
+      ]
+    }
+  },
+  "2020": {
+    "badges": [
+      {
+        "detail": "Finished last in 2020",
+        "team_id": 3,
+        "team_name_then": "Code  Bleu ",
+        "type": "last_place"
+      },
+      {
+        "detail": "Lost the 2020 final",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Won the 2020 championship",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "champion"
+      },
+      {
+        "detail": "#1 seed in 2020",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Most points in 2020 (1514)",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "points_title"
+      },
+      {
+        "detail": "Best coach of 2020 (86.9% of optimal)",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "best_coach_season"
+      },
+      {
+        "detail": "Left 325 points on the bench in 2020",
+        "team_id": 6,
+        "team_name_then": "Lost  Boyz",
+        "type": "bench_king"
+      },
+      {
+        "detail": "2020 Superlative Champion (+27 pts)",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "superlative_champion"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        171.0,
+        8,
+        12,
+        "HitMob Ent."
+      ],
+      "low": [
+        32.0,
+        3,
+        10,
+        "Code  Bleu "
+      ]
+    }
+  },
+  "2021": {
+    "badges": [
+      {
+        "detail": "Won the 2021 championship",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "champion"
+      },
+      {
+        "detail": "Finished last in 2021",
+        "team_id": 2,
+        "team_name_then": "Team Sleeper",
+        "type": "last_place"
+      },
+      {
+        "detail": "Lost the 2021 final",
+        "team_id": 6,
+        "team_name_then": "Fantasy Football Team",
+        "type": "runner_up"
+      },
+      {
+        "detail": "#1 seed in 2021",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Most points in 2021 (1431)",
+        "team_id": 6,
+        "team_name_then": "Fantasy Football Team",
+        "type": "points_title"
+      },
+      {
+        "detail": "Best coach of 2021 (88.1% of optimal)",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "best_coach_season"
+      },
+      {
+        "detail": "Left 393 points on the bench in 2021",
+        "team_id": 3,
+        "team_name_then": "MoneyMan  HQ  ",
+        "type": "bench_king"
+      },
+      {
+        "detail": "2021 Superlative Champion (+22 pts)",
+        "team_id": 6,
+        "team_name_then": "Fantasy Football Team",
+        "type": "superlative_champion"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 4,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        143.0,
+        5,
+        4,
+        "Fresh Prince of Helaire"
+      ],
+      "low": [
+        50.0,
+        10,
+        12,
+        "Trust The Process"
+      ]
+    }
+  },
+  "2022": {
+    "badges": [
+      {
+        "detail": "Finished last in 2022",
+        "team_id": 3,
+        "team_name_then": "MoneyMan  HQ  ",
+        "type": "last_place"
+      },
+      {
+        "detail": "Lost the 2022 final",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "runner_up"
+      },
+      {
+        "detail": "#1 seed in 2022",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Won the 2022 championship",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "champion"
+      },
+      {
+        "detail": "Most points in 2022 (1646)",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "points_title"
+      },
+      {
+        "detail": "Best coach of 2022 (87.3% of optimal)",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "best_coach_season"
+      },
+      {
+        "detail": "Left 456 points on the bench in 2022",
+        "team_id": 10,
+        "team_name_then": "Trust The Process",
+        "type": "bench_king"
+      },
+      {
+        "detail": "2022 Superlative Champion (+40 pts)",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "superlative_champion"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 2,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        167.0,
+        8,
+        8,
+        "HitMob Ent."
+      ],
+      "low": [
+        32.0,
+        1,
+        14,
+        "Rodger Goodell Jr. McVay"
+      ]
+    }
+  },
+  "2023": {
+    "badges": [
+      {
+        "detail": "Finished last in 2023",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "last_place"
+      },
+      {
+        "detail": "#1 seed in 2023",
+        "team_id": 6,
+        "team_name_then": "Gotham City Heathens ",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Won the 2023 championship",
+        "team_id": 8,
+        "team_name_then": "HitMob Ent.",
+        "type": "champion"
+      },
+      {
+        "detail": "Lost the 2023 final",
+        "team_id": 10,
+        "team_name_then": "Olave Pitts Sharpshooter",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Most points in 2023 (2007)",
+        "team_id": 3,
+        "team_name_then": "MoneyMan  HQ  ",
+        "type": "points_title"
+      },
+      {
+        "detail": "Best coach of 2023 (90.1% of optimal)",
+        "team_id": 9,
+        "team_name_then": "VanDorn TuaTime\u23f1",
+        "type": "best_coach_season"
+      },
+      {
+        "detail": "Left 460 points on the bench in 2023",
+        "team_id": 5,
+        "team_name_then": "Fresh Prince of Belaire",
+        "type": "bench_king"
+      },
+      {
+        "detail": "2023 Superlative Champion (+25 pts)",
+        "team_id": 3,
+        "team_name_then": "MoneyMan  HQ  ",
+        "type": "superlative_champion"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 3,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 3,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        200.0,
+        7,
+        4,
+        "Beatsbyi"
+      ],
+      "low": [
+        84.0,
+        1,
+        1,
+        "Rodger Goodell Jr."
+      ]
+    }
+  },
+  "2024": {
+    "badges": [
+      {
+        "detail": "Lost the 2024 final",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Finished last in 2024",
+        "team_id": 3,
+        "team_name_then": "MoneyMan  HQ  ",
+        "type": "last_place"
+      },
+      {
+        "detail": "Won the 2024 championship",
+        "team_id": 4,
+        "team_name_then": "How Yall DOIN!",
+        "type": "champion"
+      },
+      {
+        "detail": "#1 seed in 2024",
+        "team_id": 9,
+        "team_name_then": "VanDorn TuaTime\u23f1",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Most points in 2024 (1995)",
+        "team_id": 9,
+        "team_name_then": "VanDorn TuaTime\u23f1",
+        "type": "points_title"
+      },
+      {
+        "detail": "Best coach of 2024 (90.1% of optimal)",
+        "team_id": 9,
+        "team_name_then": "VanDorn TuaTime\u23f1",
+        "type": "best_coach_season"
+      },
+      {
+        "detail": "Left 507 points on the bench in 2024",
+        "team_id": 7,
+        "team_name_then": "TB-12",
+        "type": "bench_king"
+      },
+      {
+        "detail": "2024 Superlative Champion (+26 pts)",
+        "team_id": 4,
+        "team_name_then": "How Yall DOIN!",
+        "type": "superlative_champion"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 3,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        192.0,
+        9,
+        4,
+        "VanDorn TuaTime\u23f1"
+      ],
+      "low": [
+        52.0,
+        5,
+        10,
+        "Fresh Prince of Bel-Air "
+      ]
+    }
+  },
+  "2025": {
+    "badges": [
+      {
+        "detail": "#1 seed in 2025",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "reg_season_title"
+      },
+      {
+        "detail": "Finished last in 2025",
+        "team_id": 2,
+        "team_name_then": "Brandon's Best Team",
+        "type": "last_place"
+      },
+      {
+        "detail": "Lost the 2025 final",
+        "team_id": 6,
+        "team_name_then": "CPU Team 1",
+        "type": "runner_up"
+      },
+      {
+        "detail": "Won the 2025 championship",
+        "team_id": 10,
+        "team_name_then": "Remember the Process",
+        "type": "champion"
+      },
+      {
+        "detail": "Most points in 2025 (1985)",
+        "team_id": 6,
+        "team_name_then": "CPU Team 1",
+        "type": "points_title"
+      },
+      {
+        "detail": "Best coach of 2025 (90.1% of optimal)",
+        "team_id": 1,
+        "team_name_then": "Rodger Goodell Jr.",
+        "type": "best_coach_season"
+      },
+      {
+        "detail": "Left 544 points on the bench in 2025",
+        "team_id": 7,
+        "team_name_then": "Daevion's Daring Team",
+        "type": "bench_king"
+      },
+      {
+        "detail": "2025 Superlative Champion (+27 pts)",
+        "team_id": 10,
+        "team_name_then": "Remember the Process",
+        "type": "superlative_champion"
+      }
+    ],
+    "h2h": [
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 2,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 1,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 1,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 1,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 3,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 3,
+        "team_a": 2,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 2,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 2,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 3,
+        "team_b": 4,
+        "ties": 0
+      },
+      {
+        "a_wins": 3,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 3,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 3,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 5,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 2,
+        "team_a": 4,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 4,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 4,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 6,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 1,
+        "team_a": 5,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 3,
+        "team_a": 5,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 7,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 0,
+        "team_a": 6,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 6,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 7,
+        "team_b": 8,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 1,
+        "team_a": 7,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 0,
+        "b_wins": 2,
+        "team_a": 7,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 2,
+        "b_wins": 2,
+        "team_a": 8,
+        "team_b": 9,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 8,
+        "team_b": 10,
+        "ties": 0
+      },
+      {
+        "a_wins": 1,
+        "b_wins": 0,
+        "team_a": 9,
+        "team_b": 10,
+        "ties": 0
+      }
+    ],
+    "record_candidate": {
+      "high": [
+        192.0,
+        4,
+        12,
+        "Picken Up W's"
+      ],
+      "low": [
+        48.0,
+        7,
+        14,
+        "Daevion's Daring Team"
+      ]
+    }
+  }
+}

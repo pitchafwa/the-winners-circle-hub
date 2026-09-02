@@ -3,6 +3,69 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: badges/h2h lost historical seasons to CI cache eviction (2026-09-02)
+
+Tommy caught it live, right after the deploy-trigger fix above finally
+let him see real CI-refreshed data for the first time: "My Team and
+Franchise History pages only show 1-2 badges per team. my own team for
+example only shows one icon for my 2025 championship whereas there were
+a bunch previously." Real, longstanding bug — traced back to the day
+after the historical backfill shipped, just never visible until now.
+
+- **Root cause**: `badges.json`, `h2h.json`, and `ownership.json` are
+  all built by re-reading `ingest/.cache/` (raw ESPN API responses) —
+  a GitHub Actions cache, evictable (7-day-unused, 10GB repo-wide cap).
+  `seasons.json` hit this exact failure mode once already (2026-08-29,
+  shrank from 15 real seasons to 3) and got fixed by reading from the
+  committed, self-healing per-season JSON instead of the raw cache —
+  but that fix was deliberately NOT applied to badges/h2h/ownership at
+  the time, on the reasoning "badges/h2h aggregation genuinely needs a
+  fresh cache-backed parse.load_league() per season." That stopped being
+  true the moment (2026-08-31) the historical-backfill loop started
+  skipping any already-built year regardless of whether its raw cache
+  was still intact, to stop wasteful re-fetching/429 flooding — from
+  then on, an evicted-and-never-refetched year's badges/h2h contribution
+  had no way to ever come back. Confirmed by walking the commit history:
+  badges.json had 16 badges for team 10 right after the historical
+  backfill shipped (2026-08-25); the very next automated CI refresh
+  (2026-08-26) already showed the reduced set (1 badge) that persisted
+  in every refresh since — invisible until today's separate deploy-
+  trigger fix finally let a real CI refresh reach the live site.
+- **Fix**: new `ingest/frozen_history.py` — a committed, versioned
+  snapshot (`ingest/frozen_history.json`) of each truly-finished past
+  season's (`season_over`, and not the current live `config.SEASON`)
+  badge and head-to-head contribution. `build_badges()`/`_all_time_h2h()`
+  now replay a season from this snapshot when one exists, instead of
+  reloading its raw ESPN cache — so once a season is frozen, it's frozen
+  forever; no future run ever needs that season's cache again to
+  reproduce it. The historical-backfill loop's already_built skip now
+  also requires already_frozen, so an evicted-but-unfrozen season still
+  gets refetched (once, ever) instead of silently staying broken.
+  `ownership.json` has the same underlying exposure but doesn't
+  decompose into independent per-season snapshots as cleanly (a
+  player's ownership stint can span a season boundary) — not fixed
+  here, flagged below as a follow-up.
+- **Verified locally, not just by the diff**: full offline rebuild
+  restored team 10 to 16 badges / team 5 to 9 (both 0 before), h2h to
+  all 45 real team-pair records. Then simulated the actual CI failure
+  mode directly — moved every 2012-2025 raw cache directory out of
+  `ingest/.cache/` entirely and rebuilt offline again: badges and h2h
+  came back byte-for-byte the same (16/9/45), proving the replay path
+  really doesn't touch the evicted cache at all, not just that it
+  happens to still be warm locally.
+
+### Follow-up: `ownership.json` has the same cache-eviction exposure
+
+Same root cause as above (`ownership.build_ownership()` also reads
+straight from `ingest/.cache/` per season, same evictable-cache
+problem), not fixed in the pass above. Harder: a player's ownership
+stint can start in one season and end in another (`open_stints` carried
+across the season loop), so it doesn't decompose into independent,
+freeze-once-per-season snapshots the same clean way badges/h2h did.
+Needs its own design (e.g. freezing full open-stint state as of each
+season boundary) — worth doing if `ownership.json` is ever caught
+showing the same kind of gap.
+
 ## Fix: the live site had been stuck one refresh behind, always (2026-09-02)
 
 Tommy caught it live: "localhost version is showing the full projections,

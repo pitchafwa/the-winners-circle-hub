@@ -3,6 +3,51 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Roster strength never fades to zero + real "Game of the Week" (2026-09-02)
+
+Two more follow-ups from Tommy, addressing real modeling gaps in the
+playoff-odds explanation and the matchup-cards work above.
+
+- **Roster strength no longer fully fades away** (`simulate.py`): Tommy
+  — "there are many situations where even by week 8, a team that has
+  scored less points on average should be considered the stronger team
+  for the remainder of the season (for example, if one of their star
+  players had been injured until week 8). the fantasy pros 'rest of
+  season' player rankings will update throughout the year ... it won't
+  be stuck as a pre-season prior, it updates." Real gap: the roster-
+  strength nudge (`redraft_values`, refetched every ~12h all season —
+  a genuinely live signal, not a frozen preseason snapshot) was only
+  ever applied to the PRIOR side of the shrinkage blend, which fades to
+  near-zero influence by design as real games accumulate (~73% real-
+  results weight by week 8) — conflating "this input is stale" (never
+  true here) with "real results should count for more" (true, and
+  already handled elsewhere). Fixed by applying the nudge AFTER the
+  results/prior blend at a weight that decays only down to
+  `ROSTER_STRENGTH_FLOOR` (0.35), never to zero — verified the decay
+  curve directly: by week 14 (~end of season) roster strength now
+  retains ~46.5% of its full effect vs. ~17.6% under the old design
+  (roughly 2.6x more persistent), while real results still dominate the
+  blend outright. Preseason behavior (week 0) is bit-for-bit unchanged
+  (`roster_influence` = 1 either way), so the existing calibration
+  (best roster ~85-90% preseason odds, worst ~35-40%) still holds.
+- **Game of the Week, actually calculated now**: Tommy — "should be
+  calculated by some combination of strongest power rankings matchup,
+  highest standings matchup, highest combined projected score that
+  week, and how close the outcome of projected to be." Used to just be
+  whichever game had the single biggest playoff-odds swing
+  (`playoff_impact_score`). New `game_of_week_score` in `sim.json`
+  (equal-weight average of all four factors Tommy named, each min-max
+  normalized across just that week's games) — `this_week_matchups[]` is
+  now sorted by this instead, so the frontend's existing "Game of the
+  Week" headline (just `[0]`) picks it up with no frontend change
+  needed. `playoff_impact_score` kept as a tiebreaker, and unchanged for
+  the Playoff Stakes/Huge Swing badges. Browser-verified: the headline
+  now names the real highest-composite-score matchup, not just whatever
+  had the single biggest odds swing.
+- Verified: `tsc --noEmit` clean, full local rebuild, sanity-checked the
+  roster-influence decay curve numerically (0/3/5/8/14 games), and
+  browser-confirmed the new Game of the Week pick.
+
 ## Power score on standings + joke-lineup detection + tag polish (2026-09-02)
 
 Same-day follow-ups to the power score / matchup tag work above, all

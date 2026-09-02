@@ -361,22 +361,36 @@ the badge, rather than the old design (whichever underdog had the
 highest this-week win probability — which only ever meant "the least
 underdog of the underdogs," not a genuine quality-gap upset).
 
-**Roster strength nudges the model's PRIOR mean** (`ingest/simulate.py:
+**Roster strength nudges the model's mean** (`ingest/simulate.py:
 roster_strength_prior_shift`) — each team's value from
 `metrics.redraft_lineup_value()` (see the `spectrum.json` section below for
 the full method, shared by both), priced on REDRAFT market value
-(`valuation.redraft_values_by_name()`). That value is compared to the
-league average via a z-score (clipped to ±2.5), then scaled by
-`ROSTER_STRENGTH_WEIGHT` (0.15, hand-calibrated) × that season's own
-scoring stdev and added to the prior mean every team is shrunk toward
-before real results exist. Only the prior side of the existing shrinkage
-blend is touched, so this fades out on its own as real games accumulate
-(shrinkage weight `n / (n + 3)` already dominates past ~3 real games
-regardless) — it's a preseason/early-season signal, not a permanent thumb
-on the scale. `ROSTER_STRENGTH_WEIGHT` itself is z-score-based, so the same
-0.15 calibration (best-rostered team around 85-90% playoff odds, worst
-around 35-40%) holds regardless of exactly how the underlying roster value
-is computed.
+(`valuation.redraft_values_by_name()`, refetched every ~12h all season —
+see `fp_projections.py`/`valuation.py`'s own MIN_REFETCH_INTERVAL — so this
+is a live "roster strength going forward" read, not a frozen preseason
+snapshot). That value is compared to the league average via a z-score
+(clipped to ±2.5), then scaled by `ROSTER_STRENGTH_WEIGHT` (0.15,
+hand-calibrated) × that season's own scoring stdev.
+
+**Added 2026-09-02, not just a preseason signal**: this nudge used to be
+applied only to the PRIOR side of the shrinkage blend, which fades to near-
+zero influence as real games accumulate (`weight = n / (n + 3)`) — by week
+8 real results already carry ~73% of a team's blended mean. That's right
+for "trust real data over a cold-start guess," but wrong for what roster
+strength actually is here: since the underlying value keeps updating all
+season (an injured star's return, a big trade, a waiver breakout all move
+it), fading it away entirely ignores real, currently-relevant information.
+Tommy: "even by week 8, a team that has scored less points on average
+should be considered the stronger team for the remainder of the season
+[if] one of their star players had been injured until week 8 ... it won't
+be stuck as a pre-season prior, it updates." Fixed by applying the nudge
+AFTER the results/prior blend instead of inside it, at a weight that decays
+only down to `ROSTER_STRENGTH_FLOOR` (0.35) as games accumulate — never to
+zero. `ROSTER_STRENGTH_WEIGHT` itself is still z-score-based, so the same
+0.15 calibration (best-rostered team around 85-90% preseason playoff odds,
+worst around 35-40%) still holds at week 0, when `roster_influence` is 1
+(full effect) either way — the floor only changes how much persists once
+real results exist.
 
 **`this_week_matchups[]`**: `{matchup_period, is_playoff, playoff_tier,
 home_id, away_id, home_current, away_current, home_projected,
@@ -476,8 +490,22 @@ combined swing in playoff odds for BOTH teams between winning and losing
 this specific game — `|playoff_pct_if_win_next − playoff_pct_if_lose_next|`
 summed across the two teams, reusing those same per-team fields from
 `teams[]` above (valid here because each of this week's games is, by
-construction, both involved teams' next remaining game). Sorted by
-`playoff_impact_score` descending — the biggest game of the week first.
+construction, both involved teams' next remaining game).
+
+`game_of_week_score` (added 2026-09-02) is what `this_week_matchups[]` is
+actually sorted by now (descending, `playoff_impact_score` as a
+tiebreaker) — the frontend's "Game of the Week" headline card is just
+`this_week_matchups[0]`. Tommy: "game of the week should be calculated by
+some combination of strongest power rankings matchup, highest standings
+matchup, highest combined projected score that week, and how close the
+outcome of projected to be." Equal-weight average of four components,
+each min-max normalized across just THIS week's games (a this-week-
+relative question, unlike `power_score`'s own fixed-anchor scale): (1)
+both teams' average `power_score`, (2) both teams' average real season
+win_pct so far, (3) `home_projected + away_projected`, (4) closeness of
+`home_win_pct` to 50/50. A game used to only need the single biggest
+playoff-odds swing to lead the week — now it needs to actually look like
+a good game on paper too.
 
 **Frontend badge, redesigned 2026-09-02** (`WeeklyMatchupProjections.tsx`):
 used to render as a full-width banner under the win-probability bar,

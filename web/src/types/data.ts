@@ -408,6 +408,7 @@ export interface SimMatchup {
   away_total_starters: number;
   projection_source: ProjectionSource;
   playoff_impact_score: number;
+  game_of_week_score: number;
 }
 
 export interface Sim {

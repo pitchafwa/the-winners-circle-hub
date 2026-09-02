@@ -1111,7 +1111,12 @@ select.control {
  * that only takes up height when present. Wraps onto a second line only
  * if there genuinely isn't room for both, same as any other flex-wrap
  * row. */
-.mu-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.3rem 0.5rem; }
+/* min-height pinned to a ribbon badge's own rendered height (measured:
+ * 31.75px, this row's height WITH a tag vs. 17.36px without one) so a
+ * tagged and untagged card's header row is the same height either way —
+ * without this, everything below (team names, scores, lineups) shifts
+ * down slightly on any card that happens to have a tag. */
+.mu-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.3rem 0.5rem; min-height: 2rem; }
 
 .mu-ribbons { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .mu-head .mu-team:last-child .mu-ribbons { justify-content: flex-end; }

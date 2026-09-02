@@ -12,13 +12,20 @@ division runs its own 3-team mini-bracket (#1 seed bye, #2v#3 play-in, then
 2024/2025 playoff schedules), and the two division champions meet only at
 the very end for the league championship.
 
-Roster strength (redraft/this-season dynasty market value — same source as
-the contend/rebuild spectrum's "contending value") nudges each team's PRIOR
-mean before real results exist to override it — see
-`roster_strength_prior_shift`. This is the one place actual roster quality
-enters the model at all; before it, two teams with zero games played looked
-statistically identical regardless of whether one had rostered every stud
-in the league and the other was replacement-level.
+Roster strength (redraft/this-season market value — same source as the
+contend/rebuild spectrum's "contending value" and the matchup-card power
+score) nudges each team's mean — see `roster_strength_prior_shift`. This is
+the one place actual roster quality enters the model at all; before it, two
+teams with zero games played looked statistically identical regardless of
+whether one had rostered every stud in the league and the other was
+replacement-level. Its influence is STRONGEST before real results exist and
+decays as games accumulate (see `team_models`'s shrinkage blend), but only
+down to a floor (`ROSTER_STRENGTH_FLOOR`), never to zero — the underlying
+redraft market value is refetched all season, not a frozen preseason
+snapshot, so a team whose real roster strength changes mid-season (e.g. a
+star returning from injury) keeps a real, live signal in the model instead
+of being judged purely on already-played games that don't reflect who they
+are going forward.
 
 Honesty notes baked into the output: n_sims and standard errors are reported;
 a partially-played current week is re-simulated from scratch (the timestamp
@@ -80,6 +87,27 @@ ROSTER_STRENGTH_WEIGHT = 0.15
 # Clip how many roster-value standard deviations count, so one absurdly
 # stacked (or bare) roster can't single-handedly dominate the field.
 ROSTER_STRENGTH_Z_CAP = 2.5
+# Roster strength used to be applied ONLY to the prior mean, which the
+# shrinkage blend below (`weight = n / (n + SHRINK_GAMES)`) fades toward
+# zero influence by design as real games accumulate — by week 8, real
+# results already carry ~73% of the blend. That's right for "this is a
+# cold-start guess, stop trusting it once real data exists" — but wrong
+# for what roster strength actually IS here: `redraft_values` is refetched
+# every ~12h all season (valuation.py's MIN_REFETCH_INTERVAL), so it's a
+# continuously-updating "roster strength going forward" read (FantasyPros'
+# own redraft/ECR rankings move all season on injuries, role changes,
+# depth-chart shifts), not a frozen preseason snapshot. Tommy, 2026-09-02:
+# "even by week 8, a team that has scored less points on average should
+# be considered the stronger team for the remainder of the season [if]
+# one of their star players had been injured until week 8 ... it won't be
+# stuck as a pre-season prior, it updates." Fully fading the SIGNAL just
+# because games have been played was conflating "this input is stale"
+# (never true here) with "real results should count for more than a
+# market snapshot" (true, and still handled by the shrinkage blend on the
+# results/prior split itself) — this floor keeps roster strength meaningful
+# indefinitely, just at reduced weight once real results exist. See
+# `team_models()` for exactly how the floor is applied.
+ROSTER_STRENGTH_FLOOR = 0.35
 
 
 def league_priors(history: LeagueData | None) -> tuple[float, float]:
@@ -187,9 +215,15 @@ def team_models(league: LeagueData, prior: tuple[float, float],
         m = statistics.mean(scores) if n else prior_mean
         s = statistics.stdev(scores) if n > 1 else prior_std
         weight = n / (n + SHRINK_GAMES)
-        team_prior_mean = prior_mean + roster_shift.get(tid, 0.0)
+        blended_mean = weight * m + (1 - weight) * prior_mean
+        # Roster strength is applied AFTER the results/prior blend, at a
+        # weight that decays only down to ROSTER_STRENGTH_FLOOR (never to
+        # zero) as real games accumulate — see that constant's own comment
+        # for why fading it away entirely was wrong given it's a live,
+        # continuously-refreshed signal, not a stale cold-start guess.
+        roster_influence = ROSTER_STRENGTH_FLOOR + (1 - ROSTER_STRENGTH_FLOOR) * (1 - weight)
         models[tid] = (
-            weight * m + (1 - weight) * team_prior_mean,
+            blended_mean + roster_shift.get(tid, 0.0) * roster_influence,
             max(weight * s + (1 - weight) * prior_std, MIN_STD),
         )
     return models
@@ -257,7 +291,7 @@ def run(league: LeagueData, history: LeagueData | None = None,
     roster_shift = roster_strength_prior_shift(league, redraft_values, prior[1], roster_value)
     models = team_models(league, prior, roster_shift)
     power_score = {tid: power_score_1_100(v) for tid, v in roster_value.items()}
-    base_wins, _, base_pf, base_h2h = current_records(league)
+    base_wins, base_losses, base_pf, base_h2h = current_records(league)
     team_ids = list(league.teams)
     divisions = {t: league.teams[t].division_id for t in team_ids}
     playoff_count = league.playoff_team_count
@@ -464,7 +498,41 @@ def run(league: LeagueData, history: LeagueData | None = None,
                 "projection_source": projection_source,
                 "playoff_impact_score": round(impact, 4),
             })
-        this_week_matchups.sort(key=lambda m: -m["playoff_impact_score"])
+
+        # Game of the week: a blend of four things that each independently
+        # make a game worth watching, not just the single biggest playoff-
+        # odds swing (Tommy, 2026-09-02: "some combination of strongest
+        # power rankings matchup, highest standings matchup, highest
+        # combined projected score that week, and how close the outcome
+        # of projected to be") — how good BOTH rosters are (power_score),
+        # how good BOTH teams' real records are so far (win_pct), how much
+        # scoring the game itself should produce (combined projected
+        # final), and how close the model thinks it'll be (win prob near
+        # 50/50). Each min-max normalized across just THIS week's games
+        # (unlike power_score's own fixed-anchor scale — "which of this
+        # week's games stands out" is inherently a this-week-relative
+        # question) and averaged with equal weight; ties broken by
+        # playoff_impact_score, still a real signal worth keeping as a
+        # tiebreaker even though it's no longer the primary sort key.
+        if this_week_matchups:
+            def _win_pct(tid):
+                w, l = base_wins.get(tid, 0.0), base_losses.get(tid, 0.0)
+                return w / (w + l) if (w + l) > 0 else 0.5
+
+            def _minmax_list(values):
+                lo, hi = min(values), max(values)
+                if hi == lo:
+                    return [0.5] * len(values)
+                return [(v - lo) / (hi - lo) for v in values]
+
+            power_c = [(power_score[m["home_id"]] + power_score[m["away_id"]]) / 2 for m in this_week_matchups]
+            standings_c = [(_win_pct(m["home_id"]) + _win_pct(m["away_id"])) / 2 for m in this_week_matchups]
+            total_proj_c = [m["home_projected"] + m["away_projected"] for m in this_week_matchups]
+            closeness_c = [1 - abs(m["home_win_pct"] - 0.5) * 2 for m in this_week_matchups]
+            for m, p, s, t, c in zip(this_week_matchups, _minmax_list(power_c), _minmax_list(standings_c),
+                                     _minmax_list(total_proj_c), _minmax_list(closeness_c)):
+                m["game_of_week_score"] = round((p + s + t + c) / 4, 4)
+            this_week_matchups.sort(key=lambda m: (-m["game_of_week_score"], -m["playoff_impact_score"]))
 
     roster_strength_active = any(v != 0.0 for v in roster_shift.values())
     return {

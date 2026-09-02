@@ -504,7 +504,18 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     draft_date = f"{season}-{DRAFT_DATE_PROXY_MD}"
     season_dynasty_values = dict(dynasty_values)
     for p in picks:
-        name = p.get("player")
+        # parse.load_manual_draft()'s pick dicts carry the raw name under
+        # "player_name_raw", not "player" — a real bug lived here for a
+        # while: p.get("player") always returned None, so this loop never
+        # actually overlaid a single historical value, silently falling
+        # back to today's live dynasty_values for every pick in every
+        # season. Caught live: Raheem Mostert's real 2024-08-20 value
+        # (3413 — confirmed real in the archive) was showing as 0 in
+        # 2024's draft.json, because he's fallen off today's live KTC
+        # rankings entirely (not in dynasty_values at all -> the .get(...,
+        # 0) default) and the historical overlay meant to catch exactly
+        # this case was never actually running.
+        name = p.get("player_name_raw")
         if not name:
             continue
         hist = ktc_history.value_on_date(name, draft_date)

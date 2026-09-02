@@ -3,6 +3,46 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: draft grades' historical pricing was silently never running (2026-09-02)
+
+Tommy caught it live: 2024's draft board showed Raheem Mostert at 0
+value, despite the real historical archive clearly having a real value
+for him around the 2024 draft. Real bug, confirmed and fixed.
+
+- **Root cause**: `build.py`'s per-season historical-overlay loop
+  (added in the "Real historical KTC values" work, 2026-08-31) read
+  `p.get("player")` for each drafted pick — but `parse.load_manual_draft()`'s
+  pick dicts carry the name under `player_name_raw`, not `player`. That
+  key never existed, so `name` was always `None`, the loop's `if not
+  name: continue` fired on literally every pick, and
+  `season_dynasty_values` never actually got a single historical value
+  overlaid — for EVERY season, since the feature shipped. It silently
+  fell back to today's live `dynasty_values` dict for every single
+  drafted player the whole time.
+- **Why Mostert specifically surfaced it, and why it wasn't 100%
+  invisible**: his real value on the actual 2024-08-20 draft date
+  (3413, confirmed directly against the archive) is high enough to
+  matter, but by TODAY he's fallen off KTC's live rankings entirely —
+  not in `dynasty_values` at all, so the live-value fallback's
+  `.get(name, 0)` produced a real, visible 0 instead of a merely-wrong-
+  but-plausible-looking number. Most other players' live and historical
+  values were probably close enough in the same ballpark to not look
+  obviously broken at a glance — this bug was real for every draft,
+  just not always this visible.
+- **Fix**: read `player_name_raw` instead. One-line root cause, but
+  verified properly rather than trusting the diff: rebuilt every
+  season with a manual draft (2024/2025/2026) and checked the real
+  zero-value rate before/after — 2024 dropped from a real player
+  showing 0 to 2/35 zero-value picks (both D/ST, the documented,
+  correct "outside the market's ranked universe" case), 2025 same
+  pattern (2 D/ST), 2026 down to a single genuinely-unranked deep pick
+  (confirmed directly against the archive, not just assumed). Spot-
+  checked several other real players' values changed too (a Marvin
+  Harrison Jr./Malik Nabers/etc. first-round class now prices at real
+  2024 draft-day numbers, not today's).
+- No frontend changes needed — this was purely a backend data-pricing
+  bug, not a display bug.
+
 ## Playoff probability by week + Franchises nav pivot (2026-09-01)
 
 Three related changes: the My Team "regret chart" (cumulative bench points

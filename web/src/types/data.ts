@@ -358,6 +358,7 @@ export interface Schedule {
 
 export interface SimTeam {
   team_id: number;
+  power_score: number;
   playoff_pct: number;
   playoff_se: number;
   title_pct: number;

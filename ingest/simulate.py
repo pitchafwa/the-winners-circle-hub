@@ -34,7 +34,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from metrics import current_records, redraft_lineup_value
+from metrics import current_records, power_score_1_100, redraft_lineup_value
 from parse import (
     LeagueData,
     current_roster_players,
@@ -106,8 +106,27 @@ def league_priors(history: LeagueData | None) -> tuple[float, float]:
     return (statistics.mean(scores), statistics.pstdev(scores))
 
 
+def _roster_values(league: LeagueData, redraft_values: dict[str, int] | None) -> dict[int, float]:
+    """Each team's current best-lineup redraft value (`metrics.
+    redraft_lineup_value()`) — the SAME dollar-scale roster-strength
+    number that both feeds the playoff-odds prior shift below and, via
+    `metrics.power_score_1_100()`, the "power score" surfaced on
+    matchup cards for the upset-alert redesign. Shared so both readings
+    of "how strong is this roster" always come from the identical
+    computation, never two independently-drifting copies. All-zero (not
+    fabricated) if no redraft valuation data is available."""
+    if not redraft_values:
+        return {tid: 0.0 for tid in league.teams}
+    rosters = current_roster_players(league.season)
+    pid_values = values_by_pid(league.season, redraft_values)
+    return {
+        tid: redraft_lineup_value(rosters.get(tid, []), pid_values, league.starting_slots)
+        for tid in league.teams
+    }
+
+
 def roster_strength_prior_shift(league: LeagueData, redraft_values: dict[str, int] | None,
-                                prior_std: float) -> dict[int, float]:
+                                prior_std: float, roster_value: dict[int, float] | None = None) -> dict[int, float]:
     """Points to nudge each team's PRIOR scoring mean by, based on this-
     season (redraft) roster strength — the one signal `team_models()`'s
     shrinkage otherwise has no way to see (the flat league-wide prior
@@ -131,16 +150,13 @@ def roster_strength_prior_shift(league: LeagueData, redraft_values: dict[str, in
     (works preseason too, unlike anything derived from completed box
     scores — the exact moment this signal matters most, since there's no
     game data yet to fall back on). Returns all-zero shifts if no redraft
-    valuation data is available, rather than fabricating a signal."""
+    valuation data is available, rather than fabricating a signal.
+    `roster_value` can be passed in (from `_roster_values()`) to reuse an
+    already-computed reading rather than recomputing it here."""
     if not redraft_values:
         return {tid: 0.0 for tid in league.teams}
-
-    rosters = current_roster_players(league.season)
-    pid_values = values_by_pid(league.season, redraft_values)
-    roster_value: dict[int, float] = {
-        tid: redraft_lineup_value(rosters.get(tid, []), pid_values, league.starting_slots)
-        for tid in league.teams
-    }
+    if roster_value is None:
+        roster_value = _roster_values(league, redraft_values)
 
     values = list(roster_value.values())
     if len(values) < 2 or statistics.pstdev(values) == 0:
@@ -237,8 +253,10 @@ def run(league: LeagueData, history: LeagueData | None = None,
         return None
 
     prior = league_priors(history if history is not None else None)
-    roster_shift = roster_strength_prior_shift(league, redraft_values, prior[1])
+    roster_value = _roster_values(league, redraft_values)
+    roster_shift = roster_strength_prior_shift(league, redraft_values, prior[1], roster_value)
     models = team_models(league, prior, roster_shift)
+    power_score = {tid: power_score_1_100(v) for tid, v in roster_value.items()}
     base_wins, _, base_pf, base_h2h = current_records(league)
     team_ids = list(league.teams)
     divisions = {t: league.teams[t].division_id for t in team_ids}
@@ -341,6 +359,7 @@ def run(league: LeagueData, history: LeagueData | None = None,
         cl = cond[t]["loss"]
         teams_out.append({
             "team_id": t,
+            "power_score": power_score.get(t, 1.0),
             "playoff_pct": p_make,
             "playoff_se": se(p_make),
             "title_pct": p_title,

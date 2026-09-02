@@ -40,7 +40,7 @@ valuation source's own scale shifting under a future source change).**
 """
 from __future__ import annotations
 
-from metrics import redraft_lineup_value
+from metrics import power_score_1_100, redraft_lineup_value
 from parse import _normalize_name, pick_values_for_season, values_by_pid
 
 # dynasty roster value counts 3x as much as pick capital toward "rebuilding value"
@@ -103,6 +103,7 @@ def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board
         {
             "team_id": tid,
             "contending_value": round(contending_value.get(tid, 0.0), 0),
+            "power_score": power_score_1_100(contending_value.get(tid, 0.0)),
             "dynasty_roster_value": round(dynasty_roster_value.get(tid, 0.0), 0),
             "future_pick_capital": round(pick_capital.get(tid, 0.0), 0),
             "rebuilding_value": round(rebuilding_value[tid], 0),

@@ -3,6 +3,67 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## All-in-one power score (1-100) + matchup card tag redesign (2026-09-02)
+
+Tommy: "I want us to develop an all-in-one power ranking metric. I think
+this is essentially our 'contending value' score? ... I want to convert
+it to a roughly 1-100 scale." Confirmed via AskUserQuestion: yes, and
+specifically the redraft-market roster-value signal (`contending_value`
+/ `redraft_lineup_value`) — not the separate, already-existing weekly
+`power.json` (all-play win% + points-for + trend + roster blend), which
+Tommy was pointed to as an alternative and explicitly declined in favor
+of the market-value signal he'd already correctly identified as a real
+playoff-odds input.
+
+- **New `metrics.power_score_1_100()`**: rescales `redraft_lineup_value()`'s
+  raw dollar figure onto 1-100 via FIXED anchors (`POWER_SCORE_FLOOR_VALUE`
+  35,000 → 1, `POWER_SCORE_CEILING_VALUE` 75,000 → 100, clipped) — same
+  "pegged to today's valuation scale, not a league-relative min-max"
+  philosophy `spectrum.py`'s Contending/Rebuilding labels already use, so
+  an average roster reads near 50 instead of the field always spanning
+  the full 1-100 range regardless of how close the league actually is.
+  Real current spread: 30.0-74.5 across the 10 teams (2026 preseason).
+- **`simulate.py` refactor**: extracted `_roster_values()` (the roster-
+  value computation `roster_strength_prior_shift()` used to do inline)
+  so `run()` computes it once and feeds BOTH the existing playoff-odds
+  prior shift AND the new `power_score` field on every team in
+  `sim.json` — one shared reading of "how strong is this roster," not
+  two independently-drifting copies. Also added to `spectrum.json`
+  alongside the existing `contending_value` for consistency.
+- **Matchup card tags, redesigned**:
+  - *Playoff stakes / huge swing* moved from a full-width banner (shown
+    on every card, even a "Low stakes" line) to a ribbon badge alongside
+    must-win/clinch/upset-alert — AND gated to `matchup_period >=
+    ceil(reg_season_weeks / 2)`. Tommy: "do week 1 games really have
+    much playoff stakes? it currently applies to every week 1 matchup" —
+    real bug: the raw swing score fires easily early in the season
+    because the Monte Carlo sim is maximally uncertain then (nothing's
+    decided yet), which isn't the same thing as real stakes. Verified
+    live: a real preseason week 1 matchup that would have shown
+    "Playoff stakes" under the old always-on logic now shows nothing.
+  - *Upset alert* redesigned around the new power_score. Tommy: "Right
+    now it just tracks which underdogs have the highest probability of
+    winning. But that just indicates that they're less of an underdog...
+    the better approach would be to compare the two teams' power
+    rankings scores and see which teams that are reasonably large
+    underdogs by that measure have a 40%+ chance to win." Implemented
+    exactly that: needs a real power_score gap (`POWER_GAP_THRESHOLD`,
+    15 points — a meaningful chunk of the real ~30-75 observed spread)
+    AND a live this-week win probability of 40-50% (`UPSET_WIN_PROB_
+    THRESHOLD`) — a genuinely worse roster that still has a real shot
+    at this specific game, not just whichever underdog happens to be
+    closest to a coin flip.
+  - Confirmed the complete current tag set for Tommy's "what are our
+    other tags?" question: must-win (elimination), clinches-with-a-win,
+    upset alert, and playoff-stakes/huge-swing — no others exist on
+    matchup cards.
+- Verified: `npx tsc --noEmit` clean, production `pnpm build` clean, a
+  full local rebuild wired `power_score` through to both `sim.json` and
+  `spectrum.json` correctly (spot-checked against each other — same
+  number per team in both files), and the browser-verified week 1
+  matchup card correctly shows no playoff-stakes badge under the new
+  gate.
+
 ## Fix: badges/h2h lost historical seasons to CI cache eviction (2026-09-02)
 
 Tommy caught it live, right after the deploy-trigger fix above finally

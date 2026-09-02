@@ -328,11 +328,25 @@ Monte Carlo playoff odds. `n_sims`, `remaining_matchups`, `model` (plain-English
 method statement), `roster_strength_active` (bool — whether redraft valuation
 data was available to compute the roster-strength nudge below; `false` reads
 as an honest "not applied," never silently skipped without saying so),
-`teams[]`: `{team_id, playoff_pct, playoff_se, title_pct,
+`teams[]`: `{team_id, power_score, playoff_pct, playoff_se, title_pct,
 title_se, avg_final_wins, seed_dist{"seed": pct}, playoff_pct_if_win_next,
 playoff_pct_if_lose_next, playoff_pct_by_final_wins{"wins": pct}}` (final-wins
 buckets with <50 sims are omitted). Frontend renders absence as an explicit
 "not simulated" state and always shows ± the standard error.
+
+`power_score` (added 2026-09-02, `metrics.power_score_1_100()`): the SAME
+number as `spectrum.json`'s `power_score` (see that section — 1-100,
+fixed anchors on `contending_value`'s redraft-market dollar scale, not a
+league-relative min-max), computed once per `run()` call and reused for
+both the roster-strength prior shift below AND this field, rather than
+two independent readings of "how strong is this roster." Drives the
+frontend's matchup-card "upset alert" badge (`WeeklyMatchupProjections.tsx`
+— see `this_week_matchups[].playoff_impact_score`'s entry below for the
+rest of that redesign): a team needs a real power_score gap (≥15) from
+its opponent AND a live this-week win probability (≥40%, <50%) to earn
+the badge, rather than the old design (whichever underdog had the
+highest this-week win probability — which only ever meant "the least
+underdog of the underdogs," not a genuine quality-gap upset).
 
 **Roster strength nudges the model's PRIOR mean** (`ingest/simulate.py:
 roster_strength_prior_shift`) — each team's value from
@@ -435,6 +449,20 @@ summed across the two teams, reusing those same per-team fields from
 `teams[]` above (valid here because each of this week's games is, by
 construction, both involved teams' next remaining game). Sorted by
 `playoff_impact_score` descending — the biggest game of the week first.
+
+**Frontend badge, redesigned 2026-09-02** (`WeeklyMatchupProjections.tsx`):
+used to render as a full-width banner under the win-probability bar,
+always shown (even a "Low stakes" read got its own line) — moved to a
+ribbon badge alongside must-win/clinch/upset-alert instead, and only
+shown at all once `matchup_period >= ceil(reg_season_weeks / 2)` (the
+back half of the regular season). Before that gate, the raw score was
+firing on nearly every week-1 game — not because week 1 genuinely has
+playoff stakes, but because the Monte Carlo sim is maximally uncertain
+early on (nothing's decided yet), which makes a single game's simulated
+swing look artificially large. Same two score tiers as before
+(`PLAYOFF_IMPACT_HUGE_SWING` 0.3 → "🔥 huge swing game",
+`PLAYOFF_IMPACT_STAKES` 0.12 → "Playoff stakes"), just gated by week and
+relocated.
 
 ## `{season}/sim_by_week.json` (absent when season is over or schedule unknown, new 2026-09)
 
@@ -914,7 +942,7 @@ compares two different value lenses instead of roster age:
 last fetched (separate from `trades.json`/`draft.json`'s
 `valuation_updated_at`, which tracks the dynasty snapshot).
 
-`teams[]`: `{team_id, contending_value, dynasty_roster_value,
+`teams[]`: `{team_id, contending_value, power_score, dynasty_roster_value,
 future_pick_capital, rebuilding_value, ratio (rebuilding_value /
 (contending_value + rebuilding_value), informational only — does not
 drive label), label ("Contending"|"Balanced"|"Rebuilding")}`. `label` is
@@ -928,6 +956,16 @@ later); everything in between (53,000–60,000 contending value) reads
 "Balanced". Since these are fixed dollar amounts rather than a
 percentile, they're pegged to the current KTC valuation scale and may
 need retuning if the league's overall asset values drift meaningfully.
+
+`power_score` (`metrics.power_score_1_100()`, 1-100): `contending_value`
+rescaled onto a plain 1-100 number — same fixed-anchor philosophy as
+`label` above (`POWER_SCORE_FLOOR_VALUE` 35,000 → 1,
+`POWER_SCORE_CEILING_VALUE` 75,000 → 100, clipped), not a league-relative
+min-max, so an average roster reads near 50 rather than the field always
+spanning the full 1-100 range regardless of how close the league
+actually is. The SAME number appears on each team in `{season}/sim.json`
+(added 2026-09-02, see that section) — one shared computation, not two
+independently-drifting readings of "how strong is this roster."
 
 ## `h2h.json` (top level, cross-season)
 

@@ -204,6 +204,30 @@ def redraft_lineup_value(players: list[tuple[int, frozenset[int]]], values_by_pi
     return starting_value + bench_weight * bench_value
 
 
+# Converts redraft_lineup_value()'s raw dollar figure into a plain "1-100
+# power score" — same "fixed thresholds pegged to today's valuation scale,
+# not a league-relative percentile" philosophy spectrum.py's contend/rebuild
+# labels already use (see that module's docstring), for the same reason:
+# a league-relative min-max would force a full 1-100 spread onto whatever
+# 10 teams happen to exist this season even in a genuinely tight field,
+# which reads as far more decisive than reality. FLOOR/CEILING sit outside
+# the real observed range (46.7k-64.7k as of 2026-09-02) on purpose, so an
+# average team lands near the middle of the scale instead of the extremes
+# clumping toward 1/100, and there's headroom if a future roster is ever
+# genuinely gutted or historically stacked. Anchored loosely against
+# spectrum.py's own CONTEND_FLOOR/CONTEND_CEILING (53k/60k), which land at
+# ~46/~63 on this scale — a materially-below-average vs. clearly-above-
+# average roster, which matches the intent of those labels.
+POWER_SCORE_FLOOR_VALUE = 35_000    # maps to 1
+POWER_SCORE_CEILING_VALUE = 75_000  # maps to 100
+
+
+def power_score_1_100(contending_value: float) -> float:
+    span = POWER_SCORE_CEILING_VALUE - POWER_SCORE_FLOOR_VALUE
+    raw = (contending_value - POWER_SCORE_FLOOR_VALUE) / span * 99 + 1
+    return round(max(1.0, min(100.0, raw)), 1)
+
+
 # ---------------------------------------------------------------------------
 # 4.1c Real (not simulated) division race — current standing under this
 # league's actual top-3-per-division, no-wildcards playoff format.

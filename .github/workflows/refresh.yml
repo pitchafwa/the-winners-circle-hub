@@ -140,6 +140,7 @@ on:
 
 permissions:
   contents: write
+  actions: write  # lets the "Trigger deploy" step below dispatch deploy-pages.yml directly
 
 jobs:
   refresh:
@@ -151,13 +152,31 @@ jobs:
       # it started (confirmed 2026-09-02: 72/72 "Refresh league data" runs,
       # zero matching "Deploy to GitHub Pages" runs — the live site was
       # stuck on whatever data existed at the last real code push, not the
-      # latest refresh, this whole time). Fix: check out and push with the
-      # same WORKFLOW_PAT update-refresh-schedule.yml already uses — a
-      # push authenticated as a real token does trigger downstream
-      # workflows normally.
+      # latest refresh, this whole time).
+      #
+      # First fix tried (2026-09-02, since reverted): push authenticated as
+      # a real PAT (WORKFLOW_PAT) instead, since a push from a real token
+      # DOES trigger downstream workflows normally. Broke this workflow
+      # entirely (2026-09-02 20:15 ET on) — that secret was never actually
+      # created (confirmed with Tommy: "we never made that"), so every run
+      # failed at this exact checkout step with "Input required and not
+      # supplied: token" before doing anything at all — worse than the
+      # original bug, which at least still refreshed the data. The other
+      # workflow that already referenced this same secret
+      # (update-refresh-schedule.yml) had silently failed the identical
+      # way on its own first-ever run (2026-08-31) and nobody had noticed,
+      # since it only runs weekly — the secret's absence long predates
+      # this workflow depending on it.
+      #
+      # Real fix: don't depend on a real-token push at all. Check out with
+      # the plain default GITHUB_TOKEN (always present, needs no manual
+      # setup) and explicitly dispatch deploy-pages.yml via the Actions API
+      # in the "Trigger deploy" step below instead — GITHUB_TOKEN CAN
+      # trigger a workflow_dispatch run (unlike a push, which the anti-
+      # recursion rule blocks) as long as `actions: write` is granted,
+      # which costs nothing to grant and needs no secret anyone has to
+      # remember to create.
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.WORKFLOW_PAT }}
 
       # ingest/.cache/ is gitignored (it's raw ESPN/KTC API responses, not
       # something that belongs in the repo) — but a fresh checkout with an
@@ -214,10 +233,26 @@ jobs:
         run: ~/.local/bin/uv run python build.py
 
       - name: Commit changed data
+        id: commit
         run: |
           git config user.name "league-hub-bot"
           git config user.email "actions@users.noreply.github.com"
           git add web/public/data
-          git diff --cached --quiet && echo "No data changes." && exit 0
+          if git diff --cached --quiet; then
+            echo "No data changes."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git commit -m "Refresh league data ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
           git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # Explicit dispatch instead of relying on the push above to trigger
+      # deploy-pages.yml's own `on: push` — see this job's first step for
+      # why a GITHUB_TOKEN-authenticated push never fires that trigger.
+      # Only worth doing when there was actually a new commit to deploy.
+      - name: Trigger deploy
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy-pages.yml --repo ${{ github.repository }}

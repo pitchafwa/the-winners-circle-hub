@@ -3,6 +3,43 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: refresh.yml broke entirely, depended on a secret that never existed (2026-09-02)
+
+Tommy: "I got an email around 8:16 pm on September 2 that my refresh data
+workflow failed." Every `refresh.yml` run since 18:11 UTC Sept 2 (right
+after the earlier same-day fix below) had failed at the very first step.
+
+- **Root cause**: that earlier fix switched `refresh.yml`'s checkout/push
+  to authenticate with `secrets.WORKFLOW_PAT` instead of the default
+  `GITHUB_TOKEN`, based on the (wrong, unverified) assumption that this
+  secret already existed and worked — `update-refresh-schedule.yml`'s own
+  header comment described it as already-set-up. It was never actually
+  created ("we never made that"). Every run failed immediately with
+  "Input required and not supplied: token" — worse than the original bug,
+  since now the workflow couldn't even fetch/commit data at all, not just
+  fail to trigger a redeploy. Confirmed the secret's absence predates this
+  entirely: `update-refresh-schedule.yml` (the only other workflow that
+  referenced it) had failed the identical way on its own first-ever run
+  (2026-08-31) and nobody noticed, since it only runs weekly.
+- **Real fix, not just restoring the secret**: `refresh.yml` no longer
+  depends on any manually-created token at all. Reverted checkout to the
+  plain default `GITHUB_TOKEN`, and added an explicit "Trigger deploy"
+  step that dispatches `deploy-pages.yml` directly via the Actions API
+  (`gh workflow run`, `actions: write` permission) instead of relying on
+  a push to trigger it — `GITHUB_TOKEN` can dispatch a workflow run even
+  though it can't trigger one via `on: push` (the original anti-recursion
+  problem). Only fires when the commit step actually made a new commit
+  (`steps.commit.outputs.changed`). No secret to create, expire, or
+  forget renewing.
+- Tommy created `WORKFLOW_PAT` anyway while this was being fixed (expires
+  8/30/2027) — not needed by `refresh.yml` anymore, but it's exactly what
+  `update-refresh-schedule.yml` has been missing since its first-ever run,
+  so that workflow (regenerates the game-time refresh cron block weekly,
+  currently 0-for-1 all-time) should now actually work. Worth a manual
+  `workflow_dispatch` run to confirm rather than waiting for next Monday.
+- YAML syntax verified with a real parser (pyyaml) before shipping, not
+  just read back by eye.
+
 ## Roster strength never fades to zero + real "Game of the Week" (2026-09-02)
 
 Two more follow-ups from Tommy, addressing real modeling gaps in the

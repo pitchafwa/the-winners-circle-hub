@@ -593,7 +593,7 @@ export interface Ownership {
   };
 }
 
-export type TradeValueSource = "historical" | "unavailable";
+export type TradeValueSource = "historical" | "current_market" | "unavailable";
 
 export interface TradeProductionSinceTrade {
   points_started: number;

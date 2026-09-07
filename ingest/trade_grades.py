@@ -88,11 +88,45 @@ def _matching_stint(index: dict[tuple[int, int, int], list[dict]],
     return None
 
 
-def grade_trades(valuation_updated_at: str | None, stints: list[dict] | None = None) -> dict:
+def grade_trades(valuation_updated_at: str | None, stints: list[dict] | None = None,
+                 pick_curves: dict[str, dict[str, list[float]]] | None = None,
+                 dynasty_values: dict[str, int] | None = None) -> dict:
     """`valuation_updated_at` is passed straight through to the output
     unchanged — it's the live KTC fetch timestamp shown elsewhere on the
     site (the footer), unrelated to trade pricing now that every trade is
-    priced from ktc_history's real historical archive instead."""
+    priced from ktc_history's real historical archive instead.
+
+    `dynasty_values` (live, `valuation.values_by_name()` — the same fetch
+    that backs player_values.json/spectrum.json) is a FALLBACK for a
+    traded PLAYER, used only when the historical archive doesn't track
+    this player AT ALL, at any date (Tommy, 2026-09-07: "many players
+    from old trades have a -- value but we should know theirs from the
+    historical data" — confirmed live: this wasn't a lookup/normalization
+    bug, the archive's player list is a curated subset of KTC's full
+    rankings and several real traded players — mostly recent rookies —
+    simply never appear in it at all, at any date, so `value_on_date()`
+    correctly returns None every time regardless of the trade's real
+    date). Same `"current_market"` value_source and same honest tradeoff
+    as the pick fallback below: today's live price, not a real point-in-
+    time read, used only because no historical read could ever succeed
+    for this player, not instead of one that would have.
+
+    `pick_curves` (live, `valuation.pick_curve_by_year()` — KTC's real
+    current futures market, up to 3 draft years out) is a FALLBACK for a
+    traded pick only, used only when the historical archive has no column
+    at all for that pick's draft year (Tommy, 2026-09-07: "i thought for
+    picks as a part of trades or draft value expectation, we were using
+    the actual live KTC values? ... they have draft picks out multiple
+    years" — confirmed live: the archive only ever carries the CURRENT
+    near-term draft class, e.g. just 2026 as of this writing, so a 2027+
+    pick came back `unavailable` even though KTC's live site has real,
+    current values for it). `value_source: "current_market"` marks this
+    case distinctly from `"historical"` — it's today's live price, not a
+    real point-in-time read, which matters for an OLDER trade of a
+    since-covered year (the historical archive should always win once a
+    year exists there) but is the best available answer, not a
+    compromise, for a pick far enough out that no dated history could
+    exist yet regardless of when the trade happened."""
     valuation_available = ktc_history.is_available()
     stint_index = _stints_by_team_player(stints or [])
 
@@ -136,6 +170,11 @@ def grade_trades(valuation_updated_at: str | None, stints: list[dict] | None = N
                 pid = by_name.get(norm)
                 value = ktc_history.value_on_date(a["player"], trade_date) if trade_date else None
                 value_source = "historical" if value is not None else "unavailable"
+                if value is None and dynasty_values and norm in dynasty_values:
+                    # Archive doesn't track this player at all (usually a
+                    # recent rookie) — see grade_trades()'s own docstring.
+                    value = dynasty_values[norm]
+                    value_source = "current_market"
 
                 production, flipped_again = None, False
                 if pid is not None:
@@ -165,6 +204,16 @@ def grade_trades(valuation_updated_at: str | None, stints: list[dict] | None = N
                 value = (ktc_history.pick_round_average_on_date(parsed[0], parsed[1], trade_date)
                         if parsed and trade_date else None)
                 value_source = "historical" if value is not None else "unavailable"
+                if value is None and parsed and pick_curves:
+                    # Historical archive has no column at all for this
+                    # pick's draft year (currently: anything beyond the
+                    # single near-term year the archive covers) — fall
+                    # back to KTC's real LIVE futures value for it instead
+                    # of giving up. See grade_trades()'s own docstring.
+                    curve = parse.pick_values_for_season(parsed[0], pick_curves).get(str(parsed[1]))
+                    if curve:
+                        value = round(sum(curve) / len(curve), 1)
+                        value_source = "current_market"
                 if value is not None:
                     has_estimated_asset = True  # always a round average, never a resolved slot
                 picks_out.append({

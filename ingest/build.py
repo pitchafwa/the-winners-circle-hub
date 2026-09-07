@@ -1075,7 +1075,7 @@ def main():
     print("Building trade grades...")
     _write(config.DATA_DIR / "trades.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        **trade_grades.grade_trades(valuation_updated_at, ownership_data["stints"]),
+        **trade_grades.grade_trades(valuation_updated_at, ownership_data["stints"], pick_curves, dynasty_values),
     })
 
     print("Building pick futures board...")

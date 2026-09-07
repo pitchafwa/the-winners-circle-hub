@@ -872,6 +872,39 @@ always that draft year's **round average** on the trade's real date, and the
 trade gets `has_estimated_asset: true` regardless of source (it's always an
 estimate, never a resolved slot).
 
+**`value_source: "current_market"` (added 2026-09-07)** — a second
+fallback tried, for both players and picks, before giving up as
+`"unavailable"`. Same underlying idea both times: today's live KTC price
+used ONLY when a real point-in-time read could never succeed anyway, not
+instead of one that would have — so it doesn't compete with `"historical"`
+for a case the archive genuinely covers, only fills a case it structurally
+can't.
+- **Picks**: when the historical archive has no column at all for that
+  pick's draft year (it only ever carries the single current near-term
+  class, so anything further out always misses), the round average of
+  KTC's real LIVE futures curve for that pick's year
+  (`valuation.pick_curve_by_year()`, the same fetch that already backs
+  player values, up to 3 draft years out) is used instead. Tommy,
+  2026-09-07: "i thought for picks as a part of trades or draft value
+  expectation, we were using the actual live KTC values? ... they have
+  draft picks out multiple years."
+- **Players**: when the historical archive doesn't track this player AT
+  ALL, at any date — confirmed live this wasn't a lookup/normalization
+  bug: the archive's player list is a curated subset of KTC's full
+  rankings, and several real traded players (mostly recent rookies, e.g.
+  a player traded within days of being drafted, before a community-
+  maintained sheet had picked them up yet) simply never appear in it,
+  full stop. Falls back to `valuation.values_by_name()` (the same live
+  fetch behind `player_values.json`/`spectrum.json`) instead. Tommy,
+  2026-09-07: "many players from old trades have a -- value but we should
+  know theirs from the historical data."
+
+Both remain a real accuracy tradeoff for an otherwise-covered
+player/year traded long ago (the historical archive still always wins
+once real point-in-time data exists there) — but the best available
+answer, not a compromise, for an asset no dated history could ever
+produce regardless of when the trade happened.
+
 **`production_since_trade`** (players only, `null` when not applicable) —
 `{points_started, points_projected_started, weeks_started, still_held}`,
 pulled from the matching `ownership.json` stint: real points started (and

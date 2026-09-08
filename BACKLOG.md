@@ -3,6 +3,52 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## MVP Race revision: points-over-projection → Win Probability Added, plus historical backfill (2026-09-08)
+
+Same day as the original MVP Race ship below. Tommy's critique of the
+original metric: "cumulative points over projection isn't necessarily the
+clean, sole mark of an MVP... A player that is projected for 26 points
+every week and scores 30 points every week is probably more of an mvp
+than a player projected for 5 and scores 10 every week." Discussed
+alternatives; landed on a positional-replacement-level baseline (VOR/WAR-
+style — same bar for every player at a position, not each player's own
+projection), then went further per Tommy's ask ("what really is valuable
+from a player is how much win probability they contribute to a team over
+the course of a season") to convert points-above-replacement into real
+win probability added, reusing the app's own calibrated win-probability
+model (`WIN_PROB_SIGMA`/`normal_cdf`, relocated from `simulate.py` into
+`metrics.py` as the shared single source of truth).
+
+- **Validated against real 2025 data before shipping**: Tommy asked to
+  "run the numbers for last season and give me the top 10." First pass
+  had a real sign-inversion bug — the away side's win probability was
+  computed as the home team's and attributed to the away player with the
+  sign flipped, crediting bad away-side performances as if they helped
+  their own team. Produced an implausible top 10 (C.J. Stroud at #3
+  despite two terrible away starts; Jahmyr Gibbs and Bijan Robinson
+  missing entirely) — caught because Tommy's own memory of the season
+  didn't match: "This doesn't pass the smell test at all... I'm shocked by
+  these results honestly." Fixed by always computing "my score minus the
+  opponent's score," never sign-flipped by home/away side. Reran and got
+  a top 10 led by Christian McCaffrey that Tommy confirmed matched his own
+  read of the season exactly.
+- **Historical backfill**: the original version was gated current-season-
+  only, copying `sim.json`'s convention without re-justifying it — but
+  unlike `sim.json` (which needs today's live roster for its
+  roster-strength nudge), MVP Race is built entirely from historical
+  box-score data already cached back to 2017. Tommy: "add the data for
+  whichever previous seasons we have enough [data] to actually include
+  it." `build.py` now writes `mvp_race.json` for every season with real
+  data, not just the current one. Verified via a full offline rebuild:
+  2017–2025 all produced real leaderboards (2012–2016 correctly have
+  none, same box-score-data gap as everywhere else in this app); spot-
+  checked 2019's real output (led by Christian McCaffrey's historic 2019
+  season) as a sanity check.
+- `DATA.md`'s `mvp_race.json` section rewritten to document the new
+  formula and gating. Browser-verified the chart renders correctly with
+  real 2019 WPA data and correctly shows the "not enough of the season
+  played yet" empty state for preseason 2026.
+
 ## MVP Race chart (2026-09-08)
 
 Tommy: "let's add an 'MVP race' to the League tab right below the

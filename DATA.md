@@ -577,24 +577,78 @@ the last run) — same "completed weeks are immutable, only the current one
 refreshes" convention `fetch.py`'s box-score fetching already follows. A
 cached rerun took ~1s in the same test.
 
-## `{season}/mvp_race.json` (absent when season is over or no weeks played yet, new 2026-09)
+## `{season}/mvp_race.json` (absent for a season with no real box-score data, new 2026-09, revised 2026-09-08)
 
-League page "MVP Race" chart — cumulative points-over-projection for every
-real STARTED appearance this regular season, tracked by real player
-identity (`metrics.mvp_race_by_week()`). Same file-lifecycle rule as
-`sim.json`/`sim_by_week.json`: actively deleted, not just skipped, once
-`season_over` flips true — a finished season has no ongoing race left to
-show.
+League page "MVP Race" chart — cumulative fantasy **Win Probability Added
+(WPA)** for every real STARTED appearance this regular season, tracked by
+real player identity (`metrics.mvp_race_by_week()`).
+
+**Unlike `sim.json`/`sim_by_week.json`, this is NOT current-season-only.**
+It's written for every season that has real, week-level box-score data on
+file (2017 on — `HISTORICAL_BOXSCORE_YEARS` — plus the live current
+season once week 1 is decided), skipped only when a season genuinely has
+none (2012–2016, standings-only, same gap called out under `badges.json`
+above). `sim.json`'s current-season restriction exists because its
+roster-strength nudge needs TODAY's live roster snapshot — a dependency
+this file simply doesn't have, since it's built entirely from completed
+box scores. Tommy, 2026-09-08, after the original points-over-projection
+version shipped: "I feel like we can include the actual data for previous
+seasons, right? At least for several of them?" — "I like it. Implement as
+the new mvp race process, and add the data for whichever previous seasons
+we have enough [data] to actually include it."
+
+**The metric — why WPA, not points or points-over-projection**: the
+original version scored cumulative `actual − projected` for every started
+week. Tommy's own critique killed it: "a player projected for 26 points
+every week and scores 30 ... is probably more of an mvp than a player
+projected for 5 and scores 10" — beating a low personal bar shouldn't
+outscore a real star who met an already-high one. The fix moves to a
+shared **replacement-level baseline** (VOR/WAR-style: same bar for every
+player at a position, not each player's own bar), then goes one step
+further and converts points-above-replacement into actual **win
+probability added**, since "what really is valuable from a player is how
+much win probability they contribute to a team over the course of a
+season" (Tommy). For each real, decided regular-season week: replacement
+level at a position is the average `actual` score among every player
+STARTED there, league-wide, **that week only** (not season-to-date, so it
+reflects that week's own real texture). For each started player (K/D-ST
+excluded — not a real "MVP" candidate, same exclusion
+`redraft_lineup_value()` already applies), build a counterfactual team
+score swapping their real `actual` for that replacement average, then
+diff `normal_cdf((my_score − opp_score) / WIN_PROB_SIGMA)` (the same
+calibrated win-probability model `sim.json`'s "this week's matchups" uses,
+now shared from `metrics.normal_cdf()`/`WIN_PROB_SIGMA` so there's exactly
+one win-probability model in this codebase) between their real score and
+the counterfactual. A side's own win probability is always `(my_score −
+opponent_score)` — never sign-flipped by home/away. The gap is that
+player's WPA for the week, summed cumulatively across the season. This
+also captures something neither prior metric could: the same
+points-above-replacement performance is worth more WPA in a close game
+than a blowout, since the win-probability curve is steep near 50/50 and
+flat once a game's already decided.
+
+**A real bug caught by validating against a human, not code review**: the
+first WPA build had a sign-inversion bug — the away side's win probability
+was computed as the HOME team's win probability and attributed to the
+away player with the sign flipped, so a bad away-side week registered as
+helping that player's own team. Shipped with a plausible-looking but wrong
+top-10 (C.J. Stroud at #3 despite two away starts scoring 8 and 4 points
+against a 15-point expectation; Jahmyr Gibbs and Bijan Robinson missing
+entirely). Caught when Tommy read the real 2025 output against his own
+memory of the season ("This doesn't pass the smell test at all... I'm
+shocked by these results honestly") — fixed by always computing "my
+score minus the opponent's score," regardless of home/away, and
+reverified against a corrected top-10 Tommy confirmed matched his own
+read of the season exactly.
 
 `weeks[]`: every completed regular-season week number, ascending.
 `players{}`: keyed by `player_id` as a string, the top 20 players by their
-CURRENT (final-week) cumulative total — `{name, position, pro_team,
+CURRENT (final-week) cumulative WPA total — `{name, position, pro_team,
 current_team_id, cumulative_by_week[]}`, `cumulative_by_week` the same
-length as `weeks[]`, index-aligned (index 0 = total through week 1, etc.).
-K and D/ST are excluded entirely (not a real "MVP" candidate, same
-exclusion `redraft_lineup_value()` already applies for the analogous
-reason). A player who hasn't started a game yet this season simply isn't
-in `players{}` at all — never a fabricated 0.
+length as `weeks[]`, index-aligned (index 0 = total through week 1, etc.),
+each entry rounded to 3 decimals (WPA values run small — a single week is
+often well under 0.1). A player who hasn't started a game yet this season
+simply isn't in `players{}` at all — never a fabricated 0.
 
 **Tracked by player, not by fantasy team** — a mid-season trade doesn't
 reset a player's own line, the same way a real MVP race wouldn't reset if
@@ -603,11 +657,7 @@ recently started them, for display only (not used to bucket or reset the
 cumulative total).
 
 **Only a genuinely STARTED week counts**, for or against — a bench/IR
-week is invisible to this, it was never live. **Only a week ESPN actually
-published a projection for** counts at all — a missing projection is
-skipped entirely for that player-week (never treated as a 0), same
-"missing should look missing" convention used everywhere else in this
-app.
+week is invisible to this, it was never live.
 
 **Frontend** (`MvpRaceChart`, `HistoryCharts.tsx`): shows the top 15 of
 the 20 players on the line chart as a muted "field" for context, with

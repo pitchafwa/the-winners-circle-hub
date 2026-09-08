@@ -89,9 +89,15 @@ def strip_generated_at(d):
 def content_changed(rel_path: str) -> bool:
     """True if the working-tree file's content differs from HEAD's, once
     `generated_at` is ignored. Non-JSON or unparseable content falls back
-    to a real byte diff (never silently treated as unchanged)."""
+    to a real byte diff (never silently treated as unchanged). A file that
+    existed at HEAD but is gone from the working tree (a build that now
+    correctly omits it -- e.g. a file whose gating condition changed) is
+    always a real change, never silently skipped as noise; the reverse, a
+    file newly created by this build, is likewise always real."""
     old_raw = run(["git", "show", f"HEAD:{rel_path}"]).stdout
     new_path = ROOT / rel_path
+    if not new_path.exists() or not old_raw:
+        return True
     try:
         old = json.loads(old_raw)
         new = json.loads(new_path.read_text(encoding="utf-8"))

@@ -356,7 +356,7 @@ function MvpRaceTooltip({
         if (!info) return null;
         return (
           <div key={p.dataKey}>
-            {signed(p.value ?? 0, 1)} {info.name}
+            {signed(p.value ?? 0, 3)} {info.name}
           </div>
         );
       })}
@@ -370,20 +370,27 @@ const MVP_CHART_HEIGHT = 300;
 const MVP_MARGIN = { top: 10, right: 108, bottom: 4, left: -4 };
 const MVP_LABEL_MIN_GAP = 24;    // px — minimum vertical space between two end-labels before they'd overlap
 
-/** League page "MVP race" — cumulative points-over-projection for every
- * real STARTED appearance this regular season (`{season}/mvp_race.json`,
- * `metrics.mvp_race_by_week()`), tracked by real player identity so a
- * mid-season trade doesn't reset anyone's line. Tommy, 2026-09-08: "could
- * we include, say, the top 15 players on the line graph but only
- * highlight the current top 5 with names and headshots at the end of
- * their line ... that way we can see how they are tracking compared to
- * the rest of the league." The bottom `MVP_SHOWN_COUNT - MVP_HIGHLIGHT_
- * COUNT` lines are the muted "field" for context only (no distinct
- * color, no tooltip-worthy identity beyond hover); the top 5 get a real
- * qualitative color each (`CHART_QUALITATIVE` — deliberately not this
- * app's usual single-accent-vs-muted binary, since there's no one
- * "mine" line here) and a headshot+name label past the chart's right
- * edge.
+/** League page "MVP race" — cumulative fantasy Win Probability Added for
+ * every real STARTED appearance this regular season
+ * (`{season}/mvp_race.json`, `metrics.mvp_race_by_week()`), tracked by
+ * real player identity so a mid-season trade doesn't reset anyone's
+ * line. Revised 2026-09-08 from an earlier points-over-projection design
+ * — Tommy: "what really is valuable from a player is how much win
+ * probability they contribute to a team over the course of a season" —
+ * see that function's own docstring for the full formula (a real bug
+ * caught there too, before shipping: a sign error was crediting bad
+ * away-side performances as if they helped their own team).
+ *
+ * Layout, unchanged from the original ask: "could we include, say, the
+ * top 15 players on the line graph but only highlight the current top 5
+ * with names and headshots at the end of their line ... that way we can
+ * see how they are tracking compared to the rest of the league." The
+ * bottom `MVP_SHOWN_COUNT - MVP_HIGHLIGHT_COUNT` lines are the muted
+ * "field" for context only (no distinct color, no tooltip-worthy
+ * identity beyond hover); the top 5 get a real qualitative color each
+ * (`CHART_QUALITATIVE` — deliberately not this app's usual single-
+ * accent-vs-muted binary, since there's no one "mine" line here) and a
+ * headshot+name label past the chart's right edge.
  *
  * The end-labels are a plain absolutely-positioned HTML overlay, not a
  * Recharts `label` render prop — Recharts' own label positioning doesn't

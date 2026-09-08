@@ -147,7 +147,7 @@ export default function LeaguePage() {
         <div className="section-head">
           <h2 id="mvp-h">MVP Race</h2>
           <span className="label">
-            top 15 · cumulative points over projection, started weeks only
+            top 15 · cumulative win probability added, started weeks only
             {mvpRaceData.data && (
               <ScreenshotButton
                 targetRef={mvpRaceChartRef}

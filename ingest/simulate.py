@@ -34,14 +34,13 @@ tells the reader how stale that is).
 from __future__ import annotations
 
 import dataclasses
-import math
 import random
 import statistics
 from collections import defaultdict
 
 import numpy as np
 
-from metrics import current_records, power_score_1_100, redraft_lineup_value
+from metrics import current_records, normal_cdf, power_score_1_100, redraft_lineup_value, WIN_PROB_SIGMA
 from parse import (
     LeagueData,
     current_roster_players,
@@ -57,18 +56,12 @@ MIN_STD = 8.0             # nobody is this consistent; floor the noise
 FALLBACK_PRIOR = (120.0, 25.0)
 
 # This-week win probability from a projected-score gap: normal-CDF(diff /
-# WIN_PROB_SIGMA). A SEPARATE, simpler model from the season-long Monte
-# Carlo simulation above — it only answers "who's favored this one week,"
-# fed by the real optimal-lineup projection (see
+# WIN_PROB_SIGMA, both imported from metrics.py — see that module for why
+# the model itself lives there now). A SEPARATE, simpler model from the
+# season-long Monte Carlo simulation above — it only answers "who's
+# favored this one week," fed by the real optimal-lineup projection (see
 # parse.optimal_week_projection) rather than our shrunk-to-priors team
-# model. Sigma fit by hand against 8 real win-probability numbers pulled
-# from ESPN's own app (e.g. a 12-point favorite -> ~63% WP, a 55-point
-# favorite -> ~94% WP) — 35 matches all 8 within about a percentage point.
-WIN_PROB_SIGMA = 35.0
-
-
-def _normal_cdf(z: float) -> float:
-    return 0.5 * (1 + math.erf(z / math.sqrt(2)))
+# model.
 
 # How hard roster strength leans on the PRIOR mean, before real games exist
 # to override it. Expressed as a fraction of the league's own scoring
@@ -460,7 +453,7 @@ def run(league: LeagueData, history: LeagueData | None = None,
                 away_current = round(away_week["current"], 1)
                 home_projected = round(home_week["projected_final"] + bonus, 1)
                 away_projected = round(away_week["projected_final"], 1)
-                home_win_pct = round(_normal_cdf((home_projected - away_projected) / WIN_PROB_SIGMA), 4)
+                home_win_pct = round(normal_cdf((home_projected - away_projected) / WIN_PROB_SIGMA), 4)
                 started = home_week["started"] or away_week["started"]
                 projection_source = "espn"
                 home_lineup = _with_hot_cold(home_week["lineup"])

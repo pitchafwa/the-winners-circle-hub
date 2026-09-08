@@ -7,6 +7,7 @@ look missing.
 """
 from __future__ import annotations
 
+import math
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass
@@ -16,6 +17,24 @@ from scipy.optimize import linear_sum_assignment
 
 import config
 from parse import IR_SLOT, LeagueData, PlayerWeek, TeamWeek, SLOT_NAMES
+
+# Win probability from a score gap: normal-CDF(diff / WIN_PROB_SIGMA).
+# Lives here (not simulate.py, which uses it for the "this week's win
+# probability" pregame model) because mvp_race_by_week() below needs the
+# exact same model for a retrospective use, and simulate.py already
+# imports FROM metrics.py — defining it here and having simulate.py
+# import it back avoids a circular import and, more importantly, keeps
+# there being exactly one win-probability model in this codebase instead
+# of two copies that could quietly drift apart. Sigma fit by hand against
+# 8 real win-probability numbers pulled from ESPN's own app (e.g. a
+# 12-point favorite -> ~63% WP, a 55-point favorite -> ~94% WP) — 35
+# matches all 8 within about a percentage point.
+WIN_PROB_SIGMA = 35.0
+
+
+def normal_cdf(z: float) -> float:
+    return 0.5 * (1 + math.erf(z / math.sqrt(2)))
+
 
 # ---------------------------------------------------------------------------
 # Power ranking weights — the one place to tune the blend
@@ -1489,40 +1508,91 @@ def compute_power_rankings(league: LeagueData, all_play: dict[int, dict]) -> dic
 
 
 def mvp_race_by_week(league: LeagueData, top_n: int = 20) -> dict:
-    """Cumulative points-over-projection for every real STARTED appearance
-    this regular season, tracked by real player identity — not by fantasy
-    team, so a mid-season trade doesn't reset a player's own line, the
-    same way a real MVP race wouldn't reset if a pro athlete got traded
-    mid-season. Only a genuinely STARTED week counts for or against a
-    player (a bench/IR week is invisible to this, same as it should be —
-    it was never live), and only a week ESPN actually published a
-    projection for (a missing projection is skipped entirely, never
-    treated as a 0, same "missing should look missing" convention as
-    everywhere else in this app).
+    """Cumulative fantasy Win Probability Added for every real STARTED
+    appearance this regular season, tracked by real player identity — not
+    by fantasy team, so a mid-season trade doesn't reset a player's own
+    line, the same way a real MVP race wouldn't reset if a pro athlete
+    got traded mid-season.
 
-    Returns the top `top_n` players by their CURRENT (final-week)
-    cumulative total, each carrying their FULL week-by-week running
-    total (not just today's number) — a chart can show the whole race
-    unfolding, not just a snapshot leaderboard. `current_team_id` is
-    whichever fantasy team most recently started them (their real
-    current roster, not locked to whoever had them when they first
-    entered the top N)."""
+    For each real, decided matchup: swap a started player's actual score
+    for that WEEK's replacement level at their position (the average
+    score among every player started at that position, league-wide, this
+    week only — not season-to-date, so it reflects that week's own real
+    texture, not a slow-moving season average) and compare their team's
+    modeled win probability (the same `normal_cdf(score gap /
+    WIN_PROB_SIGMA)` model this app already uses for "who's favored this
+    week") WITH their real performance vs. WITH that counterfactual swap.
+    The gap is their win-probability-added for the week — a huge week in
+    a blowout barely moves the needle (the win-prob curve is flat out
+    there), while a smaller week that actually swings a close game counts
+    for a lot — which plain points, or points over the player's OWN
+    preseason projection, can't capture at all. Tommy, 2026-09-08: "what
+    really is valuable from a player is how much win probability they
+    contribute to a team over the course of a season."
+
+    Replaced the original points-over-projection design after a real bug
+    caught in live validation: comparing a real top-10/bottom-10
+    leaderboard against Tommy's own memory of the 2025 season surfaced a
+    sign error that was scoring a bad AWAY-side performance as if it
+    helped that player's own team (it was actually computing the
+    opponent's win-probability delta and attributing it with the wrong
+    sign) — fixed by always computing "my side's score minus the
+    opponent's score," never a home/away-relative sign. Verified against
+    Tommy's own read of a real season before shipping, not just against
+    the code looking right.
+
+    K/D-ST excluded (not a real "MVP" candidate, same exclusion
+    `redraft_lineup_value()` already applies). Returns the top `top_n`
+    players by their CURRENT (final-week) cumulative total, each
+    carrying their FULL week-by-week running total (not just today's
+    number) — a chart can show the whole race unfolding, not just a
+    snapshot leaderboard. `current_team_id` is whichever fantasy team
+    most recently started them (their real current roster, not locked to
+    whoever had them when they first entered the top N)."""
     weeks = league.regular_weeks()
     running: dict[int, float] = {}
     by_week: dict[int, dict[int, float]] = {}
     info: dict[int, dict] = {}
     for week in weeks:
-        for m in league.weeks[week]:
+        matchups = league.weeks[week]
+
+        # This week's replacement level per position: the average ACTUAL
+        # score among every player started at that position, league-wide,
+        # this week only (never season-to-date — see docstring above).
+        pos_scores: dict[str, list[float]] = {}
+        for m in matchups:
             for tw in (m.home, m.away):
                 if tw is None:
                     continue
                 for p in tw.starters():
-                    if p.projected is None or p.position in ("K", "D/ST"):
-                        continue  # same "not a real MVP-race candidate" exclusion redraft_lineup_value() already applies
-                    running[p.player_id] = running.get(p.player_id, 0.0) + (p.actual - p.projected)
+                    if p.position in ("K", "D/ST"):
+                        continue
+                    pos_scores.setdefault(p.position, []).append(p.actual)
+        replacement = {pos: statistics.mean(v) for pos, v in pos_scores.items() if v}
+
+        for m in matchups:
+            home, away = m.home, m.away
+            if home is None or away is None:
+                continue
+            # A side's own win probability is always (my score - their
+            # score) -- never flipped by home/away. Getting this backwards
+            # for the away side was the real bug the first version shipped
+            # with (see docstring above).
+            for side_tw, opp_score in ((home, away.total), (away, home.total)):
+                real_side = side_tw.total
+                real_wp = normal_cdf((real_side - opp_score) / WIN_PROB_SIGMA)
+                for p in side_tw.starters():
+                    if p.position in ("K", "D/ST"):
+                        continue
+                    repl = replacement.get(p.position)
+                    if repl is None:
+                        continue
+                    counterfactual_side = real_side - p.actual + repl
+                    cf_wp = normal_cdf((counterfactual_side - opp_score) / WIN_PROB_SIGMA)
+                    running[p.player_id] = running.get(p.player_id, 0.0) + (real_wp - cf_wp)
                     info[p.player_id] = {
                         "name": p.name, "position": p.position,
-                        "pro_team_id": p.pro_team_id, "current_team_id": tw.team_id,
+                        "pro_team_id": p.pro_team_id, "current_team_id": side_tw.team_id,
                     }
         by_week[week] = dict(running)
 
@@ -1531,7 +1601,7 @@ def mvp_race_by_week(league: LeagueData, top_n: int = 20) -> dict:
 
     top_ids = sorted(running, key=lambda pid: running[pid], reverse=True)[:top_n]
     players = {
-        str(pid): {**info[pid], "cumulative_by_week": [round(by_week[w].get(pid, 0.0), 2) for w in weeks]}
+        str(pid): {**info[pid], "cumulative_by_week": [round(by_week[w].get(pid, 0.0), 3) for w in weeks]}
         for pid in top_ids
     }
     return {"weeks": weeks, "players": players}

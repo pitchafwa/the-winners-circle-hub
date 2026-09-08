@@ -1,3 +1,5 @@
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useApp } from "../state/AppContext";
 import { MISSING, pct, pts } from "../lib/format";
 import { h2hLookup } from "../lib/h2h";
@@ -5,6 +7,7 @@ import { displayOrderIndices } from "../lib/lineupOrder";
 import MobileLineupList from "./MobileLineupList";
 import PlayerCardTrigger from "./PlayerCardTrigger";
 import PlayerHeadshot from "./PlayerHeadshot";
+import ScreenshotButton from "./ScreenshotButton";
 import TeamLink from "./TeamLink";
 import type { AwardTone, H2HPair, SimMatchup, SimTeam, WeekLineupPlayer } from "../types/data";
 
@@ -237,38 +240,57 @@ function LineupRow({ p }: { p: WeekLineupPlayer | undefined }) {
   );
 }
 
-export default function WeeklyMatchupProjections({
-  matchups,
+function MatchupPreviewCard({
+  m,
   teamInfo,
   h2hPairs,
   simTeams,
   regSeasonWeeks,
 }: {
-  matchups: SimMatchup[];
+  m: SimMatchup;
   teamInfo: Map<number, TeamInfo>;
   h2hPairs: H2HPair[];
   simTeams: Map<number, SimTeam>;
   regSeasonWeeks: number;
 }) {
   const { teamName, myTeamId } = useApp();
+  const cardRef = useRef<HTMLElement>(null);
+  // Same forced-desktop-layout-during-capture trick MatchupsPage's real
+  // (played) matchup cards already use — see that component's own
+  // comment for why this goes through React state + flushSync rather
+  // than a raw classList mutation.
+  const [forceDesktop, setForceDesktop] = useState(false);
+  const prepareCapture = () => flushSync(() => setForceDesktop(true));
+  const cleanupCapture = () => flushSync(() => setForceDesktop(false));
+
+  const awayWinPct = 1 - m.home_win_pct;
+  const homeFavored = m.home_win_pct >= 0.5;
+  const mine = m.home_id === myTeamId || m.away_id === myTeamId;
+  const h2h = h2hLookup(h2hPairs, m.away_id, m.home_id);
+  const rows = Math.max(m.away_lineup.length, m.home_lineup.length);
+  const flags = matchupFlags(m, simTeams, teamName, regSeasonWeeks);
+  // Both sides share the identical real slot order index-for-index,
+  // so one permutation (computed off either side) reorders both.
+  const order = displayOrderIndices(m.away_lineup.map((p) => p.slot));
+  const filename = `matchup-preview-week${m.matchup_period}-${teamName(m.away_id)}-vs-${teamName(m.home_id)}`
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
   return (
-    <div className="mu-list">
-      {matchups.map((m) => {
-        const awayWinPct = 1 - m.home_win_pct;
-        const homeFavored = m.home_win_pct >= 0.5;
-        const mine = m.home_id === myTeamId || m.away_id === myTeamId;
-        const h2h = h2hLookup(h2hPairs, m.away_id, m.home_id);
-        const rows = Math.max(m.away_lineup.length, m.home_lineup.length);
-        const flags = matchupFlags(m, simTeams, teamName, regSeasonWeeks);
-        // Both sides share the identical real slot order index-for-index,
-        // so one permutation (computed off either side) reorders both.
-        const order = displayOrderIndices(m.away_lineup.map((p) => p.slot));
-
-        return (
-          <article key={`${m.home_id}-${m.away_id}`} className="mu-card"
-            style={mine ? { borderColor: "var(--accent)" } : undefined}>
-            <div className="mu-card-head" style={{ marginBottom: "0.4rem" }}>
+    <article
+      className={`mu-card${forceDesktop ? " mu-card-force-desktop" : ""}`}
+      style={mine ? { borderColor: "var(--accent)" } : undefined}
+      ref={cardRef}
+    >
+      <div className="card-shot">
+        <ScreenshotButton
+          targetRef={cardRef}
+          filename={filename}
+          title={`${teamName(m.away_id)} at ${teamName(m.home_id)} — Week ${m.matchup_period} preview`}
+          prepareCapture={prepareCapture}
+          cleanupCapture={cleanupCapture}
+        />
+      </div>
+      <div className="mu-card-head" style={{ marginBottom: "0.4rem" }}>
               <div className="label">
                 Week {m.matchup_period}{mine ? " · your game" : ""}
                 {m.projection_source === "model" && (
@@ -362,9 +384,35 @@ export default function WeeklyMatchupProjections({
                 />
               </>
             )}
-          </article>
-        );
-      })}
+    </article>
+  );
+}
+
+export default function WeeklyMatchupProjections({
+  matchups,
+  teamInfo,
+  h2hPairs,
+  simTeams,
+  regSeasonWeeks,
+}: {
+  matchups: SimMatchup[];
+  teamInfo: Map<number, TeamInfo>;
+  h2hPairs: H2HPair[];
+  simTeams: Map<number, SimTeam>;
+  regSeasonWeeks: number;
+}) {
+  return (
+    <div className="mu-list">
+      {matchups.map((m) => (
+        <MatchupPreviewCard
+          key={`${m.home_id}-${m.away_id}`}
+          m={m}
+          teamInfo={teamInfo}
+          h2hPairs={h2hPairs}
+          simTeams={simTeams}
+          regSeasonWeeks={regSeasonWeeks}
+        />
+      ))}
     </div>
   );
 }

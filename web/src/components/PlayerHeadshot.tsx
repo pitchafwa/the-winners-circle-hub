@@ -37,6 +37,15 @@ export default function PlayerHeadshot({
       src={src}
       alt=""
       loading="lazy"
+      // ESPN's image CDN sends Access-Control-Allow-Origin: * (confirmed
+      // live), so requesting it in CORS mode doesn't fail — but WITHOUT
+      // this attribute, the browser still fetches it as a normal opaque
+      // cross-origin load, which taints any canvas it later ends up
+      // drawn into. ScreenshotButton's capture pipeline (SVG -> Image ->
+      // canvas) silently drops a tainted image rather than throwing, so
+      // every headshot/D-ST logo was just missing from every card
+      // screenshot site-wide with no visible error — this is the fix.
+      crossOrigin="anonymous"
       onError={(e) => {
         const img = e.currentTarget;
         img.onerror = null;

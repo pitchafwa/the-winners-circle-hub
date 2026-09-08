@@ -44,10 +44,19 @@ What it does, in order:
    commits everything under one commit with the given message, and
    pushes. Prints exactly which files got committed.
 
+If the push is rejected because someone else (almost always the refresh
+bot -- confirmed live 2026-09-08, a race between this script's own pull
+and push, refresh.yml now runs every 6h and much more often on a game
+day) pushed first, the local commit is undone (the real source-edit that
+prompted this run is never touched) and the whole cycle above retries
+from a fresh fetch, up to 3 times, rather than failing on a push a
+simple retry-just-the-push couldn't have fixed anyway (the data that
+commit held was built against a base that's now stale too).
+
 Refuses to run (prints why, exits non-zero, touches nothing) if: there's
 no commit message argument, the fast-forward pull would conflict, the
-rebuild fails, or -- after all of the above -- there's nothing real to
-commit at all.
+rebuild fails, a real (non-race) push failure happens, or -- after all
+of the above -- there's nothing real to commit at all.
 """
 from __future__ import annotations
 
@@ -91,14 +100,26 @@ def content_changed(rel_path: str) -> bool:
     return strip_generated_at(old) != strip_generated_at(new)
 
 
-def main() -> None:
-    args = sys.argv[1:]
-    offline = "--offline" in args
-    args = [a for a in args if a != "--offline"]
-    if not args:
-        die('missing commit message -- usage: python sync_and_push.py "message" [--offline]')
-    message = args[0]
+MAX_ATTEMPTS = 3  # covers a bot refresh landing mid-sync (refresh.yml runs every 6h,
+                  # much more often on a game day) -- a real race, not a hypothetical
+                  # one: confirmed live 2026-09-08, a push rejected non-fast-forward
+                  # because a "Refresh league data" commit landed between this
+                  # script's own pull and its push. Retrying the WHOLE cycle (not
+                  # just the push) is what actually fixes it: the data this script
+                  # committed was built against the base that's now stale too, so a
+                  # naive retry-just-the-push would either fail the same way again
+                  # or silently push data one refresh cycle behind the one that
+                  # just landed.
 
+
+def sync_once(message: str, offline: bool) -> str:
+    """One full attempt. Returns "pushed", "nothing" (nothing real to
+    commit), or "retry" (push was rejected because someone else — almost
+    always the refresh bot — pushed first; the local commit has already
+    been undone, ready for main()'s loop to re-run this from a fresh
+    fetch). Raises SystemExit (via die()) for anything else — a real
+    failure (build broke, a genuine merge conflict, ...) still needs a
+    human immediately, not three silent retries."""
     print("Fetching origin/main...")
     fetch = run(["git", "fetch", "origin", "main"])
     if fetch.returncode != 0:
@@ -142,7 +163,7 @@ def main() -> None:
     to_commit = other_changed + real_data_changes
     if not to_commit:
         print("Nothing real to commit -- already in sync. Nothing pushed.")
-        return
+        return "nothing"
 
     print(f"Committing {len(to_commit)} file(s):")
     for f in to_commit:
@@ -158,10 +179,46 @@ def main() -> None:
 
     print("Pushing...")
     push = run(["git", "push", "origin", "main"])
-    if push.returncode != 0:
+    if push.returncode == 0:
+        print("Pushed.")
+        return "pushed"
+
+    if "non-fast-forward" not in push.stderr and "fetch first" not in push.stderr:
         die(f"git push failed (commit is local, not lost):\n{push.stderr}")
 
-    print("Pushed.")
+    # Someone else (almost always the refresh bot) pushed in the gap
+    # between this attempt's own pull and its push. The commit we just
+    # made is real but now sits on a stale base, so undoing just the
+    # commit (never the working-tree edit that prompted this whole run)
+    # and letting main()'s loop re-fetch/rebuild/recommit/push from
+    # scratch is the actual fix -- see MAX_ATTEMPTS' comment for why a
+    # bare retry-the-push wouldn't be enough.
+    print("  push rejected -- another commit landed first, retrying the full sync...")
+    reset = run(["git", "reset", "--soft", "HEAD~1"])
+    if reset.returncode != 0:
+        die(f"push was rejected AND undoing the local commit failed -- needs a human:\n{reset.stderr}")
+    run(["git", "restore", "--staged", "."])
+    run(["git", "checkout", "--", "web/public/data"])
+    return "retry"
+
+
+def main() -> None:
+    args = sys.argv[1:]
+    offline = "--offline" in args
+    args = [a for a in args if a != "--offline"]
+    if not args:
+        die('missing commit message -- usage: python sync_and_push.py "message" [--offline]')
+    message = args[0]
+
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        if attempt > 1:
+            print(f"\n--- retry {attempt}/{MAX_ATTEMPTS} ---")
+        outcome = sync_once(message, offline)
+        if outcome != "retry":
+            return
+    die(f"still losing the race after {MAX_ATTEMPTS} attempts -- "
+        "the bot is refreshing faster than this script can sync; try again, "
+        "or run with --offline to skip the slower live fetch")
 
 
 if __name__ == "__main__":

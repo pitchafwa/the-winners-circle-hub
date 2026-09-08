@@ -1507,12 +1507,16 @@ def compute_power_rankings(league: LeagueData, all_play: dict[int, dict]) -> dic
     return rankings
 
 
-def mvp_race_by_week(league: LeagueData, top_n: int = 20) -> dict:
-    """Cumulative fantasy Win Probability Added for every real STARTED
-    appearance this regular season, tracked by real player identity — not
-    by fantasy team, so a mid-season trade doesn't reset a player's own
-    line, the same way a real MVP race wouldn't reset if a pro athlete
-    got traded mid-season.
+def weekly_wpa(league: LeagueData) -> dict[int, dict[int, dict]]:
+    """Per-week fantasy Win Probability Added for every real STARTED
+    player (K/D-ST excluded — not a real "MVP" candidate, same exclusion
+    `redraft_lineup_value()` already applies), across every completed week
+    of the season INCLUDING the playoffs. Shared, single-source-of-truth
+    computation behind `mvp_race_by_week()` below (which sums this by
+    player identity, across teams, for the League page race) and the
+    per-team WPA reports in `build.py`/`ownership.py` (which sum it by
+    team-and-player instead) — one real WPA number per player-week,
+    computed once, read three different ways.
 
     For each real, decided matchup: swap a started player's actual score
     for that WEEK's replacement level at their position (the average
@@ -1530,31 +1534,35 @@ def mvp_race_by_week(league: LeagueData, top_n: int = 20) -> dict:
     really is valuable from a player is how much win probability they
     contribute to a team over the course of a season."
 
-    Replaced the original points-over-projection design after a real bug
-    caught in live validation: comparing a real top-10/bottom-10
-    leaderboard against Tommy's own memory of the 2025 season surfaced a
-    sign error that was scoring a bad AWAY-side performance as if it
-    helped that player's own team (it was actually computing the
-    opponent's win-probability delta and attributing it with the wrong
-    sign) — fixed by always computing "my side's score minus the
-    opponent's score," never a home/away-relative sign. Verified against
-    Tommy's own read of a real season before shipping, not just against
-    the code looking right.
+    A side's own win probability is always (my score - their score) --
+    never flipped by home/away. Getting this backwards for the away side
+    was a real bug the first version shipped with, caught by comparing a
+    real 2025 top-10/bottom-10 against Tommy's own memory of the season
+    before shipping (see `mvp_race_by_week`'s git history / BACKLOG.md for
+    the full story) — fixed by always computing "my side's score minus
+    the opponent's score."
 
-    K/D-ST excluded (not a real "MVP" candidate, same exclusion
-    `redraft_lineup_value()` already applies). Returns the top `top_n`
-    players by their CURRENT (final-week) cumulative total, each
-    carrying their FULL week-by-week running total (not just today's
-    number) — a chart can show the whole race unfolding, not just a
-    snapshot leaderboard. `current_team_id` is whichever fantasy team
-    most recently started them (their real current roster, not locked to
-    whoever had them when they first entered the top N)."""
-    weeks = league.regular_weeks()
-    running: dict[int, float] = {}
-    by_week: dict[int, dict[int, float]] = {}
-    info: dict[int, dict] = {}
-    for week in weeks:
-        matchups = league.weeks[week]
+    **Playoffs included (2026-09-08)**: during any week with a playoff
+    game, only `WINNERS_BRACKET` matchups count — same "still meaningfully
+    playing" convention `ownership.py`'s `_meaningful_teams` and
+    `redraft_lineup_value`'s trophy-week filtering already use. Tommy,
+    reviewing a regular-season-only vs. playoffs-included comparison for
+    2023-2025: "It's still basically the same list but with minor changes
+    for big playoff performances, which is a good thing." Confirmed this
+    isn't a one-way boost for deep playoff runs before shipping — e.g. a
+    player whose team lost a playoff game they barely contributed to can
+    see their season total go DOWN once playoffs are folded in, same as
+    any other real game.
+
+    Returns `{week: {player_id: {"wpa", "team_id", "name", "position",
+    "pro_team_id"}}}` — a week with no qualifying games at all (shouldn't
+    happen for any real completed week, but kept explicit rather than
+    assumed) is simply absent, never an empty-but-present entry."""
+    out: dict[int, dict[int, dict]] = {}
+    for week in league.completed_weeks():
+        matchups = league.weeks.get(week, [])
+        if any(m.is_playoff for m in matchups):
+            matchups = [m for m in matchups if m.playoff_tier == "WINNERS_BRACKET"]
 
         # This week's replacement level per position: the average ACTUAL
         # score among every player started at that position, league-wide,
@@ -1570,14 +1578,11 @@ def mvp_race_by_week(league: LeagueData, top_n: int = 20) -> dict:
                     pos_scores.setdefault(p.position, []).append(p.actual)
         replacement = {pos: statistics.mean(v) for pos, v in pos_scores.items() if v}
 
+        week_out: dict[int, dict] = {}
         for m in matchups:
             home, away = m.home, m.away
             if home is None or away is None:
                 continue
-            # A side's own win probability is always (my score - their
-            # score) -- never flipped by home/away. Getting this backwards
-            # for the away side was the real bug the first version shipped
-            # with (see docstring above).
             for side_tw, opp_score in ((home, away.total), (away, home.total)):
                 real_side = side_tw.total
                 real_wp = normal_cdf((real_side - opp_score) / WIN_PROB_SIGMA)
@@ -1589,11 +1594,49 @@ def mvp_race_by_week(league: LeagueData, top_n: int = 20) -> dict:
                         continue
                     counterfactual_side = real_side - p.actual + repl
                     cf_wp = normal_cdf((counterfactual_side - opp_score) / WIN_PROB_SIGMA)
-                    running[p.player_id] = running.get(p.player_id, 0.0) + (real_wp - cf_wp)
-                    info[p.player_id] = {
-                        "name": p.name, "position": p.position,
-                        "pro_team_id": p.pro_team_id, "current_team_id": side_tw.team_id,
+                    week_out[p.player_id] = {
+                        "wpa": real_wp - cf_wp, "team_id": side_tw.team_id,
+                        "name": p.name, "position": p.position, "pro_team_id": p.pro_team_id,
                     }
+        if week_out:
+            out[week] = week_out
+    return out
+
+
+def mvp_race_by_week(league: LeagueData, top_n: int = 20, wpa_by_week: dict | None = None) -> dict:
+    """Cumulative fantasy Win Probability Added for every real STARTED
+    appearance this season (regular season AND playoffs — see
+    `weekly_wpa()`, which does the actual per-week computation this
+    function sums), tracked by real player identity — not by fantasy
+    team, so a mid-season trade doesn't reset a player's own line, the
+    same way a real MVP race wouldn't reset if a pro athlete got traded
+    mid-season.
+
+    Returns the top `top_n` players by their CURRENT (final-week)
+    cumulative total, each carrying their FULL week-by-week running total
+    (not just today's number) — a chart can show the whole race
+    unfolding, not just a snapshot leaderboard. `current_team_id` is
+    whichever fantasy team most recently started them (their real current
+    roster, not locked to whoever had them when they first entered the
+    top N).
+
+    `wpa_by_week` lets a caller that already computed `weekly_wpa(league)`
+    for something else (build.py, building the per-team WPA report in the
+    same season's build) pass it in and skip a second full pass over the
+    season; defaults to computing it fresh."""
+    if wpa_by_week is None:
+        wpa_by_week = weekly_wpa(league)
+    weeks = sorted(wpa_by_week)
+    running: dict[int, float] = {}
+    by_week: dict[int, dict[int, float]] = {}
+    info: dict[int, dict] = {}
+    for week in weeks:
+        for pid, w in wpa_by_week[week].items():
+            running[pid] = running.get(pid, 0.0) + w["wpa"]
+            info[pid] = {
+                "name": w["name"], "position": w["position"],
+                "pro_team_id": w["pro_team_id"], "current_team_id": w["team_id"],
+            }
         by_week[week] = dict(running)
 
     if not running:

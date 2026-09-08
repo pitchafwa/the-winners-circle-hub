@@ -383,6 +383,12 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         totals = [tw.total for m in league.weeks[w] for tw in (m.home, m.away) if tw]
         week_avgs.append({"week": w, "avg": round(sum(totals) / len(totals), 2) if totals else None})
 
+    # Real win-probability-added per player-week (playoffs included),
+    # computed once here and reused below both for each team's own
+    # `wpa_report` and for `mvp_race.json` further down -- one pass over
+    # the season instead of two.
+    wpa_by_week = metrics.weekly_wpa(league)
+
     teams_out = []
     for tid, t in league.teams.items():
         weekly = []
@@ -416,24 +422,32 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
                 ],
             })
 
-        # starter actual-vs-projected, aggregated per player
-        agg: dict[int, dict] = {}
+        # Real win-probability-added, aggregated per started player this
+        # team actually ran out (replaces the old actual-vs-projected
+        # table -- see mvp_race.json / metrics.weekly_wpa() for why: a
+        # shared bar for every player at the position, converted into what
+        # it actually meant to a team's chances of winning, beats each
+        # player being graded against their own preseason number). Only
+        # counts weeks `wpa_by_week` actually has this player in -- a
+        # consolation-bracket playoff week is silently absent from there
+        # (see weekly_wpa's docstring), so it's silently skipped here too,
+        # same "missing should look missing" convention as everywhere else.
+        wpa_agg: dict[int, dict] = {}
         for w in completed:
             tw = league.team_week(tid, w)
             if tw is None:
                 continue
+            week_wpa = wpa_by_week.get(w, {})
             for p in tw.starters():
-                if p.projected is None:
+                wpa = week_wpa.get(p.player_id)
+                if wpa is None:
                     continue
-                a = agg.setdefault(p.player_id, {
+                a = wpa_agg.setdefault(p.player_id, {
                     "player_id": p.player_id, "name": p.name, "position": p.position,
                     "pro_team": pro_abbrev.get(p.pro_team_id, ""),
-                    "starts": 0, "actual": 0.0, "projected": 0.0})
+                    "starts": 0, "wpa": 0.0})
                 a["starts"] += 1
-                a["actual"] = round(a["actual"] + p.actual, 2)
-                a["projected"] = round(a["projected"] + p.projected, 2)
-        for a in agg.values():
-            a["diff"] = round(a["actual"] - a["projected"], 2)
+                a["wpa"] = round(a["wpa"] + wpa["wpa"], 3)
 
         upcoming = [
             {"matchup_period": s.matchup_period,
@@ -446,7 +460,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         teams_out.append({
             "team_id": tid,
             "weekly": weekly,
-            "projection_report": sorted(agg.values(), key=lambda a: a["diff"]),
+            "wpa_report": sorted(wpa_agg.values(), key=lambda a: -a["wpa"]),
             "upcoming": upcoming,
             "season": {
                 "coach": coach[tid]["season"],
@@ -614,8 +628,10 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     # BOXSCORE_YEARS — plus the live current season once week 1's in the
     # books); unlinked, never left stale, for a season with none (2012-2016,
     # a box-score-data gap this app has hit before, or the current season
-    # before its first week is decided).
-    mvp = metrics.mvp_race_by_week(league)
+    # before its first week is decided). Includes the playoffs (see
+    # `weekly_wpa`'s docstring) — reuses the same `wpa_by_week` computed
+    # above for `teams_out` rather than a second pass over the season.
+    mvp = metrics.mvp_race_by_week(league, wpa_by_week=wpa_by_week)
     if mvp["players"]:
         pro_teams = parse.pro_team_schedule(season)
         for p in mvp["players"].values():

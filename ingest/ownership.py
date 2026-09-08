@@ -119,6 +119,10 @@ def build_ownership(seasons: list[int]) -> dict:
             continue
         is_first_season = not seen_data_season
         seen_data_season = True
+        # Real WPA per player-week (playoffs included), same shared model
+        # `mvp_race.json`/`build.py`'s per-team WPA report use — computed
+        # once per season here rather than duplicated.
+        wpa_by_week = metrics.weekly_wpa(league)
 
         for week in league.completed_weeks():
             active_teams = _meaningful_teams(league, week) & {
@@ -152,13 +156,16 @@ def build_ownership(seasons: list[int]) -> dict:
                             "weeks_rostered": 0, "weeks_started": 0, "weeks_benched": 0,
                             "weeks_projected": 0,
                             "points_started": 0.0, "points_projected_started": 0.0, "points_benched": 0.0,
-                            "points_started_projected_weeks": 0.0,
+                            "points_started_projected_weeks": 0.0, "points_wpa": 0.0,
                         }
                         open_stints[pid] = st
                     st["weeks_rostered"] += 1
                     if pw.started:
                         st["weeks_started"] += 1
                         st["points_started"] = round(st["points_started"] + pw.actual, 2)
+                        wpa = wpa_by_week.get(week, {}).get(pid)
+                        if wpa is not None:
+                            st["points_wpa"] = round(st["points_wpa"] + wpa["wpa"], 3)
                         # None means ESPN had no projection at all for this
                         # week (every 2017 week, some live-in-progress
                         # weeks) — leaving it out of both sums keeps
@@ -191,6 +198,7 @@ def build_ownership(seasons: list[int]) -> dict:
 
     leaders = {
         "value": _top_per_team(stints, key=lambda s: s["points_started"]),
+        "mvp": _top_per_team(stints, key=lambda s: s["points_wpa"]),
         "busts": _top_per_team(
             stints, key=lambda s: s["points_projected_started"] - s["points_started_projected_weeks"],
             min_weeks=MIN_BUST_WEEKS),
@@ -213,6 +221,7 @@ def _top_per_team(stints: list[dict], key, min_weeks: int = 0) -> list[dict]:
                 "team_id": team_id, "player_id": s["player_id"], "name": s["name"],
                 "position": s["position"],
                 "points_started": s["points_started"],
+                "points_wpa": s["points_wpa"],
                 "points_under_projection": round(
                     s["points_projected_started"] - s["points_started_projected_weeks"], 2)
                     if s["weeks_projected"] else None,

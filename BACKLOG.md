@@ -3,6 +3,89 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## WPA everywhere: playoffs included, My Team table, Franchise MVPs leaderboard (2026-09-08)
+
+Same day as the WPA revision below. Tommy asked to see a real regular-
+season-only vs. playoffs-included comparison before deciding: "Give me
+the top 5 year by year from 2023-2025 as we have it now, side by side
+with what those top 5s would look like if we included playoff
+performances... I'm trying to decide if that adds to the feature or
+detracts from it." After reviewing real numbers for all three seasons:
+"I like including the playoffs. It's still basically the same list but
+with minor changes for big playoff performances, which is a good thing.
+Let's update to include it." Then, same message: "I want to update our my
+team and franchise history pages — my team's current 'points over
+projection' table should be swapped out for a WPA table, and franchise
+history should have a leaderboard added for top WPA players across their
+full careers on that franchise."
+
+- **Playoffs folded into WPA everywhere it's computed**: `metrics.py`
+  gained a new shared `weekly_wpa()` (the real per-player-week
+  computation, `WINNERS_BRACKET`-only during any playoff week — same
+  "still meaningfully playing" rule `ownership.py`'s `_meaningful_teams`
+  already used) that `mvp_race_by_week()`, `build.py`'s per-team report,
+  and `ownership.py`'s career stats all now share — one computation, read
+  three ways, instead of three copies that could drift.
+- **My Team page**: "Who contributed more than expected" (season actual
+  vs. projected) replaced with "Who contributed the most win probability"
+  — real cumulative WPA per started player this season, playoffs
+  included. New `wpa_report[]` on `teams.json` (was `projection_report[]`).
+- **Franchise page**: new "Franchise MVPs" leaderboard (career WPA,
+  playoffs included) alongside the existing scorers/starters/busts/
+  stashes leaderboards — sourced from a new `points_wpa` field on
+  `ownership.json`'s stints, merged across a player's separate stints on
+  the same franchise the same way every other career leaderboard already
+  does (`careerStints()`).
+- Verified: real 2023-2025 comparison run and shown to Tommy before
+  building (playoffs move the needle for real playoff performances,
+  never a one-way boost — a bad playoff week can pull a player's total
+  DOWN, confirmed with Tyreek Hill's 2023 total actually dropping once
+  playoffs were folded in). Full offline rebuild confirmed real,
+  sensible output (2019's real top-5 WPA led by Christian McCaffrey's
+  historic season, etc.) — `tsc --noEmit` and production build clean,
+  browser-verified on both pages with real data.
+
+## Screenshot fixes: MVP Race chart cut off, name truncation, label stacking (2026-09-08)
+
+Same day, reported against a real screenshot Tommy took: "Screenshots
+don't work fully yet. I think it's expanding the chart horizontally
+successfully but taking the screenshot before the lines have a chance to
+extend rightward. It's also important to me that there be enough room
+for the names to be written out in full (no ellipses)... I also think the
+vertical placement of the names can be refined slightly... Ideal would be
+to optimize for average closeness to line end."
+
+- **Root cause of the cut-off lines, found via a real before/after
+  capture comparison, not guessed**: not (only) a resize-timing race —
+  Recharts animates every `<Line>`/`<Area>` drawing in from zero length
+  by default on mount/data-change (~1.5s), which was still mid-animation
+  when the capture fired even after the chart's own resize had settled.
+  Fixed at the source: every chart line in the app now sets
+  `isAnimationActive={false}` (serves no purpose on a dashboard, and was
+  actively breaking screenshot reliability). `useForceDesktopCapture` also
+  swapped its flat 150ms guess for actually polling the rendered `<svg>`'s
+  own `width` attribute against the container's real width, so a genuine
+  resize delay still can't race the capture either.
+- **Full names, never ellipsis-truncated**: the chart's right margin used
+  to be a flat 108px guess. Now computed from the ACTUAL rendered pixel
+  width of the 5 real names currently on the chart (`mvpTextWidth`, canvas
+  `measureText`) — can't undershoot a long real name the way a fixed
+  guess could, on mobile or desktop alike.
+- **Label stacking optimizes for average closeness, not first-collision**:
+  the old de-collision greedily pushed each label straight down past
+  whichever one came before it, compounding every time the cluster got
+  crowded. Replaced with isotonic regression (Pool Adjacent Violators) —
+  the least-squares-optimal way to stack labels with a minimum gap while
+  keeping the WHOLE cluster as close as possible to its real values,
+  which can mean pulling an earlier label back UP, not just pushing later
+  ones down. Tommy: "I would the bottom 4 of our 5 leaders to all be a
+  little higher... Ideal would be to optimize for average closeness to
+  line end" — exactly what this solves for.
+- Verified against a real captured PNG, not just code review: before the
+  fix, lines visibly stopped a few weeks in despite the axis already
+  spanning the full season; after, they run the full real season. Full
+  names confirmed present with no clipping via direct DOM measurement.
+
 ## MVP Race revision: points-over-projection → Win Probability Added, plus historical backfill (2026-09-08)
 
 Same day as the original MVP Race ship below. Tommy's critique of the

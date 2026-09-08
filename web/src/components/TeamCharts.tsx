@@ -33,8 +33,9 @@ export function ScoringChart({
         <YAxis tick={axisStyle} tickLine={false} axisLine={false} domain={["auto", "auto"]} />
         <Tooltip contentStyle={tooltipStyle} labelFormatter={(w) => `Week ${w}`} />
         <Line type="monotone" dataKey="avg" name="league avg" stroke={ACCENT_2} strokeWidth={1.2}
-          strokeDasharray="4 3" dot={false} />
-        <Line type="monotone" dataKey="points" name="points" stroke={ACCENT} strokeWidth={2} dot={false} />
+          strokeDasharray="4 3" dot={false} isAnimationActive={false} />
+        <Line type="monotone" dataKey="points" name="points" stroke={ACCENT} strokeWidth={2} dot={false}
+          isAnimationActive={false} />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -49,7 +50,7 @@ export function BenchChart({ data }: { data: { week: number; cumulative: number 
         <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
         <Tooltip contentStyle={tooltipStyle} labelFormatter={(w) => `Through week ${w}`} />
         <Area type="monotone" dataKey="cumulative" name="points benched" stroke={ACCENT}
-          fill={ACCENT} fillOpacity={0.12} strokeWidth={1.6} />
+          fill={ACCENT} fillOpacity={0.12} strokeWidth={1.6} isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -73,7 +74,8 @@ export function CoachChart({ data }: { data: { week: number; rating: number | nu
           labelFormatter={(w) => `Week ${w}`}
           formatter={(v) => [`${((v as number) * 100).toFixed(1)}%`, "coach rating"]}
         />
-        <Line type="monotone" dataKey="rating" stroke={ACCENT_2} strokeWidth={2} dot={false} connectNulls />
+        <Line type="monotone" dataKey="rating" stroke={ACCENT_2} strokeWidth={2} dot={false} connectNulls
+          isAnimationActive={false} />
       </LineChart>
     </ResponsiveContainer>
   );

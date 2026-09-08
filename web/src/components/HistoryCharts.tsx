@@ -111,7 +111,7 @@ export const BumpChart = forwardRef<HTMLDivElement, { schedule: Schedule; meta: 
           {teamIds.map((id) => {
             const mine = id === myTeamId;
             return (
-              <Line key={id} type="monotone" dataKey={`t${id}`}
+              <Line key={id} type="monotone" dataKey={`t${id}`} isAnimationActive={false}
                 stroke={mine ? ACCENT : INK_MUTED} strokeWidth={mine ? 2.4 : 1}
                 strokeOpacity={mine ? 1 : 0.45} dot={false} />
             );
@@ -227,7 +227,7 @@ export const PointsPaceChart = forwardRef<HTMLDivElement, { schedule: Schedule; 
           {teamIds.map((id) => {
             const mine = id === myTeamId;
             return (
-              <Line key={id} type="monotone" dataKey={`t${id}`}
+              <Line key={id} type="monotone" dataKey={`t${id}`} isAnimationActive={false}
                 stroke={mine ? ACCENT : INK_MUTED} strokeWidth={mine ? 2.4 : 1}
                 strokeOpacity={mine ? 1 : 0.45} dot={false} connectNulls />
             );
@@ -323,7 +323,7 @@ export const PlayoffOddsChart = forwardRef<HTMLDivElement, {
           {teamIds.map((id) => {
             const mine = id === accent;
             return (
-              <Line key={id} type="monotone" dataKey={`t${id}`}
+              <Line key={id} type="monotone" dataKey={`t${id}`} isAnimationActive={false}
                 stroke={mine ? ACCENT : INK_MUTED} strokeWidth={mine ? 2.4 : 1}
                 strokeOpacity={mine ? 1 : 0.45} dot={false} connectNulls />
             );
@@ -367,8 +367,60 @@ function MvpRaceTooltip({
 const MVP_SHOWN_COUNT = 15;      // total lines on the chart — the "field"
 const MVP_HIGHLIGHT_COUNT = 5;   // colored + labeled — the actual "race"
 const MVP_CHART_HEIGHT = 300;
-const MVP_MARGIN = { top: 10, right: 108, bottom: 4, left: -4 };
+const MVP_MARGIN_BASE = { top: 10, bottom: 4, left: -4 };
 const MVP_LABEL_MIN_GAP = 24;    // px — minimum vertical space between two end-labels before they'd overlap
+const MVP_LABEL_FONT = "600 10.88px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"; // must match the label <span> below
+const MVP_LABEL_HEADSHOT_W = 18; // .mu-headshot is 1.125rem
+const MVP_LABEL_GAP = 5;         // the label row's own flex `gap`
+const MVP_LABEL_EDGE_PAD = 4;    // the label row's `right: 4`
+const MVP_LABEL_SAFETY = 6;      // canvas measureText vs. real rendered width can differ a px or two across platforms
+
+let mvpMeasureCanvas: HTMLCanvasElement | null = null;
+/** Real pixel width of `text` set in `font` — used to size the chart's
+ * right margin to whatever the actual top-5 names need, instead of a
+ * fixed guess. A fixed guess is what silently ellipsis-truncated real
+ * names before (Tommy: "it's important to me that there be enough room
+ * for the names to be written out in full (no ellipses) whether in
+ * desktop or mobile view") — this can't undershoot the way a flat
+ * "108px, hope that's enough" constant could, because it's measuring the
+ * literal strings actually being rendered. */
+function mvpTextWidth(text: string, font: string): number {
+  if (!mvpMeasureCanvas) mvpMeasureCanvas = document.createElement("canvas");
+  const ctx = mvpMeasureCanvas.getContext("2d");
+  if (!ctx) return text.length * 7; // no canvas support — a rough fallback, never a crash
+  ctx.font = font;
+  return ctx.measureText(text).width;
+}
+
+/** Isotonic regression (Pool Adjacent Violators, L2 loss, equal weights):
+ * the least-squares-optimal non-decreasing sequence given a set of target
+ * values. Used below to stack the 5 end-labels with a minimum gap while
+ * keeping them, ON AVERAGE, as close as possible to their real values —
+ * the greedy "push every collision straight down" approach this replaced
+ * only ever pushed labels away from their true position, compounding
+ * every time a lower label was already crowded, when redistributing the
+ * whole cluster (including pulling the ones already below their target
+ * back UP) gets everyone closer on the whole. Tommy, reviewing a
+ * screenshot: "I would the bottom 4 of our 5 leaders to all be a little
+ * higher... even if it would mean [the 2nd-place player] is slightly
+ * further than currently. Ideal would be to optimize for average
+ * closeness to line end." */
+function isotonicRegression(values: number[]): number[] {
+  const blocks: { sum: number; count: number; mean: number }[] = [];
+  for (const v of values) {
+    let block = { sum: v, count: 1, mean: v };
+    while (blocks.length > 0 && blocks[blocks.length - 1].mean > block.mean) {
+      const prev = blocks.pop()!;
+      const sum = prev.sum + block.sum;
+      const count = prev.count + block.count;
+      block = { sum, count, mean: sum / count };
+    }
+    blocks.push(block);
+  }
+  const out: number[] = [];
+  for (const block of blocks) for (let i = 0; i < block.count; i++) out.push(block.mean);
+  return out;
+}
 
 /** League page "MVP race" — cumulative fantasy Win Probability Added for
  * every real STARTED appearance this regular season
@@ -397,9 +449,13 @@ const MVP_LABEL_MIN_GAP = 24;    // px — minimum vertical space between two en
  * give enough control to de-collide two labels whose final values are
  * close together, so this computes each highlighted player's pixel Y by
  * hand (same linear map an EXPLICIT (not "auto") Y-domain lets Recharts'
- * own axis use, so the two stay in sync) and nudges any that would
- * overlap apart vertically — simple, not a full label-layout solver, but
- * covers the common case. */
+ * own axis use, so the two stay in sync) and, when two are too close,
+ * re-stacks the whole cluster via isotonic regression (`isotonicRegression`
+ * above) rather than a naive greedy push — minimizes how far the labels
+ * end up from their real values ON AVERAGE, not just fixing whichever
+ * collision comes first. The chart's own right margin is sized from the
+ * ACTUAL rendered width of the 5 real names being shown (`mvpTextWidth`),
+ * not a flat guess, so a real name never gets ellipsis-truncated. */
 export const MvpRaceChart = forwardRef<HTMLDivElement, { mvpRace: MvpRace; forceDesktop?: boolean }>(
   function MvpRaceChart({ mvpRace, forceDesktop }, ref) {
   const { data, shown, highlighted, playersById, domain } = useMemo(() => {
@@ -437,28 +493,43 @@ export const MvpRaceChart = forwardRef<HTMLDivElement, { mvpRace: MvpRace; force
     return <EmptyState>Not enough of the season played yet — the race starts once week 1 is in the books.</EmptyState>;
   }
 
+  // Right margin sized from the actual rendered width of the 5 real names
+  // on the chart right now — never a flat guess that could truncate a
+  // long one (see the component doc comment above). Same value on mobile
+  // and desktop/forced-desktop capture alike: a phone's narrower chart
+  // gives up PLOT width for this, never label legibility.
+  const longestNameWidth = Math.max(
+    0, ...highlighted.map((pid) => mvpTextWidth(playersById.get(pid)!.name, MVP_LABEL_FONT)));
+  const marginRight = Math.ceil(
+    MVP_LABEL_HEADSHOT_W + MVP_LABEL_GAP + longestNameWidth + MVP_LABEL_EDGE_PAD + MVP_LABEL_SAFETY);
+  const margin = { ...MVP_MARGIN_BASE, right: marginRight };
+
   const [domainMin, domainMax] = domain;
-  const plotHeight = MVP_CHART_HEIGHT - MVP_MARGIN.top - MVP_MARGIN.bottom;
+  const plotHeight = MVP_CHART_HEIGHT - margin.top - margin.bottom;
   const yFor = (v: number) => {
     const span = domainMax - domainMin || 1;
-    return MVP_MARGIN.top + (1 - (v - domainMin) / span) * plotHeight;
+    return margin.top + (1 - (v - domainMin) / span) * plotHeight;
   };
 
-  // De-collide the 5 end-labels: sort top-to-bottom by their raw Y, then
-  // push any pair closer than MVP_LABEL_MIN_GAP apart, propagating
-  // downward — the common, good-enough case rather than a full solver.
-  const labelPositions = highlighted
+  // Stack the 5 end-labels top-to-bottom with a minimum gap, minimizing
+  // how far each one ends up from its real (raw) Y ON AVERAGE — not just
+  // resolving whichever collision comes first (see doc comment above).
+  // Isotonic regression on "raw Y minus i*GAP" is the standard trick for
+  // "least-squares-optimal non-decreasing sequence with a minimum step":
+  // shifting by i*GAP turns the minimum-gap constraint into a plain
+  // non-decreasing constraint, isotonicRegression solves THAT optimally,
+  // then shifting back by i*GAP restores the real gap.
+  const rawSorted = highlighted
     .map((pid) => ({ pid, y: yFor(playersById.get(pid)!.cumulative_by_week[playersById.get(pid)!.cumulative_by_week.length - 1]) }))
     .sort((a, b) => a.y - b.y);
-  for (let i = 1; i < labelPositions.length; i++) {
-    const minY = labelPositions[i - 1].y + MVP_LABEL_MIN_GAP;
-    if (labelPositions[i].y < minY) labelPositions[i].y = minY;
-  }
+  const shifted = rawSorted.map((p, i) => p.y - i * MVP_LABEL_MIN_GAP);
+  const pooled = isotonicRegression(shifted);
+  const labelPositions = rawSorted.map((p, i) => ({ pid: p.pid, y: pooled[i] + i * MVP_LABEL_MIN_GAP }));
 
   return (
     <div ref={ref} style={{ position: "relative", ...(forceDesktop ? { width: "650px" } : {}) }}>
       <ResponsiveContainer width="100%" height={MVP_CHART_HEIGHT}>
-        <LineChart data={data} margin={MVP_MARGIN}>
+        <LineChart data={data} margin={margin}>
           <CartesianGrid stroke={RULE} vertical={false} strokeWidth={0.5} />
           <XAxis dataKey="week" tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }}
             tickLine={false} axisLine={{ stroke: RULE }} />
@@ -469,7 +540,7 @@ export const MvpRaceChart = forwardRef<HTMLDivElement, { mvpRace: MvpRace; force
             const rank = highlighted.indexOf(pid);
             const isHighlighted = rank !== -1;
             return (
-              <Line key={pid} type="monotone" dataKey={`p${pid}`}
+              <Line key={pid} type="monotone" dataKey={`p${pid}`} isAnimationActive={false}
                 stroke={isHighlighted ? CHART_QUALITATIVE[rank] : INK_MUTED}
                 strokeWidth={isHighlighted ? 2.2 : 1} strokeOpacity={isHighlighted ? 1 : 0.35}
                 dot={false} connectNulls />
@@ -482,14 +553,13 @@ export const MvpRaceChart = forwardRef<HTMLDivElement, { mvpRace: MvpRace; force
         const rank = highlighted.indexOf(pid);
         return (
           <div key={pid} style={{
-            position: "absolute", top: y - 9, right: 4,
-            display: "flex", alignItems: "center", gap: "0.3rem", maxWidth: `${MVP_MARGIN.right - 8}px`,
+            position: "absolute", top: y - 9, right: MVP_LABEL_EDGE_PAD,
+            display: "flex", alignItems: "center", gap: `${MVP_LABEL_GAP}px`,
           }}>
             <PlayerHeadshot playerId={Number(pid)} position={info.position} proTeam={info.pro_team}
               className="mu-headshot" />
             <span style={{
-              fontSize: "0.68rem", fontWeight: 600, color: CHART_QUALITATIVE[rank],
-              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              fontSize: "0.68rem", fontWeight: 600, color: CHART_QUALITATIVE[rank], whiteSpace: "nowrap",
             }}>
               {info.name}
             </span>
@@ -624,6 +694,7 @@ interface CareerStint {
   points_projected_started: number;
   points_started_projected_weeks: number;
   points_benched: number;
+  points_wpa: number;
   start_season: number;
   start_week: number;
   end_season: number | null; // null = still on the roster
@@ -645,6 +716,7 @@ function careerStints(stints: OwnershipStint[]): CareerStint[] {
       pro_team: s.pro_team,
       weeks_rostered: 0, weeks_started: 0, weeks_benched: 0, weeks_projected: 0,
       points_started: 0, points_projected_started: 0, points_started_projected_weeks: 0, points_benched: 0,
+      points_wpa: 0,
       start_season: s.start_season, start_week: s.start_week,
       end_season: s.end_season, end_week: s.end_week,
     };
@@ -656,6 +728,7 @@ function careerStints(stints: OwnershipStint[]): CareerStint[] {
     c.points_projected_started += s.points_projected_started;
     c.points_started_projected_weeks += s.points_started_projected_weeks;
     c.points_benched += s.points_benched;
+    c.points_wpa += s.points_wpa;
     if (seasonWeekCmp(s.start_season, s.start_week, c.start_season, c.start_week) < 0) {
       c.start_season = s.start_season; c.start_week = s.start_week;
     }
@@ -838,6 +911,13 @@ export function CareerLeaderboards({ ownership, teamId, teamName }: {
     // D/ST and K scoring is low-variance and lumpy enough that they crowd
     // out every skill-position player on the over/under-expectation lists.
     const vsProjectionEligible = projectionRateEligible.filter((c) => c.position !== "D/ST" && c.position !== "K");
+    // WPA is never computed for K/D-ST at all (see metrics.weekly_wpa) so
+    // they'd only ever show up here at a flat 0 — excluded the same way
+    // vsProjectionEligible above excludes them, for the same reason.
+    // Unlike the projection-based lists, this doesn't need a `weeks_projected`
+    // floor -- WPA only needs real actual scores, which exist all the way
+    // back to 2017 (no ESPN-projection gap to work around).
+    const wpaEligible = totals.filter((c) => c.position !== "D/ST" && c.position !== "K");
     const stashEligible = totals.filter(
       (c) => Math.round((c.weeks_started / c.weeks_rostered) * 100) <= STASH_MAX_START_PCT);
     const ppg = (c: CareerStint) => c.points_started / c.weeks_started;
@@ -866,6 +946,9 @@ export function CareerLeaderboards({ ownership, teamId, teamName }: {
       starters: toRows(
         [...totals].sort((a, b) => b.weeks_started - a.weeks_started).slice(0, LEADERBOARD_LONG),
         (c) => `${c.weeks_started} wk`),
+      wpaLeaders: toRows(
+        [...wpaEligible].sort((a, b) => b.points_wpa - a.points_wpa).slice(0, LEADERBOARD_LONG),
+        (c) => signed(c.points_wpa, 2)),
       overperformers: toRows(
         [...projectionEligible].sort((a, b) => projDelta(b) - projDelta(a)).slice(0, LEADERBOARD_LONG),
         (c) => signed(projDelta(c), 0)),
@@ -891,6 +974,8 @@ export function CareerLeaderboards({ ownership, teamId, teamName }: {
     <div className="record-book">
       <Leaderboard title={teamId === undefined ? "Most points, one franchise" : "Leading scorers"}
         rows={leaderboards.scorers} />
+      <Leaderboard title={teamId === undefined ? "Most win probability added, one franchise" : "Franchise MVPs"}
+        subtitle="career WPA · playoffs included" rows={leaderboards.wpaLeaders} />
       <Leaderboard title="Most weeks started" rows={leaderboards.starters} />
       <Leaderboard title="Best value beyond projection" subtitle="min. 4 projected starts"
         rows={leaderboards.overperformers} />

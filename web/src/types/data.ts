@@ -235,15 +235,13 @@ export interface TeamWeekRow {
   top_scorers: TopScorer[];
 }
 
-export interface ProjectionReportRow {
+export interface WpaReportRow {
   player_id: number;
   name: string;
   position: string;
   pro_team: string;
   starts: number;
-  actual: number;
-  projected: number;
-  diff: number;
+  wpa: number;
 }
 
 export interface UpcomingGame {
@@ -272,7 +270,7 @@ export interface TeamSeason {
 export interface TeamData {
   team_id: number;
   weekly: TeamWeekRow[];
-  projection_report: ProjectionReportRow[];
+  wpa_report: WpaReportRow[];
   upcoming: UpcomingGame[];
   season: TeamSeason;
 }
@@ -578,6 +576,14 @@ export interface OwnershipStint {
    * matching numerator for points_projected_started, so the two can be
    * diffed without a season with no projections skewing the result. */
   points_started_projected_weeks: number;
+  /** Cumulative real win-probability-added across every started week of
+   * this stint (regular season and playoffs) — see
+   * `metrics.weekly_wpa()`. 0 for any stint entirely before 2017 (no
+   * box-score data to compute it from), same "missing means missing"
+   * convention as points_projected_started above, just represented as 0
+   * here since a stint spans many weeks and a true null would have to be
+   * per-week, not per-stint. */
+  points_wpa: number;
   start_rate: number;
 }
 
@@ -587,6 +593,7 @@ export interface OwnershipLeader {
   name: string;
   position: string;
   points_started: number;
+  points_wpa: number;
   points_under_projection: number | null;
   weeks_rostered: number;
   weeks_started: number;
@@ -602,6 +609,7 @@ export interface Ownership {
   stints: OwnershipStint[];
   leaders: {
     value: OwnershipLeader[];
+    mvp: OwnershipLeader[];
     busts: OwnershipLeader[];
     stashes: OwnershipLeader[];
   };

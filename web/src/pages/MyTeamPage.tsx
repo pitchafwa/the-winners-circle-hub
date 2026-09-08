@@ -13,7 +13,7 @@ import ScreenshotButton from "../components/ScreenshotButton";
 import TeamLink from "../components/TeamLink";
 import { PlayoffOddsChart } from "../components/HistoryCharts";
 import { BenchChart, CoachChart, ScoringChart } from "../components/TeamCharts";
-import type { Badges, ProjectionReportRow, Roster, Sim, SimByWeek, Teams, TopScorer } from "../types/data";
+import type { Badges, Roster, Sim, SimByWeek, Teams, TopScorer, WpaReportRow } from "../types/data";
 
 interface ScheduleRow {
   week: number;
@@ -26,13 +26,11 @@ interface ScheduleRow {
   topScorers?: TopScorer[];
 }
 
-const PROJ_COLS: { key: keyof ProjectionReportRow | "player"; label: string; numeric: boolean }[] = [
+const WPA_COLS: { key: keyof WpaReportRow | "player"; label: string; numeric: boolean }[] = [
   { key: "player", label: "Player", numeric: false },
   { key: "position", label: "Pos", numeric: false },
   { key: "starts", label: "Starts", numeric: true },
-  { key: "actual", label: "Actual", numeric: true },
-  { key: "projected", label: "Projected", numeric: true },
-  { key: "diff", label: "Diff", numeric: true },
+  { key: "wpa", label: "WPA", numeric: true },
 ];
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -64,10 +62,10 @@ export default function MyTeamPage() {
   const roster = useOptionalJson<Roster>(base ? `${base}/roster.json` : null);
 
   const my = teams.data?.teams.find((t) => t.team_id === teamId) ?? null;
-  const projSort = useSort<ProjectionReportRow>("diff", -1, (r, key) =>
-    key === "player" ? r.name : (r[key as keyof ProjectionReportRow] as number | string),
+  const wpaSort = useSort<WpaReportRow>("wpa", -1, (r, key) =>
+    key === "player" ? r.name : (r[key as keyof WpaReportRow] as number | string),
   );
-  const projRows = useSorted(my?.projection_report ?? [], projSort);
+  const wpaRows = useSorted(my?.wpa_report ?? [], wpaSort);
   const scheduleRows: ScheduleRow[] = useMemo(() => {
     if (!my) return [];
     const played: ScheduleRow[] = my.weekly.map((w) => ({
@@ -271,28 +269,28 @@ export default function MyTeamPage() {
 
             <section className="section">
               <div className="section-head">
-                <h2>Who contributed more than expected</h2>
-                <span className="label">your starters, season actual vs projected</span>
+                <h2>Who contributed the most win probability</h2>
+                <span className="label">your starters, cumulative WPA this season · playoffs included</span>
               </div>
-              {my.projection_report.length === 0 ? (
-                <EmptyState>No projection data yet.</EmptyState>
+              {my.wpa_report.length === 0 ? (
+                <EmptyState>No WPA data yet.</EmptyState>
               ) : (
                 <div className="table-wrap">
                   <table className="stat">
                     <thead>
                       <tr>
-                        {PROJ_COLS.map((c) => (
+                        {WPA_COLS.map((c) => (
                           <th key={c.key} scope="col"
                             className={`sortable${c.numeric ? " num" : ""}`}
-                            aria-sort={projSort.ariaSort(c.key)}
-                            onClick={() => projSort.toggle(c.key, c.numeric ? -1 : 1)}>
-                            {c.label}{projSort.marker(c.key)}
+                            aria-sort={wpaSort.ariaSort(c.key)}
+                            onClick={() => wpaSort.toggle(c.key, c.numeric ? -1 : 1)}>
+                            {c.label}{wpaSort.marker(c.key)}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {projRows.map((p) => (
+                      {wpaRows.map((p) => (
                         <tr key={p.player_id}>
                           <td>
                             <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
@@ -306,9 +304,7 @@ export default function MyTeamPage() {
                           </td>
                           <td className="muted">{p.position}</td>
                           <td className="num">{p.starts}</td>
-                          <td className="num">{pts(p.actual)}</td>
-                          <td className="num">{pts(p.projected)}</td>
-                          <td className={`num ${p.diff >= 0 ? "pos" : "neg"}`}>{signed(p.diff)}</td>
+                          <td className={`num ${p.wpa >= 0 ? "pos" : "neg"}`}>{signed(p.wpa, 3)}</td>
                         </tr>
                       ))}
                     </tbody>

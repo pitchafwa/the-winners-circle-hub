@@ -251,9 +251,16 @@ guessed).
   `{player_id, name, position, pro_team, points}` — that team's own top
   starters that specific week, for the My Team page's Schedule table
   (real per-player points, not the team total).
-- `projection_report[]`: per started player season aggregate
-  `{player_id, name, position, pro_team, starts, actual, projected, diff}`
-  sorted worst-first.
+- `wpa_report[]` (was `projection_report[]`, replaced 2026-09-08 — see
+  `mvp_race.json` below for why): per started player, real cumulative
+  win-probability-added this season (regular season and playoffs) —
+  `{player_id, name, position, pro_team, starts, wpa}`, sorted best-first.
+  Built from the same `metrics.weekly_wpa()` per-player-week values as
+  `mvp_race.json`, just summed per-team instead of per-player-across-
+  teams — a consolation-bracket playoff week for this team is silently
+  absent from `weekly_wpa()`'s output, so it's silently skipped here too
+  (never a fabricated 0), same "missing means missing" convention as
+  everywhere else.
 - `upcoming[]`: `{matchup_period, opponent_id, is_home}` for unplayed matchups.
 - `season`: `{coach {actual, optimal, rating, bench_lost}, all_play {wins, losses,
   ties, pct, expected_wins, luck}}`.
@@ -580,8 +587,20 @@ cached rerun took ~1s in the same test.
 ## `{season}/mvp_race.json` (absent for a season with no real box-score data, new 2026-09, revised 2026-09-08)
 
 League page "MVP Race" chart — cumulative fantasy **Win Probability Added
-(WPA)** for every real STARTED appearance this regular season, tracked by
-real player identity (`metrics.mvp_race_by_week()`).
+(WPA)** for every real STARTED appearance this season, tracked by real
+player identity (`metrics.mvp_race_by_week()`, `metrics.weekly_wpa()`).
+
+**Playoffs included (2026-09-08)**: during any week with a playoff game,
+only `WINNERS_BRACKET` matchups count — a consolation-bracket week is
+invisible to this, same as it is to `ownership.py`'s career stats. Tommy,
+after reviewing a regular-season-only vs. playoffs-included comparison
+for 2023-2025: "It's still basically the same list but with minor changes
+for big playoff performances, which is a good thing." Confirmed live this
+isn't a one-way boost for a deep playoff run before shipping — a player
+whose team lost a playoff game they barely contributed to can see their
+season total go DOWN once playoffs are folded in, same as any other real
+game; it's the exact same WPA computation as every other week, just
+scoped to the games that still counted.
 
 **Unlike `sim.json`/`sim_by_week.json`, this is NOT current-season-only.**
 It's written for every season that has real, week-level box-score data on
@@ -641,7 +660,8 @@ score minus the opponent's score," regardless of home/away, and
 reverified against a corrected top-10 Tommy confirmed matched his own
 read of the season exactly.
 
-`weeks[]`: every completed regular-season week number, ascending.
+`weeks[]`: every completed week number this season with a qualifying game
+(regular season, or a `WINNERS_BRACKET` playoff week), ascending.
 `players{}`: keyed by `player_id` as a string, the top 20 players by their
 CURRENT (final-week) cumulative WPA total — `{name, position, pro_team,
 current_team_id, cumulative_by_week[]}`, `cumulative_by_week` the same
@@ -667,8 +687,19 @@ this app's usual single-accent-vs-everyone-else-muted binary, since
 there's no one "mine" line here) and a headshot+name label past the
 chart's right edge — computed via a manual linear pixel map (an EXPLICIT
 Y-domain, not "auto", so the label overlay's own math stays in sync with
-what Recharts actually renders) with simple vertical de-collision for
-labels whose values are close together. Tommy, 2026-09-08: "could we
+what Recharts actually renders). The chart's right margin is sized from
+the actual measured pixel width of the 5 real names currently shown
+(`mvpTextWidth`, canvas `measureText`), not a flat guess — Tommy: "it's
+important to me that there be enough room for the names to be written
+out in full (no ellipses) whether in desktop or mobile view." When two
+labels' target positions collide, the whole crowded cluster is re-stacked
+via isotonic regression (`isotonicRegression`, Pool Adjacent Violators)
+rather than a naive greedy downward push — minimizes how far the labels
+end up from their real values ON AVERAGE, not just whichever collision
+comes first. Tommy, reviewing a screenshot: "I would the bottom 4 of our
+5 leaders to all be a little higher... even if it would mean [one of
+them] is slightly further than currently. Ideal would be to optimize for
+average closeness to line end." Tommy, 2026-09-08: "could we
 include, say, the top 15 players on the line graph but only highlight
 the current top 5 with names and headshots at the end of their line ...
 that way we can see how they are tracking compared to the rest of the
@@ -887,8 +918,19 @@ lineup with `played: false`).
 start_week, departed_via ("trade"|"dropped"|null), end_season, end_week
 (both null = still on this roster today), weeks_rostered, weeks_started,
 weeks_benched, weeks_projected, points_started, points_projected_started,
-points_started_projected_weeks, points_benched,
-start_rate (weeks_started / weeks_rostered)}`. `acquired_via: "preexisting"`
+points_started_projected_weeks, points_benched, points_wpa,
+start_rate (weeks_started / weeks_rostered)}`. `points_wpa` (added
+2026-09-08, backs the Franchise page's "Franchise MVPs" leaderboard): real
+cumulative win-probability-added across every started week of this stint
+(regular season and playoffs — `metrics.weekly_wpa()`, same shared
+computation `{season}/mvp_race.json` sums a different way). Unlike the
+projection-based fields below, this doesn't need `weeks_projected` — WPA
+only needs real actual scores, which exist all the way back to 2017, so
+it's never held back by 2017's missing-projection gap. Stays `0.0` (not
+null) for any stint entirely before 2017, same as the value a stint with
+zero qualifying weeks would produce — no per-week granularity at the
+stint level to represent a true "no data" the way a per-week field could.
+`acquired_via: "preexisting"`
 means the stint's first data week is also the first season this league has
 any lineup data for at all (2017 in practice — 2012–2016 is standings-only,
 see the History note under `badges.json` above) — there's no earlier record
@@ -921,16 +963,24 @@ for a fair per-game version of the same comparison. `points_started` (the
 leaderboard) are unaffected — those stay honest full totals across every
 real started week regardless of projection availability.
 
-`leaders`: three per-team top-5 lists derived from `stints[]` — `value`
-(highest `points_started`, "who's delivered the most value"), `busts`
-(highest `points_projected_started − points_started_projected_weeks`,
-min. 4 weeks rostered, "biggest headache"), `stashes` (lowest `start_rate`,
-min. 10 weeks rostered, "longest-held bench project"). `points_under_projection`
-below is `null` (not a fabricated number) for a stint with no
-`weeks_projected` at all. Each entry:
-`{team_id, player_id, name, position, points_started,
-points_under_projection, weeks_rostered, weeks_started, start_rate,
-start_season, start_week, end_season, end_week}`.
+`leaders`: four per-team top-5 lists derived from `stints[]` — `value`
+(highest `points_started`, "who's delivered the most value"), `mvp`
+(highest `points_wpa`, added 2026-09-08, "who's actually moved the needle
+on winning"), `busts` (highest `points_projected_started −
+points_started_projected_weeks`, min. 4 weeks rostered, "biggest
+headache"), `stashes` (lowest `start_rate`, min. 10 weeks rostered,
+"longest-held bench project"). `points_under_projection` below is `null`
+(not a fabricated number) for a stint with no `weeks_projected` at all.
+Each entry: `{team_id, player_id, name, position, points_started,
+points_wpa, points_under_projection, weeks_rostered, weeks_started,
+start_rate, start_season, start_week, end_season, end_week}`. Note: the
+frontend currently recomputes all of its own career leaderboards
+client-side straight from `stints[]` (`HistoryCharts.tsx`'s
+`careerStints()`, which merges a player's separate stints on the same
+franchise into one career total — something this per-stint `leaders`
+block doesn't do) rather than reading this field — kept for API
+completeness / any future server-side consumer, not dead weight to
+delete, but don't expect a frontend change here to do anything visible.
 
 ## `trades.json` (top level, cross-season)
 

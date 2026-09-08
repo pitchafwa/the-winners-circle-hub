@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { flushSync } from "react-dom";
 import { useApp } from "../state/AppContext";
 import { useJson, useOptionalJson } from "../lib/data";
@@ -23,19 +24,42 @@ import type {
 // what a "send this to the group chat" screenshot shouldn't be
 // constrained by. flushSync (not a plain setState) so the wider layout
 // is guaranteed to have committed before ScreenshotButton reads
-// anything. `asyncDelayMs`, when given, is for recharts'
-// ResponsiveContainer specifically: unlike pure-CSS blocks (settle the
-// instant the class/width flips), it only re-renders its SVG at the new
-// width after its own ResizeObserver actually fires — a real async step
-// flushSync can't force through. A short fixed wait (not
-// requestAnimationFrame — confirmed live elsewhere in this feature that
-// rAF never fires in a backgrounded/non-compositing tab) gives that time
-// to settle before capture reads the resized chart.
-function useForceDesktopCapture(asyncDelayMs?: number) {
+// anything.
+//
+// `chartRef`, when given, is for recharts' ResponsiveContainer
+// specifically: unlike pure-CSS blocks (settle the instant the
+// class/width flips), it only re-renders its <svg> at the new width
+// after its own ResizeObserver actually fires — a real async step
+// flushSync can't force through. Used to just be a flat 150ms wait, which
+// wasn't always enough — confirmed live (Tommy, screenshotting the MVP
+// Race chart) the capture sometimes fired while the lines were still
+// visibly cut off partway across the plot despite the axis already
+// spanning the full (correct) domain. Two separate real causes, both
+// fixed: (1) polls the rendered <svg>'s own `width` attribute (the
+// number recharts itself computed and drew at — not a CSS box, which can
+// stretch independent of what's actually been redrawn) against the
+// container's real width every 50ms instead of guessing a fixed delay,
+// resolving the moment they actually match, with a real ceiling (~1.5s)
+// so a stalled resize can't hang the button forever; (2) every <Line>/
+// <Area> in this app's charts now sets `isAnimationActive={false}` —
+// recharts animates a line drawing in from zero length by default on
+// mount/data-change (~1.5s), which is exactly what was still happening
+// mid-capture even once the SVG itself had resized, and serves no real
+// purpose on a dashboard nobody's staring at load-in.
+function useForceDesktopCapture(chartRef?: RefObject<HTMLElement | null>) {
   const [forceDesktop, setForceDesktop] = useState(false);
-  const prepareCapture = () => {
+  const prepareCapture = async () => {
     flushSync(() => setForceDesktop(true));
-    if (asyncDelayMs) return new Promise<void>((resolve) => setTimeout(resolve, asyncDelayMs));
+    if (!chartRef) return;
+    const container = chartRef.current;
+    if (!container) return;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const svg = container.querySelector("svg");
+      const drawnWidth = svg ? Number(svg.getAttribute("width")) : 0;
+      const containerWidth = container.getBoundingClientRect().width;
+      if (svg && drawnWidth > 0 && Math.abs(drawnWidth - containerWidth) < 1) return;
+    }
   };
   const cleanupCapture = () => flushSync(() => setForceDesktop(false));
   return { forceDesktop, prepareCapture, cleanupCapture };
@@ -54,10 +78,10 @@ export default function LeaguePage() {
   const mvpRaceChartRef = useRef<HTMLDivElement>(null);
 
   const odds = useForceDesktopCapture();
-  const oddsByWeek = useForceDesktopCapture(150);
-  const bump = useForceDesktopCapture(150);
-  const points = useForceDesktopCapture(150);
-  const mvpRace = useForceDesktopCapture(150);
+  const oddsByWeek = useForceDesktopCapture(playoffOddsChartRef);
+  const bump = useForceDesktopCapture(bumpChartRef);
+  const points = useForceDesktopCapture(pointsChartRef);
+  const mvpRace = useForceDesktopCapture(mvpRaceChartRef);
 
   const [standingsWeek, setStandingsWeek] = useState<"current" | number>("current");
 
@@ -147,7 +171,7 @@ export default function LeaguePage() {
         <div className="section-head">
           <h2 id="mvp-h">MVP Race</h2>
           <span className="label">
-            top 15 · cumulative win probability added, started weeks only
+            top 15 · cumulative win probability added, started weeks only · playoffs included
             {mvpRaceData.data && (
               <ScreenshotButton
                 targetRef={mvpRaceChartRef}

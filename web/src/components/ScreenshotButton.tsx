@@ -116,6 +116,47 @@ export default function ScreenshotButton({
         }
       };
       freezeWidths(node, clone);
+
+      // Player headshots/team logos come from ESPN's CDN, a cross-origin
+      // host — html-to-image's default capture path leaves an <img>'s
+      // src as a live external URL inside the SVG it builds, then relies
+      // on the browser to fetch and rasterize it as part of loading that
+      // SVG into an <Image>. Confirmed broken on iOS (every browser
+      // there, Chrome included, runs on WebKit, which has long-standing
+      // problems rasterizing <img> elements inside an SVG
+      // <foreignObject> at all — a rendering-engine gap, not a CORS one:
+      // `crossOrigin="anonymous"` on PlayerHeadshot.tsx fixed a real
+      // canvas-taint bug on desktop, but iOS still showed no headshots
+      // at all afterward). Fetching each image ourselves and swapping
+      // its `src` to an embedded base64 data URI removes the problem
+      // entirely rather than working around this engine's quirks: the
+      // SVG then has nothing external left to load during rasterization
+      // on ANY browser, so there's no load-timing/CORS/engine-support
+      // gap left for it to fall into. Best-effort — an image that fails
+      // to fetch just keeps its original (likely blank-in-capture) src,
+      // same as before this existed.
+      const inlineImages = async (root: Element) => {
+        const imgs = Array.from(root.querySelectorAll("img"));
+        await Promise.all(imgs.map(async (img) => {
+          if (img.src.startsWith("data:")) return; // the silhouette fallback — already inline
+          try {
+            const res = await fetch(img.src, { mode: "cors" });
+            const blob = await res.blob();
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(blob);
+            });
+            img.src = dataUrl;
+          } catch {
+            // leave the original src — capture just shows this one image
+            // blank there, same as the pre-existing behavior
+          }
+        }));
+      };
+      await inlineImages(clone);
+
       frame.appendChild(clone);
       stage.appendChild(frame);
       document.body.appendChild(stage);

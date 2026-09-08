@@ -13,9 +13,10 @@ import { pct, pts, signed } from "../lib/format";
 import EmptyState from "./EmptyState";
 import PlayerHeadshot from "./PlayerHeadshot";
 import TeamLink from "./TeamLink";
-import { ACCENT, FONT_MONO, INK_MUTED, PAPER_2, RULE } from "../lib/tokens";
+import { ACCENT, CHART_QUALITATIVE, FONT_MONO, INK_MUTED, PAPER_2, RULE } from "../lib/tokens";
 import type {
-  Badges, Meta, Ownership, OwnershipStint, Schedule, ScheduleEntry, ScheduleSwap, SimByWeek,
+  Badges, Meta, MvpRace, MvpRacePlayer, Ownership, OwnershipStint, Schedule, ScheduleEntry,
+  ScheduleSwap, SimByWeek,
 } from "../types/data";
 import type { SeasonBundle } from "../lib/useAllSeasons";
 
@@ -329,6 +330,165 @@ export const PlayoffOddsChart = forwardRef<HTMLDivElement, {
           })}
         </LineChart>
       </ResponsiveContainer>
+    </div>
+  );
+});
+
+function MvpRaceTooltip({
+  active, payload, label, playersById,
+}: {
+  active?: boolean;
+  payload?: BumpTooltipEntry[];
+  label?: string | number;
+  playersById: Map<string, MvpRacePlayer>;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const sorted = [...payload].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  return (
+    <div style={{
+      background: PAPER_2, border: `1px solid ${RULE}`,
+      fontFamily: FONT_MONO, fontSize: "0.72rem", padding: "0.5rem 0.65rem",
+    }}>
+      <div style={{ marginBottom: "0.3rem", fontWeight: 600 }}>Week {label}</div>
+      {sorted.map((p) => {
+        const pid = String(p.dataKey).slice(1);
+        const info = playersById.get(pid);
+        if (!info) return null;
+        return (
+          <div key={p.dataKey}>
+            {signed(p.value ?? 0, 1)} {info.name}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const MVP_SHOWN_COUNT = 15;      // total lines on the chart — the "field"
+const MVP_HIGHLIGHT_COUNT = 5;   // colored + labeled — the actual "race"
+const MVP_CHART_HEIGHT = 300;
+const MVP_MARGIN = { top: 10, right: 108, bottom: 4, left: -4 };
+const MVP_LABEL_MIN_GAP = 24;    // px — minimum vertical space between two end-labels before they'd overlap
+
+/** League page "MVP race" — cumulative points-over-projection for every
+ * real STARTED appearance this regular season (`{season}/mvp_race.json`,
+ * `metrics.mvp_race_by_week()`), tracked by real player identity so a
+ * mid-season trade doesn't reset anyone's line. Tommy, 2026-09-08: "could
+ * we include, say, the top 15 players on the line graph but only
+ * highlight the current top 5 with names and headshots at the end of
+ * their line ... that way we can see how they are tracking compared to
+ * the rest of the league." The bottom `MVP_SHOWN_COUNT - MVP_HIGHLIGHT_
+ * COUNT` lines are the muted "field" for context only (no distinct
+ * color, no tooltip-worthy identity beyond hover); the top 5 get a real
+ * qualitative color each (`CHART_QUALITATIVE` — deliberately not this
+ * app's usual single-accent-vs-muted binary, since there's no one
+ * "mine" line here) and a headshot+name label past the chart's right
+ * edge.
+ *
+ * The end-labels are a plain absolutely-positioned HTML overlay, not a
+ * Recharts `label` render prop — Recharts' own label positioning doesn't
+ * give enough control to de-collide two labels whose final values are
+ * close together, so this computes each highlighted player's pixel Y by
+ * hand (same linear map an EXPLICIT (not "auto") Y-domain lets Recharts'
+ * own axis use, so the two stay in sync) and nudges any that would
+ * overlap apart vertically — simple, not a full label-layout solver, but
+ * covers the common case. */
+export const MvpRaceChart = forwardRef<HTMLDivElement, { mvpRace: MvpRace; forceDesktop?: boolean }>(
+  function MvpRaceChart({ mvpRace, forceDesktop }, ref) {
+  const { data, shown, highlighted, playersById, domain } = useMemo(() => {
+    const entries = Object.entries(mvpRace.players);
+    const finalValue = (p: MvpRacePlayer) => p.cumulative_by_week[p.cumulative_by_week.length - 1] ?? 0;
+    const ranked = [...entries].sort((a, b) => finalValue(b[1]) - finalValue(a[1]));
+    const shownEntries = ranked.slice(0, MVP_SHOWN_COUNT);
+    const highlightedIds = shownEntries.slice(0, MVP_HIGHLIGHT_COUNT).map(([pid]) => pid);
+
+    const rows = mvpRace.weeks.map((w, i) => {
+      const row: Record<string, number> = { week: w };
+      shownEntries.forEach(([pid, info]) => { row[`p${pid}`] = info.cumulative_by_week[i]; });
+      return row;
+    });
+
+    let dMin = 0;
+    let dMax = 0;
+    for (const [, info] of shownEntries) {
+      for (const v of info.cumulative_by_week) {
+        if (v < dMin) dMin = v;
+        if (v > dMax) dMax = v;
+      }
+    }
+
+    return {
+      data: rows,
+      shown: shownEntries.map(([pid]) => pid),
+      highlighted: highlightedIds,
+      playersById: new Map(entries) as Map<string, MvpRacePlayer>,
+      domain: [dMin, dMax] as [number, number],
+    };
+  }, [mvpRace]);
+
+  if (data.length === 0) {
+    return <EmptyState>Not enough of the season played yet — the race starts once week 1 is in the books.</EmptyState>;
+  }
+
+  const [domainMin, domainMax] = domain;
+  const plotHeight = MVP_CHART_HEIGHT - MVP_MARGIN.top - MVP_MARGIN.bottom;
+  const yFor = (v: number) => {
+    const span = domainMax - domainMin || 1;
+    return MVP_MARGIN.top + (1 - (v - domainMin) / span) * plotHeight;
+  };
+
+  // De-collide the 5 end-labels: sort top-to-bottom by their raw Y, then
+  // push any pair closer than MVP_LABEL_MIN_GAP apart, propagating
+  // downward — the common, good-enough case rather than a full solver.
+  const labelPositions = highlighted
+    .map((pid) => ({ pid, y: yFor(playersById.get(pid)!.cumulative_by_week[playersById.get(pid)!.cumulative_by_week.length - 1]) }))
+    .sort((a, b) => a.y - b.y);
+  for (let i = 1; i < labelPositions.length; i++) {
+    const minY = labelPositions[i - 1].y + MVP_LABEL_MIN_GAP;
+    if (labelPositions[i].y < minY) labelPositions[i].y = minY;
+  }
+
+  return (
+    <div ref={ref} style={{ position: "relative", ...(forceDesktop ? { width: "650px" } : {}) }}>
+      <ResponsiveContainer width="100%" height={MVP_CHART_HEIGHT}>
+        <LineChart data={data} margin={MVP_MARGIN}>
+          <CartesianGrid stroke={RULE} vertical={false} strokeWidth={0.5} />
+          <XAxis dataKey="week" tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }}
+            tickLine={false} axisLine={{ stroke: RULE }} />
+          <YAxis width={36} domain={domain}
+            tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }} tickLine={false} axisLine={false} />
+          <Tooltip content={<MvpRaceTooltip playersById={playersById} />} />
+          {shown.map((pid) => {
+            const rank = highlighted.indexOf(pid);
+            const isHighlighted = rank !== -1;
+            return (
+              <Line key={pid} type="monotone" dataKey={`p${pid}`}
+                stroke={isHighlighted ? CHART_QUALITATIVE[rank] : INK_MUTED}
+                strokeWidth={isHighlighted ? 2.2 : 1} strokeOpacity={isHighlighted ? 1 : 0.35}
+                dot={false} connectNulls />
+            );
+          })}
+        </LineChart>
+      </ResponsiveContainer>
+      {labelPositions.map(({ pid, y }) => {
+        const info = playersById.get(pid)!;
+        const rank = highlighted.indexOf(pid);
+        return (
+          <div key={pid} style={{
+            position: "absolute", top: y - 9, right: 4,
+            display: "flex", alignItems: "center", gap: "0.3rem", maxWidth: `${MVP_MARGIN.right - 8}px`,
+          }}>
+            <PlayerHeadshot playerId={Number(pid)} position={info.position} proTeam={info.pro_team}
+              className="mu-headshot" />
+            <span style={{
+              fontSize: "0.68rem", fontWeight: 600, color: CHART_QUALITATIVE[rank],
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}>
+              {info.name}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 });

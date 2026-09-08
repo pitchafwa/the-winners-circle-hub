@@ -595,6 +595,15 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             "generated_at": generated_at,
             "weeks": {str(w): {str(tid): p for tid, p in row.items()} for w, row in by_week.items()},
         })
+
+        # ---- mvp_race.json: League page "MVP race" chart — current
+        # season only, same lifecycle as sim.json/sim_by_week.json above
+        # (a finished season has no ongoing race left to show).
+        mvp = metrics.mvp_race_by_week(league)
+        pro_teams = parse.pro_team_schedule(season)
+        for p in mvp["players"].values():
+            p["pro_team"] = pro_teams.get(p.pop("pro_team_id"), {}).get("abbrev", "")
+        _write(out_dir / "mvp_race.json", {"generated_at": generated_at, **mvp})
     else:
         # A finished season has no "playoff odds" left to show — and a
         # sim.json from back when this season was still live would just
@@ -602,6 +611,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         # block only ever regenerates it, never revisits an old one). Same
         # "stale file must not outlive its data source" rule as draft.json.
         (out_dir / "sim.json").unlink(missing_ok=True)
+        (out_dir / "mvp_race.json").unlink(missing_ok=True)
         (out_dir / "sim_by_week.json").unlink(missing_ok=True)
 
     # ---- roster.json (live roster cards, current season only) -------------

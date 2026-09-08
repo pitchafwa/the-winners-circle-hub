@@ -3,6 +3,44 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## MVP Race chart (2026-09-08)
+
+Tommy: "let's add an 'MVP race' to the League tab right below the
+division race tables that shows the top 5 players in cumulative points
+over projection as a starter." Design was discussed before building —
+offered a compact leaderboard table, a horizontal bar chart, a "race"
+line chart (reusing the existing Bump Chart pattern), and a trophy-card
+grid; Tommy picked the race chart with a refinement: "could we include,
+say, the top 15 players on the line graph but only highlight the current
+top 5 with names and headshots at the end of their line ... that way we
+can see how they are tracking compared to the rest of the league."
+
+- **New backend metric** (`metrics.mvp_race_by_week()`): cumulative
+  points-over-projection for every genuinely STARTED appearance this
+  regular season, tracked by real player identity (not fantasy team — a
+  mid-season trade doesn't reset a player's line). Only counts a week
+  ESPN actually published a projection for; K/D-ST excluded (same
+  exclusion `redraft_lineup_value()` already applies — not a real "MVP"
+  candidate). New `{season}/mvp_race.json`, current-season-only lifecycle
+  (same "deleted once season_over" rule as sim.json).
+- **New `MvpRaceChart`** (`HistoryCharts.tsx`): top 15 players shown as a
+  muted "field" for context, top 5 given a real color each (new
+  `CHART_QUALITATIVE` 5-color palette in `tokens.ts` — deliberately not
+  this app's usual single-accent-vs-muted binary, since there's no one
+  "mine" line here) plus a headshot+name label past the chart's right
+  edge. Labels are a hand-computed absolutely-positioned HTML overlay
+  (not Recharts' own `label` prop) — an explicit Y-domain keeps the
+  overlay's pixel math in sync with what Recharts actually renders, with
+  simple vertical de-collision for labels whose values are close
+  together.
+- Verified with real data, not just types: temporarily forced a REAL
+  past season (2025) to render as-if-in-progress (never committed) to
+  confirm the chart renders correctly end to end with genuine
+  season-long data — real headshots, correct top-5 ranking/colors, no
+  label overlap. Separately confirmed the real preseason (2026, 0 weeks
+  played) and real past-season (file absent) paths both show the correct
+  empty state. `tsc --noEmit` and production build both clean.
+
 ## Fix: refresh.yml broke entirely, depended on a secret that never existed (2026-09-02)
 
 Tommy: "I got an email around 8:16 pm on September 2 that my refresh data

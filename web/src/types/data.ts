@@ -426,6 +426,20 @@ export interface SimByWeek {
   weeks: Record<string, Record<string, number>>;
 }
 
+export interface MvpRacePlayer {
+  name: string;
+  position: string;
+  pro_team: string;
+  current_team_id: number;
+  cumulative_by_week: number[];
+}
+
+export interface MvpRace {
+  generated_at: string;
+  weeks: number[];
+  players: Record<string, MvpRacePlayer>;
+}
+
 export interface SwapRecord {
   wins: number;
   losses: number;

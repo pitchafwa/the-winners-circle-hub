@@ -577,6 +577,53 @@ the last run) — same "completed weeks are immutable, only the current one
 refreshes" convention `fetch.py`'s box-score fetching already follows. A
 cached rerun took ~1s in the same test.
 
+## `{season}/mvp_race.json` (absent when season is over or no weeks played yet, new 2026-09)
+
+League page "MVP Race" chart — cumulative points-over-projection for every
+real STARTED appearance this regular season, tracked by real player
+identity (`metrics.mvp_race_by_week()`). Same file-lifecycle rule as
+`sim.json`/`sim_by_week.json`: actively deleted, not just skipped, once
+`season_over` flips true — a finished season has no ongoing race left to
+show.
+
+`weeks[]`: every completed regular-season week number, ascending.
+`players{}`: keyed by `player_id` as a string, the top 20 players by their
+CURRENT (final-week) cumulative total — `{name, position, pro_team,
+current_team_id, cumulative_by_week[]}`, `cumulative_by_week` the same
+length as `weeks[]`, index-aligned (index 0 = total through week 1, etc.).
+K and D/ST are excluded entirely (not a real "MVP" candidate, same
+exclusion `redraft_lineup_value()` already applies for the analogous
+reason). A player who hasn't started a game yet this season simply isn't
+in `players{}` at all — never a fabricated 0.
+
+**Tracked by player, not by fantasy team** — a mid-season trade doesn't
+reset a player's own line, the same way a real MVP race wouldn't reset if
+a pro athlete got traded. `current_team_id` is whichever fantasy team most
+recently started them, for display only (not used to bucket or reset the
+cumulative total).
+
+**Only a genuinely STARTED week counts**, for or against — a bench/IR
+week is invisible to this, it was never live. **Only a week ESPN actually
+published a projection for** counts at all — a missing projection is
+skipped entirely for that player-week (never treated as a 0), same
+"missing should look missing" convention used everywhere else in this
+app.
+
+**Frontend** (`MvpRaceChart`, `HistoryCharts.tsx`): shows the top 15 of
+the 20 players on the line chart as a muted "field" for context, with
+only the current top 5 given a real color
+(`CHART_QUALITATIVE` — a 5-color qualitative palette, deliberately not
+this app's usual single-accent-vs-everyone-else-muted binary, since
+there's no one "mine" line here) and a headshot+name label past the
+chart's right edge — computed via a manual linear pixel map (an EXPLICIT
+Y-domain, not "auto", so the label overlay's own math stays in sync with
+what Recharts actually renders) with simple vertical de-collision for
+labels whose values are close together. Tommy, 2026-09-08: "could we
+include, say, the top 15 players on the line graph but only highlight
+the current top 5 with names and headshots at the end of their line ...
+that way we can see how they are tracking compared to the rest of the
+league."
+
 ## `{season}/roster.json` (absent when season is over)
 
 Live roster cards for the My Team page — starters/bench/IR exactly as set on

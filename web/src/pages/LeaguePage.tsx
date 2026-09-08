@@ -11,9 +11,10 @@ import EmptyState from "../components/EmptyState";
 import PositionHeatmap from "../components/PositionHeatmap";
 import ContendRebuildTable from "../components/ContendRebuildTable";
 import ScreenshotButton from "../components/ScreenshotButton";
-import { BumpChart, PlayoffOddsChart, PointsPaceChart, SwapMatrix } from "../components/HistoryCharts";
+import { BumpChart, MvpRaceChart, PlayoffOddsChart, PointsPaceChart, SwapMatrix } from "../components/HistoryCharts";
 import type {
-  Activity, Positions, Schedule, ScheduleSwap, Sim, SimByWeek, Spectrum, Standings, StandingsByWeek, Superlatives,
+  Activity, MvpRace, Positions, Schedule, ScheduleSwap, Sim, SimByWeek, Spectrum, Standings, StandingsByWeek,
+  Superlatives,
 } from "../types/data";
 
 // Shared by every bar-chart-style block below (no border/header of its
@@ -50,11 +51,13 @@ export default function LeaguePage() {
   const playoffOddsChartRef = useRef<HTMLDivElement>(null);
   const bumpChartRef = useRef<HTMLDivElement>(null);
   const pointsChartRef = useRef<HTMLDivElement>(null);
+  const mvpRaceChartRef = useRef<HTMLDivElement>(null);
 
   const odds = useForceDesktopCapture();
   const oddsByWeek = useForceDesktopCapture(150);
   const bump = useForceDesktopCapture(150);
   const points = useForceDesktopCapture(150);
+  const mvpRace = useForceDesktopCapture(150);
 
   const [standingsWeek, setStandingsWeek] = useState<"current" | number>("current");
 
@@ -64,6 +67,7 @@ export default function LeaguePage() {
   const superlatives = useJson<Superlatives>(base ? `${base}/superlatives.json` : null);
   const activity = useJson<Activity>(base ? `${base}/activity.json` : null);
   const sim = useOptionalJson<Sim>(base ? `${base}/sim.json` : null);
+  const mvpRaceData = useOptionalJson<MvpRace>(base ? `${base}/mvp_race.json` : null);
   const simByWeek = useOptionalJson<SimByWeek>(base ? `${base}/sim_by_week.json` : null);
   const positions = useOptionalJson<Positions>(base ? `${base}/positions.json` : null);
   const spectrum = useJson<Spectrum>("spectrum.json");
@@ -137,6 +141,28 @@ export default function LeaguePage() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="section" aria-labelledby="mvp-h">
+        <div className="section-head">
+          <h2 id="mvp-h">MVP Race</h2>
+          <span className="label">
+            top 15 · cumulative points over projection, started weeks only
+            {mvpRaceData.data && (
+              <ScreenshotButton
+                targetRef={mvpRaceChartRef}
+                filename="mvp-race"
+                title="MVP Race"
+                prepareCapture={mvpRace.prepareCapture}
+                cleanupCapture={mvpRace.cleanupCapture}
+              />
+            )}
+          </span>
+        </div>
+        {mvpRaceData.error && <div className="error-state">{mvpRaceData.error}</div>}
+        {mvpRaceData.data
+          ? <MvpRaceChart ref={mvpRaceChartRef} mvpRace={mvpRaceData.data} forceDesktop={mvpRace.forceDesktop} />
+          : !mvpRaceData.error && <EmptyState>Not enough of the season played yet — the race starts once week 1 is in the books.</EmptyState>}
       </section>
 
       <section className="section" aria-labelledby="odds-h">

@@ -1486,3 +1486,52 @@ def compute_power_rankings(league: LeagueData, all_play: dict[int, dict]) -> dic
         prev_rank = {r["team_id"]: r["rank"] for r in week_list}
 
     return rankings
+
+
+def mvp_race_by_week(league: LeagueData, top_n: int = 20) -> dict:
+    """Cumulative points-over-projection for every real STARTED appearance
+    this regular season, tracked by real player identity — not by fantasy
+    team, so a mid-season trade doesn't reset a player's own line, the
+    same way a real MVP race wouldn't reset if a pro athlete got traded
+    mid-season. Only a genuinely STARTED week counts for or against a
+    player (a bench/IR week is invisible to this, same as it should be —
+    it was never live), and only a week ESPN actually published a
+    projection for (a missing projection is skipped entirely, never
+    treated as a 0, same "missing should look missing" convention as
+    everywhere else in this app).
+
+    Returns the top `top_n` players by their CURRENT (final-week)
+    cumulative total, each carrying their FULL week-by-week running
+    total (not just today's number) — a chart can show the whole race
+    unfolding, not just a snapshot leaderboard. `current_team_id` is
+    whichever fantasy team most recently started them (their real
+    current roster, not locked to whoever had them when they first
+    entered the top N)."""
+    weeks = league.regular_weeks()
+    running: dict[int, float] = {}
+    by_week: dict[int, dict[int, float]] = {}
+    info: dict[int, dict] = {}
+    for week in weeks:
+        for m in league.weeks[week]:
+            for tw in (m.home, m.away):
+                if tw is None:
+                    continue
+                for p in tw.starters():
+                    if p.projected is None or p.position in ("K", "D/ST"):
+                        continue  # same "not a real MVP-race candidate" exclusion redraft_lineup_value() already applies
+                    running[p.player_id] = running.get(p.player_id, 0.0) + (p.actual - p.projected)
+                    info[p.player_id] = {
+                        "name": p.name, "position": p.position,
+                        "pro_team_id": p.pro_team_id, "current_team_id": tw.team_id,
+                    }
+        by_week[week] = dict(running)
+
+    if not running:
+        return {"weeks": [], "players": {}}
+
+    top_ids = sorted(running, key=lambda pid: running[pid], reverse=True)[:top_n]
+    players = {
+        str(pid): {**info[pid], "cumulative_by_week": [round(by_week[w].get(pid, 0.0), 2) for w in weeks]}
+        for pid in top_ids
+    }
+    return {"weeks": weeks, "players": players}

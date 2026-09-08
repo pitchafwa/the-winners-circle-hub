@@ -118,60 +118,79 @@ export default function ScreenshotButton({
       freezeWidths(node, clone);
 
       // Player headshots/team logos come from ESPN's CDN, a cross-origin
-      // host. First fix tried (2026-09-08, insufficient on its own):
-      // fetch each image and swap its `src` to an embedded base64 data
-      // URI, on the theory that html-to-image relying on the browser to
-      // fetch a live external URL while rasterizing the SVG was the
-      // problem. Confirmed still broken on iOS afterward (every browser
-      // there, Chrome included, runs on WebKit) — Tommy reported the
-      // capture itself works fine (real layout/text/scores), just every
-      // headshot/logo spot comes back blank, which pins the actual bug:
-      // WebKit has long-documented trouble rasterizing <img> elements
-      // AT ALL inside an SVG <foreignObject> (the technique html-to-image
-      // uses), independent of the image's src — a data URI doesn't route
-      // around this because the element is still an <img>. The real fix
-      // is to stop using an <img> tag in the captured tree entirely:
-      // swap each one for a plain <div> painted with a CSS
-      // `background-image` instead — WebKit's SVG rasterizer paints
-      // background-images inside foreignObject correctly where it won't
-      // paint <img> elements. Same visual result (the div keeps the
-      // original's class, so width/height/border-radius/fallback
-      // background-color all still come from .player-headshot's own
-      // CSS), just a different paint mechanism under the hood.
-      const replaceImagesWithBackgrounds = async (root: Element) => {
-        const imgs = Array.from(root.querySelectorAll("img"));
-        await Promise.all(imgs.map(async (img) => {
-          let url = img.src;
-          if (!url.startsWith("data:")) {
-            try {
-              const res = await fetch(url, { mode: "cors" });
-              const blob = await res.blob();
-              url = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.onerror = () => reject(reader.error);
-                reader.readAsDataURL(blob);
-              });
-            } catch {
-              // couldn't fetch it — still swap to a div below so the capture
-              // at least shows the same empty circle every other missing-
-              // art player already gets, not a raw broken-image icon
-              url = "";
-            }
-          }
-          const replacement = document.createElement("div");
-          replacement.className = img.className;
-          const existingStyle = img.getAttribute("style");
-          if (existingStyle) replacement.setAttribute("style", existingStyle);
-          if (url) {
-            replacement.style.backgroundImage = `url("${url}")`;
-            replacement.style.backgroundSize = "cover";
-            replacement.style.backgroundPosition = "center";
-          }
-          img.replaceWith(replacement);
-        }));
+      // host — and every attempt to get them through html-to-image's own
+      // SVG-based rasterization (2026-09-08: crossOrigin="anonymous" on
+      // the <img>, fetching+inlining a base64 data URI, swapping the
+      // <img> for a CSS background-image div) still came back blank on
+      // real iOS hardware (every browser there, Chrome included, runs on
+      // WebKit). Tommy's own report each time — the capture itself works
+      // fine (real layout/text/scores), only the image spots are blank —
+      // points at the SVG <foreignObject> rasterization step itself
+      // being unreliable for embedded raster content on WebKit, not any
+      // one specific way of referencing the image. Rather than keep
+      // guessing at that pipeline, this sidesteps it entirely for
+      // photos: strip every <img> out of the captured tree (leaving an
+      // empty placeholder — same class, so it still reserves the right
+      // size/shape and shows .player-headshot's own fallback background
+      // color), then AFTER the base image/text/layout capture is drawn
+      // to the canvas below, paint each real headshot/logo on top of it
+      // directly via the plain canvas `drawImage()` API instead — a
+      // universally-supported, WebKit-included mechanism that has
+      // nothing to do with SVG rasterization at all. `crossOrigin=
+      // "anonymous"` on the ORIGINAL <img> (PlayerHeadshot.tsx) plus
+      // ESPN's CDN allowing it (`Access-Control-Allow-Origin: *`,
+      // confirmed live) is what keeps that drawImage call from tainting
+      // the canvas.
+      const imagePlacements: { original: HTMLImageElement; placeholder: HTMLElement }[] = [];
+      const stripImages = (originalRoot: Element, clonedRoot: Element) => {
+        const originals = Array.from(originalRoot.querySelectorAll("img"));
+        const clones = Array.from(clonedRoot.querySelectorAll("img"));
+        originals.forEach((original, i) => {
+          const clonedImg = clones[i];
+          if (!clonedImg) return;
+          const placeholder = document.createElement("div");
+          placeholder.className = clonedImg.className;
+          const existingStyle = clonedImg.getAttribute("style");
+          if (existingStyle) placeholder.setAttribute("style", existingStyle);
+          clonedImg.replaceWith(placeholder);
+          imagePlacements.push({ original, placeholder });
+        });
       };
-      await replaceImagesWithBackgrounds(clone);
+      stripImages(node, clone);
+
+      // The REAL bug behind three failed attempts at this (2026-09-08):
+      // PlayerHeadshot.tsx's <img loading="lazy"> genuinely hadn't
+      // finished loading yet for most players at the moment someone taps
+      // the screenshot button — confirmed by instrumenting a real capture
+      // directly (every `original` came back `complete: false,
+      // naturalWidth: 0` even though the SAME elements loaded fine
+      // moments earlier once actually scrolled/settled). None of the
+      // WebKit/foreignObject/CORS theories were wrong exactly, they just
+      // weren't THE bug — an unloaded image comes back blank from ANY
+      // capture technique, on ANY browser, which is exactly why every
+      // previous attempt produced the identical result regardless of
+      // platform. `loading="lazy"` also means the browser may not have
+      // even STARTED fetching yet — flipping it to "eager" here is what
+      // actually forces that to happen, not just waiting on a fetch that
+      // was never triggered.
+      const waitForImage = (original: HTMLImageElement, timeoutMs = 4000): Promise<void> =>
+        new Promise((resolve) => {
+          if (original.complete && original.naturalWidth > 0) {
+            resolve();
+            return;
+          }
+          const done = () => {
+            original.removeEventListener("load", done);
+            original.removeEventListener("error", done);
+            clearTimeout(timer);
+            resolve(); // resolve either way — a real failure just leaves this one placeholder's fallback color showing below, same as today
+          };
+          original.addEventListener("load", done);
+          original.addEventListener("error", done);
+          const timer = setTimeout(done, timeoutMs);
+          original.loading = "eager";
+        });
+      await Promise.all(imagePlacements.map(({ original }) => waitForImage(original)));
 
       frame.appendChild(clone);
       stage.appendChild(frame);
@@ -216,6 +235,46 @@ export default function ScreenshotButton({
       if (!ctx) throw new Error("no 2d canvas context");
       ctx.scale(pixelRatio, pixelRatio);
       ctx.drawImage(img, 0, 0, frame.offsetWidth, frame.offsetHeight);
+
+      // Paint each real headshot/logo on top of the base capture now —
+      // see stripImages()'s comment above for why this doesn't go
+      // through the SVG rasterization at all. `placeholder` has real
+      // layout (it's a live, if off-screen, DOM node inside `frame`),
+      // so measuring both rects gives its exact position within the
+      // canvas's own coordinate space regardless of the frame's padding
+      // or the heading's height — no manual layout math to get wrong.
+      const frameRect = frame.getBoundingClientRect();
+      for (const { original, placeholder } of imagePlacements) {
+        if (!original.complete || original.naturalWidth === 0) continue; // still not loaded after waitForImage's timeout — leave the placeholder's own fallback color showing
+        const rect = placeholder.getBoundingClientRect();
+        console.log("DEBUG rect", rect, "complete", original.complete, "nw", original.naturalWidth);
+        const x = rect.left - frameRect.left;
+        const y = rect.top - frameRect.top;
+        const w = rect.width;
+        const h = rect.height;
+        if (w <= 0 || h <= 0) continue;
+        // .player-headshot is always square with border-radius: 50% —
+        // a real circle, never an ellipse, at every size this app uses.
+        const radius = Math.min(w, h) / 2;
+        // object-fit: cover — crop the source to the target box's own
+        // aspect ratio before drawing, same as the live CSS does.
+        const srcAspect = original.naturalWidth / original.naturalHeight;
+        const dstAspect = w / h;
+        let sx = 0, sy = 0, sw = original.naturalWidth, sh = original.naturalHeight;
+        if (srcAspect > dstAspect) {
+          sw = original.naturalHeight * dstAspect;
+          sx = (original.naturalWidth - sw) / 2;
+        } else {
+          sh = original.naturalWidth / dstAspect;
+          sy = (original.naturalHeight - sh) / 2;
+        }
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2, radius, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(original, sx, sy, sw, sh, x, y, w, h);
+        ctx.restore();
+      }
 
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("empty image");

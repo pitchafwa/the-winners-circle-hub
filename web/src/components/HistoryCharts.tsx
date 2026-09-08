@@ -367,13 +367,15 @@ function MvpRaceTooltip({
 const MVP_SHOWN_COUNT = 15;      // total lines on the chart — the "field"
 const MVP_HIGHLIGHT_COUNT = 5;   // colored + labeled — the actual "race"
 const MVP_CHART_HEIGHT = 300;
-const MVP_MARGIN_BASE = { top: 10, bottom: 4, left: -4 };
+const MVP_MARGIN_BASE = { top: 10, bottom: 4, left: 0 };
 const MVP_LABEL_MIN_GAP = 24;    // px — minimum vertical space between two end-labels before they'd overlap
 const MVP_LABEL_FONT = "600 10.88px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"; // must match the label <span> below
 const MVP_LABEL_HEADSHOT_W = 18; // .mu-headshot is 1.125rem
 const MVP_LABEL_GAP = 5;         // the label row's own flex `gap`
 const MVP_LABEL_EDGE_PAD = 4;    // the label row's `right: 4`
 const MVP_LABEL_SAFETY = 6;      // canvas measureText vs. real rendered width can differ a px or two across platforms
+const MVP_YAXIS_TICK_FONT = "11px 'IBM Plex Mono', monospace"; // must match the YAxis `tick` style below
+const MVP_YAXIS_PAD = 8;         // Recharts' own tick-to-text padding inside its reserved axis width
 
 let mvpMeasureCanvas: HTMLCanvasElement | null = null;
 /** Real pixel width of `text` set in `font` — used to size the chart's
@@ -505,6 +507,32 @@ export const MvpRaceChart = forwardRef<HTMLDivElement, { mvpRace: MvpRace; force
   const margin = { ...MVP_MARGIN_BASE, right: marginRight };
 
   const [domainMin, domainMax] = domain;
+
+  // Y-axis width sized the same way as the right margin above — from the
+  // actual rendered pixel width of its own widest real tick text, not a
+  // flat guess. A flat `width={36}` combined with a small negative
+  // `margin.left` (an earlier tightening hack) was clipping the leading
+  // "-" off a negative tick (e.g. "-0.069" rendering as ".069" in an
+  // exported capture, correct-but-cramped in the live page) whenever a
+  // player's cumulative WPA dipped below zero early in the season. The
+  // widest tick is always domainMin or domainMax themselves: Recharts
+  // generates the intermediate ticks as domainMin plus a "nice" step (see
+  // this component's real observed output — a 3-decimal domainMin like
+  // -0.069 produces intermediate ticks 0.331, 0.731, 1.131, all the same
+  // 3-decimal precision, never more), so measuring just the two endpoints
+  // is a safe upper bound without having to replicate Recharts' own tick
+  // algorithm. Measure BOTH endpoints and take the wider — a first attempt
+  // at this compared their raw numeric magnitude instead (`abs(domainMin)
+  // > abs(domainMax) ? ... `), which is exactly backwards for a case like
+  // this one: "-0.069" is a LONGER string (6 characters, leading minus and
+  // zero) than "1.468" (5 characters) despite being the smaller number, so
+  // that version still picked the shorter string and still clipped — the
+  // fix has to compare rendered width, not value.
+  const yAxisWidth = Math.ceil(Math.max(
+    mvpTextWidth(domainMin.toFixed(3), MVP_YAXIS_TICK_FONT),
+    mvpTextWidth(domainMax.toFixed(3), MVP_YAXIS_TICK_FONT),
+  )) + MVP_YAXIS_PAD + MVP_LABEL_SAFETY;
+
   const plotHeight = MVP_CHART_HEIGHT - margin.top - margin.bottom;
   const yFor = (v: number) => {
     const span = domainMax - domainMin || 1;
@@ -533,7 +561,7 @@ export const MvpRaceChart = forwardRef<HTMLDivElement, { mvpRace: MvpRace; force
           <CartesianGrid stroke={RULE} vertical={false} strokeWidth={0.5} />
           <XAxis dataKey="week" tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }}
             tickLine={false} axisLine={{ stroke: RULE }} />
-          <YAxis width={36} domain={domain}
+          <YAxis width={yAxisWidth} domain={domain}
             tick={{ fontFamily: FONT_MONO, fontSize: 11, fill: INK_MUTED }} tickLine={false} axisLine={false} />
           <Tooltip content={<MvpRaceTooltip playersById={playersById} />} />
           {shown.map((pid) => {

@@ -3,6 +3,28 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: MVP Race Y-axis clipping a negative tick's minus sign (2026-09-08)
+
+Follow-up to the screenshot fixes below, flagged as a known-but-unfixed
+issue in that same report: a negative WPA tick (e.g. `-0.069`, whenever a
+player's cumulative total dips below zero early in the season) rendered
+as `.069` — the leading minus and zero clipped off by the chart's own
+fixed-width Y-axis. Tommy: "Please fix the Y axis bug."
+
+- **First fix attempt was itself wrong, caught before shipping**: sized
+  the axis width from whichever of `domainMin`/`domainMax` had the larger
+  numeric magnitude — backwards, since `-0.069` is a LONGER string (6
+  characters) than `1.468` (5 characters) despite being the smaller
+  number. Verified in-browser with a real negative-domain season (2025)
+  that this still clipped (`textLeft < svgLeft` via direct
+  `getBoundingClientRect()`, not just eyeballing it) before diagnosing
+  the actual bug and fixing it for real: measure BOTH endpoints' real
+  rendered width (canvas `measureText`, same approach the label-width fix
+  already used) and take whichever is actually wider.
+- Reverified the same way after the real fix: the "-0.069" tick's
+  bounding box now sits safely inside the SVG's own left edge, and the
+  full un-clipped string is present in the live DOM.
+
 ## WPA everywhere: playoffs included, My Team table, Franchise MVPs leaderboard (2026-09-08)
 
 Same day as the WPA revision below. Tommy asked to see a real regular-

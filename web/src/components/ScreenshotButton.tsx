@@ -118,44 +118,60 @@ export default function ScreenshotButton({
       freezeWidths(node, clone);
 
       // Player headshots/team logos come from ESPN's CDN, a cross-origin
-      // host — html-to-image's default capture path leaves an <img>'s
-      // src as a live external URL inside the SVG it builds, then relies
-      // on the browser to fetch and rasterize it as part of loading that
-      // SVG into an <Image>. Confirmed broken on iOS (every browser
-      // there, Chrome included, runs on WebKit, which has long-standing
-      // problems rasterizing <img> elements inside an SVG
-      // <foreignObject> at all — a rendering-engine gap, not a CORS one:
-      // `crossOrigin="anonymous"` on PlayerHeadshot.tsx fixed a real
-      // canvas-taint bug on desktop, but iOS still showed no headshots
-      // at all afterward). Fetching each image ourselves and swapping
-      // its `src` to an embedded base64 data URI removes the problem
-      // entirely rather than working around this engine's quirks: the
-      // SVG then has nothing external left to load during rasterization
-      // on ANY browser, so there's no load-timing/CORS/engine-support
-      // gap left for it to fall into. Best-effort — an image that fails
-      // to fetch just keeps its original (likely blank-in-capture) src,
-      // same as before this existed.
-      const inlineImages = async (root: Element) => {
+      // host. First fix tried (2026-09-08, insufficient on its own):
+      // fetch each image and swap its `src` to an embedded base64 data
+      // URI, on the theory that html-to-image relying on the browser to
+      // fetch a live external URL while rasterizing the SVG was the
+      // problem. Confirmed still broken on iOS afterward (every browser
+      // there, Chrome included, runs on WebKit) — Tommy reported the
+      // capture itself works fine (real layout/text/scores), just every
+      // headshot/logo spot comes back blank, which pins the actual bug:
+      // WebKit has long-documented trouble rasterizing <img> elements
+      // AT ALL inside an SVG <foreignObject> (the technique html-to-image
+      // uses), independent of the image's src — a data URI doesn't route
+      // around this because the element is still an <img>. The real fix
+      // is to stop using an <img> tag in the captured tree entirely:
+      // swap each one for a plain <div> painted with a CSS
+      // `background-image` instead — WebKit's SVG rasterizer paints
+      // background-images inside foreignObject correctly where it won't
+      // paint <img> elements. Same visual result (the div keeps the
+      // original's class, so width/height/border-radius/fallback
+      // background-color all still come from .player-headshot's own
+      // CSS), just a different paint mechanism under the hood.
+      const replaceImagesWithBackgrounds = async (root: Element) => {
         const imgs = Array.from(root.querySelectorAll("img"));
         await Promise.all(imgs.map(async (img) => {
-          if (img.src.startsWith("data:")) return; // the silhouette fallback — already inline
-          try {
-            const res = await fetch(img.src, { mode: "cors" });
-            const blob = await res.blob();
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = () => reject(reader.error);
-              reader.readAsDataURL(blob);
-            });
-            img.src = dataUrl;
-          } catch {
-            // leave the original src — capture just shows this one image
-            // blank there, same as the pre-existing behavior
+          let url = img.src;
+          if (!url.startsWith("data:")) {
+            try {
+              const res = await fetch(url, { mode: "cors" });
+              const blob = await res.blob();
+              url = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsDataURL(blob);
+              });
+            } catch {
+              // couldn't fetch it — still swap to a div below so the capture
+              // at least shows the same empty circle every other missing-
+              // art player already gets, not a raw broken-image icon
+              url = "";
+            }
           }
+          const replacement = document.createElement("div");
+          replacement.className = img.className;
+          const existingStyle = img.getAttribute("style");
+          if (existingStyle) replacement.setAttribute("style", existingStyle);
+          if (url) {
+            replacement.style.backgroundImage = `url("${url}")`;
+            replacement.style.backgroundSize = "cover";
+            replacement.style.backgroundPosition = "center";
+          }
+          img.replaceWith(replacement);
         }));
       };
-      await inlineImages(clone);
+      await replaceImagesWithBackgrounds(clone);
 
       frame.appendChild(clone);
       stage.appendChild(frame);

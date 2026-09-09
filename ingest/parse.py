@@ -583,6 +583,25 @@ def values_by_pid(season: int, market_values: dict[str, int]) -> dict[int, float
     return {pid: market_values.get(_normalize_name(name), 0) for pid, name in names.items()}
 
 
+def ranks_by_pid(season: int, market_ranks: dict[str, int]) -> dict[int, int]:
+    """player_id -> real rank (1 = best), resolved by name against
+    whichever rank table the caller passes in (currently just FantasyPros'
+    redraft ECR, `valuation.fantasypros_redraft_rank_by_name`). Same name
+    universe as `values_by_pid()` (global NFL list + this season's
+    rosters, so free agents resolve too, not just rostered players) but
+    — unlike that function's `0` default for a market VALUE (an honest
+    "the market prices this at nothing") — missing entirely, never a
+    fabricated rank, for anyone outside the source's ranked universe: rank
+    0 isn't a real rank the way value 0 is a real (if low) value."""
+    names = {**global_player_names(), **roster_player_names(season)}
+    result: dict[int, int] = {}
+    for pid, name in names.items():
+        rank = market_ranks.get(_normalize_name(name))
+        if rank is not None:
+            result[pid] = rank
+    return result
+
+
 def ages_by_pid(market_ages: dict[str, float]) -> dict[int, float]:
     """player_id -> real age, resolved by name against KTC's dynasty-
     rankings fetch (`valuation.ages_by_name`). Global, not season-scoped —

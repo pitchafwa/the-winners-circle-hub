@@ -300,6 +300,24 @@ def fantasypros_redraft_values_by_name(offline: bool = False) -> tuple[dict[str,
     return values, fetched_at
 
 
+def fantasypros_redraft_rank_by_name(offline: bool = False) -> tuple[dict[str, int], str | None]:
+    """normalized_name -> FantasyPros' raw consensus expert rank (1 = best),
+    from the SAME cheat-sheet scrape `fantasypros_redraft_values_by_name()`
+    already fetches (cached, no extra request — same pattern
+    `fantasypros_player_ids_by_name()` above already uses for its own
+    derived view of this one source). The RAW rank, not the 0-9999-ish
+    value that function derives from it — added for the Players page
+    (2026-09-09), where Tommy explicitly wants to see "their fantasy pros
+    rank," not this app's own rescaled market-value number. Same missing-
+    player convention as everywhere else: absent, never a fabricated
+    rank, for anyone outside FantasyPros' ~517-deep ranked universe."""
+    from parse import _normalize_name  # local import: avoid a circular import at module load
+
+    players, fetched_at = _get_players(FANTASYPROS_REDRAFT, offline)
+    ranks = {_normalize_name(p["player_name"]): p["rank_ecr"] for p in players}
+    return ranks, fetched_at
+
+
 def fantasypros_player_ids_by_name(offline: bool = False) -> dict[str, tuple[int, str]]:
     """normalized_name -> (FantasyPros player_id, position_id), from the
     SAME free cheat-sheet scrape `fantasypros_redraft_values_by_name()`

@@ -36,8 +36,19 @@ const COLS: { key: string; label: string; numeric: boolean; title?: string }[] =
   { key: "projected_avg_points", label: "Proj Avg", numeric: true, title: "ESPN's projected points per game" },
 ];
 
+// LM-Tools-gated — real market data (FantasyPros consensus redraft rank,
+// KTC dynasty value), not core league content, same gate RosterTable's
+// FP projection column already uses. Tommy: "can we add their fantasy
+// pros rank (rest of season or whatever we're using for contending
+// value) and KTC dynasty value to the table when lm tools is activated?"
+const ADMIN_COLS: { key: string; label: string; numeric: boolean; title?: string }[] = [
+  { key: "fp_rank", label: "FP Rank", numeric: true,
+    title: "FantasyPros consensus redraft rank (1 = best) — the same source spectrum.json's contending value uses" },
+  { key: "dynasty_value", label: "Dynasty", numeric: true, title: "KeepTradeCut dynasty value (0-9999-ish)" },
+];
+
 export default function PlayersPage() {
-  const { season, meta, currentTeamName } = useApp();
+  const { season, meta, currentTeamName, adminUnlocked } = useApp();
   const base = season !== null ? `${season}` : null;
   const pool = useOptionalJson<PlayerPool>(base ? `${base}/player_pool.json` : null);
 
@@ -46,6 +57,7 @@ export default function PlayersPage() {
   const [teamFilter, setTeamFilter] = useState("");
 
   const teamName = (id: number) => currentTeamName(id);
+  const cols = adminUnlocked ? [...COLS, ...ADMIN_COLS] : COLS;
 
   const sort = useSort<PlayerPoolEntry>("percent_owned", -1, (r, key) => {
     if (key === "player") return r.name;
@@ -114,7 +126,7 @@ export default function PlayersPage() {
             <table className="stat">
               <thead>
                 <tr>
-                  {COLS.map((c) => (
+                  {cols.map((c) => (
                     <th key={c.key} scope="col" title={c.title}
                       className={`sortable${c.numeric ? " num" : ""}`}
                       aria-sort={sort.ariaSort(c.key)}
@@ -159,6 +171,12 @@ export default function PlayersPage() {
                       <td className="num muted">{pts(p.projected_total_points)}</td>
                       <td className="num">{pts(p.avg_points)}</td>
                       <td className="num muted">{pts(p.projected_avg_points)}</td>
+                      {adminUnlocked && (
+                        <>
+                          <td className="num muted">{p.fp_rank ?? "—"}</td>
+                          <td className="num muted">{p.dynasty_value || "—"}</td>
+                        </>
+                      )}
                     </tr>
                   );
                 })}

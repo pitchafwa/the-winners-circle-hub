@@ -43,7 +43,8 @@ def _season_stat_totals(player: dict, season: int) -> tuple[float, float, float,
     return total, projected_total, avg, projected_avg
 
 
-def _player_row(pid: int, player: dict, team_id: int | None, season: int, pro_teams: dict) -> dict:
+def _player_row(pid: int, player: dict, team_id: int | None, season: int, pro_teams: dict,
+                dynasty_by_pid: dict[int, float], fp_rank_by_pid: dict[int, int]) -> dict:
     total, projected_total, avg, projected_avg = _season_stat_totals(player, season)
     pro_info = pro_teams.get(player.get("proTeamId", 0), {})
     ownership = player.get("ownership") or {}
@@ -61,17 +62,40 @@ def _player_row(pid: int, player: dict, team_id: int | None, season: int, pro_te
         "projected_total_points": projected_total,
         "avg_points": avg,
         "projected_avg_points": projected_avg,
+        # LM-Tools-gated columns on the frontend (real market data, not
+        # core league content — same gate RosterTable's FP projection
+        # column already uses). Always present here regardless of the
+        # gate, same "the data ships, the column just doesn't render"
+        # convention that column already established.
+        "dynasty_value": dynasty_by_pid.get(pid, 0.0),
+        "fp_rank": fp_rank_by_pid.get(pid),  # None = outside FantasyPros' ranked universe
     }
 
 
-def build_player_pool(season: int) -> list[dict]:
+def build_player_pool(season: int, dynasty_by_pid: dict[int, float] | None = None,
+                      fp_rank_by_pid: dict[int, int] | None = None) -> list[dict]:
     """Returns [] when the raw roster snapshot isn't on file at all (a past
     season, or a current season this app hasn't fetched yet) — build.py
-    treats that as "no file to write," never a fabricated empty pool."""
+    treats that as "no file to write," never a fabricated empty pool.
+
+    `dynasty_by_pid` (KTC dynasty value, `parse.values_by_pid`) and
+    `fp_rank_by_pid` (FantasyPros redraft rank, `parse.ranks_by_pid`) are
+    optional purely so this module stays independently callable/testable
+    without a live valuation fetch — build.py always passes both in
+    practice. Tommy, 2026-09-09: "can we add their fantasy pros rank
+    (rest of season or whatever we're using for contending value) and
+    KTC dynasty value to the table when lm tools is activated?" — "rest
+    of season... value" is FantasyPros' redraft rank (same source
+    spectrum.json's contending-value side already uses; see that
+    module's docstring for why FantasyPros replaced KTC's own redraft
+    numbers there), not a re-derived value, hence a RANK column here
+    instead of another 0-9999 number."""
     league_raw = parse._load(season, "league")
     if not league_raw:
         return []
     pro_teams = parse.pro_team_schedule(season)
+    dynasty_by_pid = dynasty_by_pid or {}
+    fp_rank_by_pid = fp_rank_by_pid or {}
 
     rows: dict[int, dict] = {}
     for t in league_raw.get("teams", []):
@@ -81,7 +105,7 @@ def build_player_pool(season: int) -> list[dict]:
             pid = player.get("id")
             if pid is None:
                 continue
-            rows[pid] = _player_row(pid, player, team_id, season, pro_teams)
+            rows[pid] = _player_row(pid, player, team_id, season, pro_teams, dynasty_by_pid, fp_rank_by_pid)
 
     # Free agents: a rostered player should never also show up in the
     # FREEAGENT/WAIVERS-filtered fetch, but if ESPN's own data is ever
@@ -94,7 +118,7 @@ def build_player_pool(season: int) -> list[dict]:
             pid = entry.get("id") or player.get("id")
             if pid is None or pid in rows:
                 continue
-            rows[pid] = _player_row(pid, player, None, season, pro_teams)
+            rows[pid] = _player_row(pid, player, None, season, pro_teams, dynasty_by_pid, fp_rank_by_pid)
 
     # Default order: highest-owned first (same landing sort ESPN's own
     # Players tab uses) — meaningful at any point in the season, unlike

@@ -96,6 +96,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
                  valuation_updated_at: str | None = None,
                  redraft_values: dict[str, int] | None = None,
                  pick_curves: dict[str, dict[str, list[float]]] | None = None,
+                 redraft_ranks: dict[str, int] | None = None,
                  offline: bool = False) -> dict:
     """Write every data file for one season. Returns summary for seasons.json."""
     league = parse.load_league(season)
@@ -677,7 +678,9 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     # "who owns this player right now," not a historical record, so it
     # only ever exists for the season still being played.
     if not league.season_over:
-        pool = player_pool.build_player_pool(season)
+        dynasty_by_pid = parse.values_by_pid(season, dynasty_values) if dynasty_values else {}
+        fp_rank_by_pid = parse.ranks_by_pid(season, redraft_ranks) if redraft_ranks else {}
+        pool = player_pool.build_player_pool(season, dynasty_by_pid, fp_rank_by_pid)
         if pool:
             _write(out_dir / "player_pool.json", {
                 "generated_at": generated_at,
@@ -1087,6 +1090,11 @@ def main():
     if not redraft_values:
         print("  no redraft valuation data available — contend/rebuild spectrum will read 0 for the contending side", file=sys.stderr)
 
+    # Same cheat-sheet scrape as redraft_values above (cached, no extra
+    # request) — the raw FantasyPros rank, for the Players page's "FP
+    # Rank" column, rather than that call's own rescaled 0-9999 value.
+    redraft_ranks, _ = valuation.fantasypros_redraft_rank_by_name(offline=args.offline)
+
     # Same dynasty-rankings fetch as values_by_name() above (cached, no
     # extra request) — KTC lists future picks alongside players, so the
     # pick-value curve stays as live as the player values do instead of
@@ -1104,7 +1112,7 @@ def main():
     for season in seasons:
         print(f"Building {season}...")
         build_season(season, dynasty_values, valuation_updated_at, redraft_values, pick_curves,
-                    offline=args.offline)
+                    redraft_ranks=redraft_ranks, offline=args.offline)
 
     # cross-season aggregates always span every season on record, even when
     # --season restricted the per-season build loop above (e.g. the trade/

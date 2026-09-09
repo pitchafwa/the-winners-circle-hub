@@ -3,6 +3,36 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Players page: FP rank + KTC dynasty value, LM-Tools-gated (2026-09-09)
+
+Tommy: "can we add their fantasy pros rank (rest of season or whatever
+we're using for contending value) and KTC dynasty value to the table
+when lm tools is activated?"
+
+- **New `valuation.fantasypros_redraft_rank_by_name()`**: the RAW
+  FantasyPros consensus redraft rank (1 = best), not the 0-9999-ish value
+  `fantasypros_redraft_values_by_name()` already derives from it — same
+  cached cheat-sheet fetch, no extra request. Tommy asked for the rank
+  itself, not another rescaled number.
+- **New `parse.ranks_by_pid()`**: name-resolved to player_id, same
+  rostered+free-agent name universe `values_by_pid()` already covers.
+  Missing entirely (never a fabricated `0`) for anyone outside
+  FantasyPros' ranked universe — a rank of 0 isn't a real rank the way a
+  value of 0 is a real (if low) value.
+- **`player_pool.json`** gains `dynasty_value` (the same KTC number
+  `player_values.json` already carries, just resolved for free agents
+  too, not only current rosters) and `fp_rank` on every player.
+- **`PlayersPage.tsx`**: two new columns, FP Rank and Dynasty, rendered
+  only when `adminUnlocked` — same LM-Tools gate `RosterTable`'s
+  FantasyPros projection column already uses (real market data, not core
+  league content).
+- Verified live with `adminUnlocked` toggled both ways: columns render
+  with real, sane data when unlocked (Jahmyr Gibbs FP #2 / 9999 dynasty;
+  Brandon Aubrey, a kicker, correctly shows "—" dynasty — outside KTC's
+  ranked universe) and disappear entirely when locked. Full offline
+  rebuild across every season clean. `tsc --noEmit` and production build
+  both clean.
+
 ## Fix: `ownership.json` lost historical seasons to CI cache eviction (2026-09-09)
 
 The flagged-but-deliberately-unfixed follow-up from the badges/h2h fix

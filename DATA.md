@@ -809,7 +809,8 @@ points are a live snapshot.
 `players[]`: `{player_id, name, position, pro_team, eligible_slots,
 team_id (fantasy team id, or null = free agent/on waivers),
 injury_status, percent_owned, percent_started, total_points,
-projected_total_points, avg_points, projected_avg_points}`. `position` is
+projected_total_points, avg_points, projected_avg_points, dynasty_value,
+fp_rank}`. `position` is
 the single primary position (`parse.POSITION_NAMES`, same scheme
 `roster_card.py` uses); `eligible_slots[]` is the full real-ESPN slot list
 (e.g. `["BE","FLEX","IR","RB","RB/WR"]`, same `parse.SLOT_NAMES` naming
@@ -831,6 +832,24 @@ A rostered player can never also appear in the FREEAGENT/WAIVERS-filtered
 fetch in practice, but if ESPN's own data were ever briefly inconsistent
 mid-transaction, the rostered entry wins — "who owns this player" is the
 more load-bearing fact of the two.
+
+`dynasty_value`/`fp_rank` (added 2026-09-09, LM-Tools-gated on the
+frontend — real market data, not core league content, same gate
+`roster.json`'s `fp_projection` already uses): Tommy — "can we add their
+fantasy pros rank (rest of season or whatever we're using for contending
+value) and KTC dynasty value to the table when lm tools is activated?"
+`dynasty_value` is the exact same KTC dynasty number (0-9999-ish, `0` for
+outside KTC's ranked universe — an honest "no market value," never
+missing) `player_values.json`'s `dynasty` field already carries, just
+resolved for every player in THIS file's pool (free agents included), not
+only current rosters (`parse.values_by_pid`). `fp_rank` is deliberately
+the RAW FantasyPros consensus redraft rank (1 = best; `null`, never `0`,
+for anyone outside FantasyPros' ~517-deep ranked universe — a real rank
+can't be 0 the way a value can) — the same source `spectrum.json`'s
+contending-value side already uses (see that section's docstring for why
+FantasyPros replaced KTC's own redraft numbers there), but the RAW rank
+Tommy asked for, not this app's own rescaled 0-9999 value
+(`valuation.fantasypros_redraft_rank_by_name`, `parse.ranks_by_pid`).
 
 **Frontend** (`PlayersPage.tsx`, new top-level nav tab "Players" between
 "Matchups" and the History dropdown — ESPN itself has a top-level

@@ -794,6 +794,11 @@ export interface PlayerPoolEntry {
   projected_total_points: number;
   avg_points: number;
   projected_avg_points: number;
+  // LM-Tools-gated on the frontend (real market data, not core league
+  // content — same gate RosterTable's FP projection column already
+  // uses). Always present here; only the columns are gated.
+  dynasty_value: number; // KTC dynasty value, 0-9999-ish (0 = outside KTC's ranked universe)
+  fp_rank: number | null; // FantasyPros redraft rank, 1 = best; null = unranked
 }
 
 export interface PlayerPool {

@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 
 import config
+import frozen_ownership
 import metrics
 import parse
 
@@ -106,14 +107,35 @@ def _meaningful_teams(league: "parse.LeagueData", week: int) -> set[int]:
 
 
 def build_ownership(seasons: list[int]) -> dict:
-    seasons = sorted(seasons)
+    # `frozen_ownership.json` (see that module's docstring) carries state
+    # for any season this ledger has already frozen, EVEN IF that season's
+    # raw cache is gone from this run entirely (evicted CI cache) — union
+    # it in rather than trusting `seasons` alone, same reasoning
+    # build.py's own badge_seasons union with the frozen badge/h2h ledger
+    # already uses.
+    frozen = frozen_ownership.load()
+    seasons = sorted(set(seasons) | {int(s) for s in frozen})
     all_trades = _load_manual_trades()
 
     open_stints: dict[int, dict] = {}  # player_id -> open stint (one team at a time)
     stints: list[dict] = []
     seen_data_season = False  # box-score/lineup caches don't reach as far back as standings do
+    newly_frozen = False
 
     for season in seasons:
+        # A truly-finished, previously-frozen season replays from that
+        # frozen state instead of touching its raw cache at all — its
+        # real result never changes, so there's nothing left to
+        # recompute. (Never true for the live current season: its result
+        # keeps changing all season long.)
+        key = str(season)
+        if season != config.SEASON and key in frozen:
+            entry = frozen[key]
+            stints.extend(entry["closed_stints"])
+            open_stints = {int(pid): dict(st) for pid, st in entry["open_stints"].items()}
+            seen_data_season = True
+            continue
+
         league, draft_map, trade_moves, activity_by_pair = _season_context(season, all_trades)
         if not league.completed_weeks():
             continue
@@ -123,6 +145,11 @@ def build_ownership(seasons: list[int]) -> dict:
         # `mvp_race.json`/`build.py`'s per-team WPA report use — computed
         # once per season here rather than duplicated.
         wpa_by_week = metrics.weekly_wpa(league)
+        # Everything appended to `stints` from here through the end of
+        # this season's loop is this season's own "closed stints" delta —
+        # sliced off below to freeze, if this season turns out to be
+        # genuinely done.
+        stints_before_season = len(stints)
 
         for week in league.completed_weeks():
             active_teams = _meaningful_teams(league, week) & {
@@ -181,6 +208,18 @@ def build_ownership(seasons: list[int]) -> dict:
                     else:
                         st["weeks_benched"] += 1
                         st["points_benched"] = round(st["points_benched"] + pw.actual, 2)
+
+        # This season is genuinely, permanently done — freeze its closed-
+        # stints delta plus the resulting open_stints state so no future
+        # run ever needs its raw cache again (see frozen_ownership.py).
+        # Never true for the live current season, whose result keeps
+        # changing.
+        if season != config.SEASON and league.season_over:
+            frozen_ownership.freeze_season(frozen, season, stints[stints_before_season:], open_stints)
+            newly_frozen = True
+
+    if newly_frozen:
+        frozen_ownership.save(frozen)
 
     stints.extend(open_stints.values())  # still on the roster today
 

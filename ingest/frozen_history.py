@@ -26,11 +26,13 @@ down to 1 (every automated CI refresh since 2026-08-26).
 A finished season's real result never changes, so once frozen here, it's
 frozen forever — no future run should ever need that season's raw ESPN
 cache again to reproduce its badges/h2h contribution. Only badges.json
-and h2h.json are covered here; ownership.json has the same underlying
-cache-eviction exposure but doesn't decompose into independent per-
-season snapshots the same clean way (a player's ownership stint can
-span a season boundary, carried in `open_stints` — freezing it needs a
-different design). Flagged as a follow-up in BACKLOG.md, not fixed here.
+and h2h.json are covered here; `ownership.json` had the same underlying
+cache-eviction exposure (confirmed live, 2026-09-09 — "the app is again
+only looking back to 2024ish for things like roster legends") and got
+its own fix, `frozen_ownership.py`, once a stint-spanning-a-season-
+boundary-shaped design was worked out for it (see that module's own
+docstring — freezes the full resumable `open_stints` state as of each
+season's end, not just an independent per-season fact).
 """
 from __future__ import annotations
 

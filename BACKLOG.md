@@ -3,6 +3,46 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: `ownership.json` lost historical seasons to CI cache eviction (2026-09-09)
+
+The flagged-but-deliberately-unfixed follow-up from the badges/h2h fix
+below finally hit in the wild. Tommy: "the dropdown is showing the
+option for all the years but the app is again only looking back to
+2024ish for things like roster legends."
+
+- **Root cause**: exactly what the follow-up predicted — `ownership.py`'s
+  `build_ownership()` reads straight from `ingest/.cache/` per season
+  (the same evictable GitHub Actions cache badges/h2h were fixed for),
+  and `build.py`'s `all_seasons = cached_seasons()` only lists seasons
+  whose cache dir still physically exists — an evicted 2017-2023 simply
+  never gets iterated at all, silently dropping those seasons' whole
+  contribution to `ownership.json` (career leaderboards, "Roster
+  legends," the new "Franchise MVPs" leaderboard).
+- **The harder design the follow-up flagged**: a player's ownership
+  stint can start in one season and close in a later one (carried across
+  the season loop in `open_stints`), so it can't freeze as an
+  independent per-season fact the way one badge or h2h record can. New
+  `ingest/frozen_ownership.py` freezes the FULL resumable state instead
+  — every stint that closed during a season (a real delta) plus the
+  `open_stints` dict as it stood at that exact moment — so a later run
+  can replay a frozen season (extend `stints[]`, overwrite
+  `open_stints`) and then resume the live computation from exactly
+  where a fresh run would have left off, without ever touching that
+  season's raw cache again. `build_ownership()` also now unions its
+  `seasons` argument with whatever's already in the frozen ledger, so a
+  frozen year gets replayed even when it's missing from `cached_seasons()`
+  entirely (fully evicted).
+- **Verified the actual failure mode, not just the diff**: after a full
+  local rebuild froze all 9 real historical seasons (2017-2025, 2863
+  total stints, matching the pre-fix count exactly), moved every
+  2012-2025 raw cache directory out of `ingest/.cache/` entirely
+  (simulating the real CI eviction) and rebuilt offline again —
+  `ownership.json` came back with the exact same 2,863 stints and all 4
+  leader categories identical once sorted (list ORDER differs run to
+  run, a pre-existing, unrelated non-determinism from Python's randomized
+  set-iteration order — the CONTENT is byte-identical), proving the
+  replay path really doesn't need the evicted cache at all.
+
 ## New "Players" page: browse every rostered player + free agent (2026-09-09)
 
 Tommy: "Can we add a tab... to just view the list of players? ESPN does
@@ -490,17 +530,11 @@ after the historical backfill shipped, just never visible until now.
   really doesn't touch the evicted cache at all, not just that it
   happens to still be warm locally.
 
-### Follow-up: `ownership.json` has the same cache-eviction exposure
+### Follow-up: `ownership.json` has the same cache-eviction exposure — FIXED 2026-09-09
 
-Same root cause as above (`ownership.build_ownership()` also reads
-straight from `ingest/.cache/` per season, same evictable-cache
-problem), not fixed in the pass above. Harder: a player's ownership
-stint can start in one season and end in another (`open_stints` carried
-across the season loop), so it doesn't decompose into independent,
-freeze-once-per-season snapshots the same clean way badges/h2h did.
-Needs its own design (e.g. freezing full open-stint state as of each
-season boundary) — worth doing if `ownership.json` is ever caught
-showing the same kind of gap.
+Was exactly the gap flagged here; see "Fix: `ownership.json` lost
+historical seasons to CI cache eviction (2026-09-09)" near the top of
+this file for what shipped (`ingest/frozen_ownership.py`).
 
 ## Fix: the live site had been stuck one refresh behind, always (2026-09-02)
 

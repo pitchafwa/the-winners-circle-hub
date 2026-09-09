@@ -970,6 +970,18 @@ A stint ends the moment a player stops appearing in that team's weekly
 lineup (a real departure — never a bye; byes still leave the player in the
 lineup with `played: false`).
 
+**Cache-eviction-proof (`ingest/frozen_ownership.py`, 2026-09-09)**: every
+genuinely-finished season's contribution — every stint that closed that
+season, plus the still-open stints as of that season's end (a stint can
+span a season boundary) — is frozen into a committed
+`ingest/frozen_ownership.json` the first time it's computed, and replayed
+from there on every later run instead of re-reading that season's raw
+ESPN cache (`ingest/.cache/`, a GitHub Actions cache — evictable, 7-day-
+unused/10GB-repo-wide-cap). Same root cause and same fix shape as
+`badges.json`/`h2h.json`'s own `frozen_history.py` (see that module's
+docstring) — confirmed live, 2026-09-09: an evicted CI cache had silently
+dropped everything before ~2024 from every leaderboard on this page.
+
 `stints[]`: `{player_id, name, position, pro_team, team_id, acquired_via
 ("draft"|"trade"|"waiver"|"fa"|"preexisting"|"unknown"), start_season,
 start_week, departed_via ("trade"|"dropped"|null), end_season, end_week

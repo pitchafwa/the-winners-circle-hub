@@ -23,6 +23,7 @@ import metrics
 import ownership
 import parse
 import pick_tracking
+import player_pool
 import roster_card
 import spectrum
 import trade_grades
@@ -669,6 +670,23 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             (out_dir / "roster.json").unlink(missing_ok=True)
     else:
         (out_dir / "roster.json").unlink(missing_ok=True)
+
+    # ---- player_pool.json (Players page — browse every rostered player +
+    # every free agent, current season only) ---------------------------
+    # Same lifecycle rule as roster.json right above: a live snapshot of
+    # "who owns this player right now," not a historical record, so it
+    # only ever exists for the season still being played.
+    if not league.season_over:
+        pool = player_pool.build_player_pool(season)
+        if pool:
+            _write(out_dir / "player_pool.json", {
+                "generated_at": generated_at,
+                "players": pool,
+            })
+        else:
+            (out_dir / "player_pool.json").unlink(missing_ok=True)
+    else:
+        (out_dir / "player_pool.json").unlink(missing_ok=True)
 
     # ---- schedule.json (full season, for H2H matrix + bump chart) ---------
     _write(out_dir / "schedule.json", {

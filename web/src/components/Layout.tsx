@@ -11,6 +11,7 @@ const NAV = [
   { to: "/", label: "League", end: true },
   { to: "/team", label: "My Team" },
   { to: "/matchups", label: "Matchups" },
+  { to: "/players", label: "Players" },
 ];
 
 // Season Arc (the week-by-week bump chart + schedule swap) moved onto the

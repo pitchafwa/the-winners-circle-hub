@@ -3,6 +3,37 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## New "Players" page: browse every rostered player + free agent (2026-09-09)
+
+Tommy: "Can we add a tab... to just view the list of players? ESPN does
+this well, I'd like to be able to view available players, players on
+rosters, filter by a specific team, players by position, etc."
+
+- **New raw fetch** (`fetch.fetch_free_agents_raw()`): ESPN's
+  `kona_player_info` view, `FREEAGENT`/`WAIVERS` filter, capped at 3,000
+  results (comfortably above the real ~850 fantasy-relevant free agents
+  in a given week) — the one piece of data nothing else in this app had
+  ever needed: everyone NOT on a roster. Rostered players needed no new
+  fetch at all — `mRoster` (already cached for `roster.json`) already
+  covers every team in the league, not just the user's own.
+- **New `ingest/player_pool.py`**: merges both into one flat list —
+  `{season}/player_pool.json`, current-season-only (same live-snapshot
+  lifecycle as `roster.json`/`sim.json`, not a historical record).
+  1,036 real players end to end on a live test build (183 rostered + 853
+  free agents).
+- **New `PlayersPage.tsx`**, top-level nav tab "Players" (between
+  Matchups and the History dropdown, matching ESPN's own top-level tab
+  placement Tommy already knows): search by name, filter by position or
+  by team (including a "Free agents" pseudo-team), full column sorting —
+  same headshot/player-card/team-link components every other player
+  table in this app already uses.
+- Verified live end to end, not just types: real search/position/team
+  filters cross-checked together (e.g. searching "kelce" + TE filter
+  correctly narrowed to exactly Travis Kelce), free-agent filter
+  confirmed showing real unrostered players including D/ST logos,
+  column-sort confirmed reordering correctly. `tsc --noEmit` and
+  production build both clean.
+
 ## Fix: MVP Race Y-axis clipping a negative tick's minus sign (2026-09-08)
 
 Follow-up to the screenshot fixes below, flagged as a known-but-unfixed

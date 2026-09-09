@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 import LeaguePage from "./pages/LeaguePage";
 import MyTeamPage from "./pages/MyTeamPage";
 import MatchupsPage from "./pages/MatchupsPage";
+import PlayersPage from "./pages/PlayersPage";
 import HistoryRecordsPage from "./pages/HistoryRecordsPage";
 import HistoryH2HPage from "./pages/HistoryH2HPage";
 import HistoryCareersPage from "./pages/HistoryCareersPage";
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="team" element={<MyTeamPage />} />
           <Route path="team/:teamId" element={<MyTeamPage />} />
           <Route path="matchups" element={<MatchupsPage />} />
+          <Route path="players" element={<PlayersPage />} />
           <Route path="history" element={<HistoryRecordsPage />} />
           <Route path="history/h2h" element={<HistoryH2HPage />} />
           <Route path="history/careers" element={<HistoryCareersPage />} />

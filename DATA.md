@@ -782,6 +782,63 @@ recent_avg_diff, on_fire, on_ice, suggested}`.
   scoring-period's real `statSourceId: 0` stat line exists). Renders as
   🔥/🧊 next to the name on both this table and the matchup cards.
 
+## `{season}/player_pool.json` (absent when season is over, new 2026-09-09)
+
+Backs the "Players" page — an ESPN-Players-tab-style browsable list of
+EVERY player relevant to this league right now: everyone rostered on any
+of the league's teams, plus every free agent/waiver-wire player, in one
+flat list (`ingest/player_pool.py`). Tommy: "I'd like to be able to view
+available players, players on rosters, filter by a specific team,
+players by position, etc." Same "right now" lifecycle as `roster.json`
+right above (a live ownership/scoring snapshot, not a historical record)
+— absent for a past season, and actively deleted the moment `season_over`
+flips true.
+
+Rostered players come for free out of the same raw `league.json` cache
+(`fetch.fetch_league_raw`'s `mRoster` view) `roster.json` itself already
+reads — every team in the league, not just the user's own. Free agents
+need a second raw fetch, since `mRoster` never includes anyone off a
+roster at all: `fetch.fetch_free_agents_raw()` (new), ESPN's
+`kona_player_info` view filtered to `FREEAGENT`/`WAIVERS` status, capped
+at 3,000 results (`FREE_AGENT_POOL_SIZE` — comfortably above the ~850
+fantasy-relevant free agents ESPN actually has in a given week; the goal
+is "everyone worth showing," not an exact number). Always refreshed, same
+as `league.json` — there's no "final" week to freeze here, ownership%/
+points are a live snapshot.
+
+`players[]`: `{player_id, name, position, pro_team, eligible_slots,
+team_id (fantasy team id, or null = free agent/on waivers),
+injury_status, percent_owned, percent_started, total_points,
+projected_total_points, avg_points, projected_avg_points}`. `position` is
+the single primary position (`parse.POSITION_NAMES`, same scheme
+`roster_card.py` uses); `eligible_slots[]` is the full real-ESPN slot list
+(e.g. `["BE","FLEX","IR","RB","RB/WR"]`, same `parse.SLOT_NAMES` naming
+`player_values.json` already uses). `percent_owned`/`percent_started` are
+ESPN's own cross-league ownership stats (not specific to this one
+league). `total_points`/`avg_points` are this league's real scoring so
+far this season; `projected_total_points`/`projected_avg_points` are
+ESPN's own rest-of-season projections — all four sourced the same way
+espn_api's own `Player` class derives them internally (filtered to this
+season's `seasonId`, `scoringPeriodId: 0` season-aggregate stat line,
+`statSourceId` 0 for actual / 1 for projected), replicated directly
+against the raw dict rather than constructing a full `Player` object just
+for four numbers. Sorted by `percent_owned` descending by default (same
+landing sort ESPN's own Players tab uses — meaningful at any point in the
+season, unlike `total_points`, which is uninformative in week 1); the
+frontend table is fully sortable by any column regardless.
+
+A rostered player can never also appear in the FREEAGENT/WAIVERS-filtered
+fetch in practice, but if ESPN's own data were ever briefly inconsistent
+mid-transaction, the rostered entry wins — "who owns this player" is the
+more load-bearing fact of the two.
+
+**Frontend** (`PlayersPage.tsx`, new top-level nav tab "Players" between
+"Matchups" and the History dropdown — ESPN itself has a top-level
+"Players" tab, so this matches a shape Tommy's already used to): search
+by name, filter by position or by team (including a "Free agents"
+pseudo-team), sortable table with headshot/player-card/team-link, same
+components and conventions `RosterTable`/`MyTeamPage` already use.
+
 ## `{season}/schedule_swap.json` (absent preseason)
 
 `rows[]`: `{team_id, records{"<other_team_id>": {wins, losses, ties}}}` — the

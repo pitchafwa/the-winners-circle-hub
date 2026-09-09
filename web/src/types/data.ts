@@ -779,3 +779,24 @@ export interface Roster {
   current_week: number;
   teams: Record<string, TeamRoster>;
 }
+
+export interface PlayerPoolEntry {
+  player_id: number;
+  name: string;
+  position: string;
+  pro_team: string;
+  eligible_slots: string[];
+  team_id: number | null; // null = free agent / on waivers
+  injury_status: string | null;
+  percent_owned: number;
+  percent_started: number;
+  total_points: number;
+  projected_total_points: number;
+  avg_points: number;
+  projected_avg_points: number;
+}
+
+export interface PlayerPool {
+  generated_at: string;
+  players: PlayerPoolEntry[];
+}

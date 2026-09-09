@@ -106,6 +106,50 @@ def fetch_league_raw(league: League):
     return data
 
 
+FREE_AGENT_POOL_SIZE = 3000  # comfortably above the ~850 fantasy-relevant
+# free agents ESPN actually has in a given week — the point is "everyone
+# worth showing," not hitting an exact number.
+
+
+def fetch_free_agents_raw(league: League):
+    """Every free agent / waiver-wire player this league's rules would let
+    you pick up right now — the Players page's "not on a roster" half (the
+    other half, rostered players, already comes for free out of
+    `fetch_league_raw`'s `mRoster` view, no separate fetch needed). Always
+    refreshed, same as `fetch_league_raw` — ownership%/points are a live
+    snapshot, not immutable history, so there's no "final" week to freeze.
+
+    Hand-replicates `League.free_agents()`'s own raw request (same
+    `kona_player_info` view/filters) rather than calling that method
+    directly, because it returns already-parsed `BoxPlayer` objects with
+    no raw dict left to cache — this app's whole build is
+    cache-then-offline-parse (`build.py --offline` must work without a
+    network call), so the raw JSON is what needs to survive to disk, not
+    an in-memory object that's gone the moment this process exits.
+
+    `scoringPeriodId` matters here (ESPN's ownership%/points are scored
+    per week) — `league.current_week` is 0 in true preseason (nothing's
+    kicked off yet), so this falls back to week 1 rather than passing 0,
+    same "there's no week 0 to actually show" reasoning
+    `fetch_season()`'s own `upcoming` fallback already uses."""
+    import json as _json
+
+    week = league.current_week or 1
+    params = {"view": "kona_player_info", "scoringPeriodId": week}
+    filters = {
+        "players": {
+            "filterStatus": {"value": ["FREEAGENT", "WAIVERS"]},
+            "filterSlotIds": {"value": []},  # empty = every position, not none
+            "limit": FREE_AGENT_POOL_SIZE,
+            "sortPercOwned": {"sortPriority": 1, "sortAsc": False},
+        },
+    }
+    headers = {"x-fantasy-filter": _json.dumps(filters)}
+    data = league.espn_request.league_get(params=params, headers=headers)
+    write_cache("free_agents", data)
+    return data
+
+
 def fetch_week_raw(league: League, week: int, current_week: int, is_final: bool | None = None):
     """Raw box-score view for one week. Finalized weeks come from cache."""
     cached = read_cache("boxscores", week)
@@ -364,6 +408,7 @@ def fetch_season(league: League | None = None):
     fetch_league_raw(league)
     fetch_pro_schedule_raw(league)
     fetch_player_names(league)
+    fetch_free_agents_raw(league)
 
     season_over = league.scoringPeriodId > league.finalScoringPeriod
     weeks = completed_weeks(league)

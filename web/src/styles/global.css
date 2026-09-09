@@ -148,6 +148,13 @@ hr,
   font-size: 1.45rem;
 }
 
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
 /* ------------------------------------------------------------------ */
 /* Masthead — a full-bleed navy block, not just navy text on paper.    */
 /* box-shadow/clip-path bleed the background past .shell's max-width   */
@@ -903,7 +910,7 @@ table.stat tr.cutline td { border-bottom: 2px solid var(--ink); }
 .movement.down { color: var(--negative); }
 .movement.flat { color: var(--ink-muted); }
 
-select.control {
+.control {
   font: inherit;
   font-size: 0.88rem;
   color: var(--ink);
@@ -911,6 +918,10 @@ select.control {
   border: 2px solid var(--ink);
   padding: 0.3rem 0.5rem;
   border-radius: 8px;
+}
+
+input.control::placeholder {
+  color: var(--ink-muted);
 }
 
 /* ------------------------------------------------------------------ */

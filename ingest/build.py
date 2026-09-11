@@ -309,21 +309,51 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
 
     # ---- matchups/week-N.json --------------------------------------------
     pro_abbrev = {tid: info["abbrev"] for tid, info in parse.pro_team_schedule(season).items()}
+    # Only ever true for the app's actual live current season — a past
+    # season being rebuilt can have a stale/leftover current_matchup_period
+    # that happens to collide with one of ITS OWN real week numbers
+    # (confirmed live: crashed rebuilding 2017 otherwise), which would
+    # wrongly try to apply live-game pinning logic to a season that's been
+    # over for years and has no "pregame" state left to pin at all.
+    current_week = parse.current_fantasy_week(league) if season == config.SEASON and not league.season_over else None
 
-    def side_json(tw, week, recent_by_pid):
+    def side_json(tw, week, recent_by_pid, pregame_by_pid):
         if tw is None:
             return None
         c = coach[tw.team_id]["weeks"][week]
+        is_live_week = current_week is not None and week == current_week
 
         def _player_json(p):
+            # For the week actually being played right now, judge
+            # on_fire/on_ice against the PRE-GAME projection (pinned
+            # below, before kickoff) using a live-adjusted current
+            # estimate — never the raw actual alone, which sits at 0.0
+            # for the first several minutes of a game and would read as
+            # a false "ice cold" the instant a player's game starts. For
+            # any other (already-decided) week, this is unchanged: the
+            # real final actual against ESPN's own projection. See
+            # `parse.hot_cold_status`'s docstring for the full reasoning
+            # — Tommy, 2026-09-10, flagged both this and the matching
+            # team-projected-score bug the same day.
+            if is_live_week:
+                pregame = pregame_by_pid.get(p.player_id, p.projected)
+                if not p.played:
+                    live_estimate = p.projected
+                elif p.projected is None:
+                    live_estimate = p.actual
+                else:
+                    live_estimate = max(p.actual, p.projected)
+            else:
+                pregame = p.projected
+                live_estimate = p.actual if p.played else None
             on_fire, on_ice = parse.hot_cold_status(
-                p.position, p.played, p.actual if p.played else None, p.projected,
+                p.position, p.played, live_estimate, pregame,
                 recent_by_pid.get(p.player_id, []),
             )
             return {"player_id": p.player_id, "name": p.name, "position": p.position,
                     "pro_team": pro_abbrev.get(p.pro_team_id, ""),
                     "slot": p.slot_name, "started": p.started, "actual": p.actual,
-                    "projected": p.projected, "played": p.played,
+                    "projected": p.projected, "pregame_projected": pregame, "played": p.played,
                     "on_fire": on_fire, "on_ice": on_ice}
 
         return {
@@ -357,6 +387,43 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         for old in (out_dir / "matchups").glob("week-*.json") if (out_dir / "matchups").exists() else []:
             if int(old.stem.replace("week-", "")) not in completed:
                 old.unlink()
+
+    # Pre-game projection for the CURRENT week only, pinned before kickoff
+    # and carried forward — read back from `sim.json`'s OWN previous
+    # build (below), the same "the committed output is the durable
+    # memory, not the evictable ingest/.cache/" pattern `frozen_history.py`/
+    # `frozen_ownership.py` already established (no new cache file
+    # needed). Deliberately NOT `matchups/week-{current_week}.json`: that
+    # file only ever gets written once a week's matchups are fully
+    # DECIDED (`league.weeks` itself is built the same way, filtering out
+    # any still-UNDECIDED matchup) — during the actual live game window
+    # this whole feature is for, it doesn't exist yet and never updates,
+    # so reading it would silently re-seed the "pin" from today's live
+    # value on EVERY build and never actually hold still. `sim.json`, by
+    # contrast, rebuilds every run for exactly as long as the season's
+    # live (`not league.season_over`), so it's the one file that's
+    # actually warm throughout the live window. A player already pinned
+    # there keeps that exact number forever (even once their game's over
+    # and ESPN's own `projected` has moved on); a player seen for the
+    # first time this week (just added, or this is the season's first
+    # build ever) gets pinned at whatever ESPN's projection reads RIGHT
+    # NOW, which is the real pre-game number in the overwhelming common
+    # case — this build almost always runs long before kickoff, not for
+    # the first time mid-game. Computed once here (not per-week-in-the-
+    # loop below) since `simulate.run()` further down needs this exact
+    # same dict for `sim.json`'s own live matchup cards — the two share
+    # one pin, they don't each keep a separate one.
+    live_week_pregame_by_pid: dict[int, float] = {}
+    prev_sim_path = out_dir / "sim.json"
+    if prev_sim_path.exists():
+        with open(prev_sim_path, encoding="utf-8") as f:
+            prev_sim_data = json.load(f)
+        for m in prev_sim_data.get("this_week_matchups", []):
+            for lineup_key in ("home_lineup", "away_lineup"):
+                for p in m.get(lineup_key, []):
+                    if p.get("player_id") is not None and p.get("pregame_projected") is not None:
+                        live_week_pregame_by_pid[p["player_id"]] = p["pregame_projected"]
+
     for week in completed:
         # "As of week W," not "as of right now" — see recent_player_performance's
         # own docstring for why a rewritten-every-build historical box score
@@ -367,13 +434,16 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         # still-in-progress "week" (bye entries just fail the len<3 check
         # harmlessly).
         recent_by_pid = parse.recent_player_performance(league, upto_week=week)
+        pregame_by_pid = live_week_pregame_by_pid if week == current_week else {}
+
         _write(out_dir / "matchups" / f"week-{week}.json", {
             "generated_at": generated_at,
             "week": week,
             "matchups": [
                 {"matchup_period": m.matchup_period, "winner": m.winner,
                  "is_playoff": m.is_playoff, "playoff_tier": m.playoff_tier,
-                 "home": side_json(m.home, week, recent_by_pid), "away": side_json(m.away, week, recent_by_pid)}
+                 "home": side_json(m.home, week, recent_by_pid, pregame_by_pid),
+                 "away": side_json(m.away, week, recent_by_pid, pregame_by_pid)}
                 for m in league.weeks[week]
             ],
             "late_swings": metrics.compute_late_swings(league, week, parse.pro_game_dates(season, week)),
@@ -585,7 +655,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             if (config.CACHE_DIR / str(prev) / "league.json").exists():
                 history = parse.load_league(prev)
                 break
-        sim = simulate.run(league, history, redraft_values)
+        sim = simulate.run(league, history, redraft_values, live_week_pregame_by_pid)
         if sim:
             _write(out_dir / "sim.json", {"generated_at": generated_at, **sim})
 
@@ -660,7 +730,21 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             parse.roster_player_names(season),
             offline=offline,
         )
-        cards = roster_card.build_roster_cards(season, league, fp_points)
+        # Pre-game projections pinned last build, read back from this
+        # module's own previous committed output — see
+        # `roster_card.build_roster_cards`'s docstring / `parse.
+        # hot_cold_status`'s for the full reasoning.
+        pregame_by_pid: dict[int, float] = {}
+        prev_roster_path = out_dir / "roster.json"
+        if prev_roster_path.exists():
+            with open(prev_roster_path, encoding="utf-8") as f:
+                prev_roster = json.load(f)
+            for team in prev_roster.get("teams", {}).values():
+                for group_name in ("starters", "bench", "ir"):
+                    for card in team.get(group_name, []):
+                        if card.get("player_id") is not None and card.get("pregame_projection") is not None:
+                            pregame_by_pid[card["player_id"]] = card["pregame_projection"]
+        cards = roster_card.build_roster_cards(season, league, fp_points, pregame_by_pid)
         if cards:
             _write(out_dir / "roster.json", {
                 "generated_at": generated_at,

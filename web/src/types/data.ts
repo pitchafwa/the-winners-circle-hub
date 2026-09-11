@@ -151,6 +151,12 @@ export interface LineupPlayer {
   started: boolean;
   actual: number;
   projected: number | null;
+  // Pinned before kickoff, for the week actually being played right now
+  // (equal to `projected` for any other, already-decided week) — the
+  // baseline on_fire/on_ice is judged against, so a live game doesn't
+  // read as ice-cold the moment it kicks off. See parse.hot_cold_status's
+  // docstring (ingest/parse.py) for the full reasoning.
+  pregame_projected: number | null;
   played: boolean;
   on_fire: boolean;
   on_ice: boolean;
@@ -379,6 +385,13 @@ export interface WeekLineupPlayer {
   slot: string;
   actual: number | null;
   projected: number | null;
+  // Pinned before kickoff, carried forward across every live rebuild —
+  // the baseline on_fire/on_ice is judged against (never the raw,
+  // continuously-live-updating `projected` itself, which would read a
+  // player as ice-cold the instant their game kicks off). See
+  // parse.hot_cold_status's docstring (ingest/parse.py) for the full
+  // reasoning.
+  pregame_projected: number | null;
   played: boolean;
   on_fire: boolean;
   on_ice: boolean;
@@ -760,6 +773,9 @@ export interface RosterPlayerCard {
   on_bye: boolean;
   next_game: RosterNextGame | null;
   week_projection: number | null;
+  // Pinned before kickoff, carried forward across every live rebuild —
+  // see parse.hot_cold_status's docstring (ingest/parse.py).
+  pregame_projection: number | null;
   fp_projection: number | null;
   recent: RosterRecentWeek[];
   recent_avg_diff: number | null;

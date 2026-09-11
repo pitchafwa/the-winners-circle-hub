@@ -18,7 +18,8 @@ import parse
 
 
 def build_roster_cards(season: int, league: parse.LeagueData,
-                       fp_points: dict[int, float] | None = None) -> dict[int, dict]:
+                       fp_points: dict[int, float] | None = None,
+                       pregame_by_pid: dict[int, float] | None = None) -> dict[int, dict]:
     """`fp_points` (player_id -> FantasyPros' PPR projection for the
     current week, from fp_projections.points_by_pid()) is optional —
     None/empty just means every card's `fp_projection` comes back None,
@@ -26,7 +27,13 @@ def build_roster_cards(season: int, league: parse.LeagueData,
     parameter rather than fetched inside this module so build.py stays
     the one place that decides whether/when to hit a rate-limited
     external API, matching how every other network-backed input
-    (dynasty/redraft values, pick curves) already flows into build_season."""
+    (dynasty/redraft values, pick curves) already flows into build_season.
+
+    `pregame_by_pid` (added 2026-09-10) is the same idea, but internal:
+    build.py reads it back from THIS module's own previous `roster.json`
+    output (the durable, committed memory — see `parse.hot_cold_status`'s
+    docstring for the full reasoning) and passes it in, rather than this
+    module reaching for its own past output itself."""
     raw = parse._load(season, "league")
     if not raw:
         return {}
@@ -36,6 +43,7 @@ def build_roster_cards(season: int, league: parse.LeagueData,
     recent = parse.recent_player_performance(league)
     current_week = parse.current_fantasy_week(league)
     fp_points = fp_points or {}
+    pregame_by_pid = pregame_by_pid or {}
 
     out: dict[int, dict] = {}
     for t in raw.get("teams", []):
@@ -73,8 +81,24 @@ def build_roster_cards(season: int, league: parse.LeagueData,
             diffs = [r["points"] - r["projected"] for r in player_recent if r["projected"] is not None]
             position = parse.POSITION_NAMES.get(player.get("defaultPositionId", 0), "?")
             played_this_week = week_actual is not None
+            # Pinned before kickoff, carried forward from last build (see
+            # this function's own docstring) — never the live-updating
+            # `week_projection` itself, or a player would read as ice-cold
+            # the instant their game starts (0 real points yet, nothing
+            # left to compare against but however many points high their
+            # projection already sits). Falls back to today's live number
+            # on first sight, which in practice IS the real pre-game
+            # number almost always (this build runs long before kickoff,
+            # not for the first time mid-game).
+            pregame_projection = pregame_by_pid.get(pid, week_projection)
+            if not played_this_week:
+                live_estimate = week_projection
+            elif week_projection is None:
+                live_estimate = week_actual
+            else:
+                live_estimate = max(week_actual, week_projection)
             on_fire, on_ice = parse.hot_cold_status(
-                position, played_this_week, week_actual, week_projection, player_recent,
+                position, played_this_week, live_estimate, pregame_projection, player_recent,
             )
 
             card = {
@@ -87,6 +111,11 @@ def build_roster_cards(season: int, league: parse.LeagueData,
                 "on_bye": on_bye,
                 "next_game": next_game,
                 "week_projection": week_projection,
+                # Pinned before kickoff — see the live_estimate/
+                # pregame_projection comment above. Carried forward on
+                # every future build so it survives ESPN's own
+                # `week_projection` continuing to move.
+                "pregame_projection": pregame_projection,
                 # FantasyPros' generic-PPR consensus for the same week —
                 # LM-Tools-gated on the frontend (see fp_projections.py's
                 # module docstring for why this is a second opinion, not
@@ -100,7 +129,7 @@ def build_roster_cards(season: int, league: parse.LeagueData,
                 # kept off the final card — only needed for the bench-fill
                 # valuation pass below, stripped before this dict is used
                 "_eligible": frozenset(player.get("eligibleSlots", [])),
-                "_value": week_actual if week_actual is not None else (week_projection or 0.0),
+                "_value": live_estimate if live_estimate is not None else 0.0,
             }
 
             if slot_id == parse.BENCH_SLOT:
@@ -144,7 +173,8 @@ def build_roster_cards(season: int, league: parse.LeagueData,
                     "player_id": None, "name": None, "position": None,
                     "pro_team": None, "slot": parse.SLOT_NAMES.get(slot_id, str(slot_id)),
                     "injury_status": None, "on_bye": False, "next_game": None,
-                    "week_projection": None, "fp_projection": None, "recent": [], "recent_avg_diff": None,
+                    "week_projection": None, "pregame_projection": None, "fp_projection": None,
+                    "recent": [], "recent_avg_diff": None,
                     "on_fire": False, "on_ice": False, "suggested": False,
                 }
 

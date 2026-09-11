@@ -170,25 +170,57 @@ where the real story is about one player's game, not the team's.
 
 ## `{season}/matchups/week-N.json`
 
-One file per completed week. `matchups[]`:
-`{matchup_period, winner, is_playoff, playoff_tier, home, away|null}`.
-Side: `{team_id, total, lineup_points, home_bonus, adjustment, is_home,
-optimal_points, coach_rating, bench_points_lost,
+One file per week with at least one real DECIDED matchup (`league.weeks`
+itself, which this reads, only ever includes a week once its winner is
+determined — a week still fully in progress with nothing decided yet
+isn't here at all; that live view is `sim.json`'s `this_week_matchups`
+below instead). `matchups[]`: `{matchup_period, winner, is_playoff, playoff_tier, home,
+away|null}`. Side: `{team_id, total, lineup_points, home_bonus,
+adjustment, is_home, optimal_points, coach_rating, bench_points_lost,
 optimal_lineup[] {slot, player_id, player, points},
 lineup[] {player_id, name, position, pro_team, slot, started, actual,
-projected, played, on_fire, on_ice}}`. Lineup is sorted starters-first.
-`pro_team` is the player's real NFL team abbreviation (`""` for a genuinely
-empty placeholder slot) — mainly so the frontend can show a D/ST's team
-logo instead of a generic silhouette (ESPN has no "player" photo for a
-defense).
+projected, pregame_projected, played, on_fire, on_ice}}`. Lineup is
+sorted starters-first. `pro_team` is the player's real NFL team
+abbreviation (`""` for a genuinely empty placeholder slot) — mainly so
+the frontend can show a D/ST's team logo instead of a generic silhouette
+(ESPN has no "player" photo for a defense).
+
+`pregame_projected` (added 2026-09-10) — for a genuinely decided week
+(the normal case here), identical to `projected`. The one exception:
+this file's `is_live_week` case, for the rare moment `current_week`
+still points at a week that JUST became fully decided (build.py hasn't
+rolled `current_matchup_period` forward yet) — there, and always for the
+real live view on `sim.json`'s `this_week_matchups` below, ESPN's OWN
+`projected` number (`statSourceId: 1`) keeps live-updating as the real
+game unfolds (confirmed live — not the frozen pregame number an earlier
+version of this doc, and this app's own code, wrongly assumed), so
+`pregame_projected` is a separate, PINNED snapshot of what `projected`
+read the moment this player was first seen that week — almost always the
+real pre-game number, since a build almost always runs well before
+kickoff. Pinned once, held forever after, by reading it back from
+`sim.json`'s own previous build (the file that's actually rebuilt
+throughout the live window) — the committed output is the durable memory
+across runs, not `ingest/.cache/`, same pattern `frozen_history.py`/
+`frozen_ownership.py` use for a different reason. Exists specifically so
+`on_fire`/`on_ice` (below) has a stable baseline instead of the
+constantly-moving live number.
 
 `on_fire`/`on_ice` (also on `sim.json`'s `home_lineup`/`away_lineup` and
 `roster.json`'s player cards — same fields, same rule, computed once in
 `parse.hot_cold_status()`): whether a player is running meaningfully hot
 or cold relative to projection, in one of two regimes depending on
 `played`:
-- **`played: true`** (that week's game has started or finished): that
-  single week's real `actual − projected` vs `IN_GAME_MARGIN[position]`.
+- **`played: true`** (that week's game has started or finished): a
+  live-adjusted current estimate (real `actual` once a game's decided;
+  while a game's still in progress, `max(actual, projected)` — ESPN's
+  own live-updating projection, never just the raw actual-so-far, which
+  sits at 0 for the first several real-world minutes of a game and would
+  read every in-progress player as ice-cold the instant their game
+  starts) minus `pregame_projected`, vs `IN_GAME_MARGIN[position]`.
+  Tommy, 2026-09-10: "we shouldn't assign the ice indicator to a player
+  whose game just started... the time to add the icons... is when that
+  player's live projection exceeds their pre-game projected by whatever
+  amount we determined qualifies."
 - **`played: false`** (hasn't played that week yet): EACH of the player's
   last 3 real games (`recent_player_performance()`, newest first) beat/
   missed ITS OWN projection by `PRE_GAME_MARGIN[position]` — a genuine
@@ -429,8 +461,18 @@ tracks what's actually being scored, not a suggested better lineup. Only a
 team with NO real lineup set at all (routine right up until kickoff) ends
 up close to fully bench-optimal-filled, which is what stops an unset
 lineup from reading as "projected for 0." Each player's value (real or
-bench-filled) is their ACTUAL score (`statSourceId: 0`) if they've already
-played this week, else their ESPN PROJECTED score (`statSourceId: 1`).
+bench-filled) is their ESPN PROJECTED score (`statSourceId: 1`) if they
+haven't played yet, else `max(actual, projected)` — revised 2026-09-10:
+using `actual` ALONE the moment a player's game starts used to make a
+whole team's `home_projected`/`away_projected` instantly drop by that
+player's entire pregame projection at kickoff (0 real points yet,
+nothing left to fall back on), then only climb back as they actually
+scored, instead of tracking ESPN's own live-updating in-game projection
+(confirmed live: ESPN keeps recalculating `statSourceId: 1` for a game
+actually in progress, not just pregame — see `parse.optimal_week_
+projection()`'s docstring). Tommy: "ESPN does live projections for
+players whose games are in progress. can we pull those values and use
+them to inform the team's projected score during the games?"
 `home_current`/`away_current` sum only the already-played
 members of that same lineup (`0.0` before anyone's played);
 `started` is true the moment either team has a real stat line, so the
@@ -455,9 +497,13 @@ the normal-CDF calc.
 
 `home_lineup`/`away_lineup` are `optimal_week_projection()`'s real-first
 lineup, in the league's real slot order: `{player_id, name, position,
-pro_team, slot, actual, projected, played, on_fire, on_ice, assumed_start,
-replaced_name}` (`on_fire`/`on_ice` merged in at the `simulate.py` call
-site — see `matchups/week-N.json`'s section above for the full rule).
+pro_team, slot, actual, projected, pregame_projected, played, on_fire,
+on_ice, assumed_start, replaced_name}` (`on_fire`/`on_ice`/
+`pregame_projected` merged in at the `simulate.py` call site — see
+`matchups/week-N.json`'s section above for the full rule; this is the
+REAL live view that section's own `pregame_projected` pinning actually
+reads back from run to run, since this file is the one that's genuinely
+rebuilt throughout the live window).
 Each slot holds the manager's real ESPN-entered player when one exists;
 only a genuinely blank slot gets the best available bench player instead
 — **except** a "joke lineup" swap (added 2026-09-02,
@@ -741,8 +787,8 @@ hold whatever's actually in those slots, no placeholders (they're not
 slot-count-limited the same way starters are).
 
 Each player card: `{player_id, name, position, pro_team, slot,
-injury_status, on_bye, next_game, week_projection, fp_projection, recent[],
-recent_avg_diff, on_fire, on_ice, suggested}`.
+injury_status, on_bye, next_game, week_projection, pregame_projection,
+fp_projection, recent[], recent_avg_diff, on_fire, on_ice, suggested}`.
 - `pro_team`: NFL team abbreviation (`parse.pro_team_schedule()`, sourced
   from the same cached `proschedule.json` the refresh-schedule generator
   uses for its own cron windows).
@@ -750,10 +796,23 @@ recent_avg_diff, on_fire, on_ice, suggested}`.
   if that team's schedule doesn't reach this far out yet. `on_bye` is `true`
   specifically when there's no game AND this IS that team's real bye week
   (distinct from "schedule not published yet").
-- `week_projection`: ESPN's real pre-game projection for `current_week`
+- `week_projection`: ESPN's real projection for `current_week`
   (`statSourceId: 1`), read straight off the live roster snapshot — no
   separate fetch needed, the projection is already embedded in the same
-  `league.json` response the roster itself comes from.
+  `league.json` response the roster itself comes from. Despite the name,
+  this is NOT frozen at the pregame number — ESPN keeps live-updating it
+  for a game actually in progress (confirmed live, 2026-09-10), so this
+  field moves throughout that player's real game.
+- `pregame_projection` (added 2026-09-10): what `week_projection` read
+  the FIRST time this player was seen this week — pinned then, held
+  forever after by reading it back from `roster.json`'s own previous
+  build (the committed output is the durable memory across runs, not
+  `ingest/.cache/`, same pattern `frozen_history.py`/`frozen_ownership.py`
+  use for a different reason). Almost always the real pre-game number,
+  since this build almost always runs well before kickoff. This, not the
+  live-moving `week_projection`, is what `on_fire`/`on_ice` below is
+  actually judged against — see `matchups/week-N.json`'s section for the
+  full reasoning (same fix, same day, same root cause).
 - `fp_projection` (`ingest/fp_projections.py`, new 2026-08-31): FantasyPros'
   generic PPR consensus projection for the same week — a second opinion,
   not scored against this league's exact custom rules the way

@@ -3,6 +3,74 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: live matchup scores/on_fire/on_ice broke the moment a game started (2026-09-10)
+
+Tommy, two related bugs in the same message: "when a play is mid game,
+their score will start at 0 and work upward... that means that for our
+calculation of that team's projected score, it shouldn't consider that
+player's projected score to be 0 the minute the game starts... ESPN does
+live projections for players whose games are in progress. can we pull
+those values and use them" — and "we shouldn't assign the ice indicator
+to a player whose game just started and thus has few points... the time
+to add the icons... is when that player's live projection exceeds their
+pre-game projected by whatever amount we determined qualifies."
+
+- **Root cause, confirmed live against real in-progress games (2026-09-10,
+  week 1)**: `PlayerWeek.played` (and the equivalent flag everywhere a
+  team's live projected score gets summed) flips `True` the INSTANT ESPN
+  creates a real stat line for a player's game — which happens at
+  kickoff, with `actual: 0.0`, before anything's happened. Every place
+  that summed "actual if played else projected" was therefore dropping a
+  player's ENTIRE pregame projection to 0 the second their game started,
+  not just showing a genuinely low score once one existed. Separately
+  confirmed live that ESPN's own `projected` field (`statSourceId: 1`)
+  is NOT frozen at the pregame number the way this app's own code (and
+  docs) assumed — it keeps live-updating for a game actually in
+  progress, which is exactly the signal Tommy asked to use instead.
+- **Team projected score**: `parse.optimal_week_projection()` (backs
+  `sim.json`'s live matchup cards) now uses `max(actual, projected)` per
+  played lineup member instead of `actual` alone — a new `_best_estimate()`
+  helper, applied consistently everywhere that function needed "how good
+  is this player right now" (filling a blank slot, the joke-lineup bench
+  comparison, and the final team total).
+- **on_fire/on_ice**: needed a real pre-game baseline, not just a
+  different current-value formula — `parse.hot_cold_status()`'s "played"
+  branch now compares that live-adjusted current estimate against a
+  PINNED pre-game projection, not the live-updating one. The pin itself
+  (`pregame_projected`, new field on `matchups/week-N.json`,
+  `sim.json`'s live lineups, and `roster.json`'s player cards): captured
+  the first time a player's projection is ever seen that week, then held
+  forever after by reading it back from `sim.json`'s/`roster.json`'s own
+  previous build — the committed output as durable memory across runs,
+  same pattern `frozen_history.py`/`frozen_ownership.py` use for a
+  different reason, so no new cache file was needed. Threaded through
+  build.py -> `simulate.run()` / `roster_card.build_roster_cards()`.
+- **A real bug caught mid-fix, not shipped**: the live-week pin was
+  first wired to read back from `matchups/week-N.json`'s own previous
+  build — wrong, since that file (by design) only ever gets written once
+  a week is fully DECIDED, so during the actual live-game window it
+  never exists yet and the "pin" would've silently re-seeded from
+  today's live value on every single build, never actually holding
+  still. Fixed by reading from `sim.json` instead, the one file that
+  genuinely rebuilds throughout the live window. Caught by tracing where
+  each file actually gets written, not just by the code looking right.
+- **A second real bug, caught by a real offline rebuild crash**: the
+  live-pinning branch wasn't gated to the app's actual current season —
+  a fully-finished past season's `current_matchup_period` can coincidentally
+  collide with one of ITS OWN real week numbers, wrongly triggering
+  live-game logic (and crashing on 2017, which has no projection data at
+  all — `TypeError` on `max(actual, None)`). Fixed by gating on `season
+  == config.SEASON and not league.season_over`, and made the live
+  estimate computation null-safe regardless.
+- **Verified, not just plausible**: real in-progress week 1 build showed
+  a team's `projected_final` no longer collapsing at kickoff; direct unit
+  checks of `hot_cold_status()` confirmed all four real scenarios (just
+  kicked off, live projection cratered, live projection surged, a mild
+  move within margin) return the right icon; the pin was confirmed to
+  hold still across two live rebuilds AND an intervening full offline
+  rebuild of every other season; a full offline rebuild of every season
+  came back byte-identical to before except for the new field.
+
 ## Players page: FP rank + KTC dynasty value, LM-Tools-gated (2026-09-09)
 
 Tommy: "can we add their fantasy pros rank (rest of season or whatever

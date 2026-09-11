@@ -411,13 +411,29 @@ _DEFAULT_PRE_GAME_MARGIN = 4.5
 
 
 def hot_cold_status(
-    position: str, played: bool, week_actual: float | None,
-    week_projected: float | None, recent: list[dict],
+    position: str, played: bool, live_estimate: float | None,
+    baseline_projected: float | None, recent: list[dict],
 ) -> tuple[bool, bool]:
     """(on_fire, on_ice) for one player in one specific week's context.
 
     `played=True` (that week's game has started or finished): single-game
-    `week_actual - week_projected` vs IN_GAME_MARGIN[position].
+    `live_estimate - baseline_projected` vs IN_GAME_MARGIN[position].
+    For an already-DECIDED week, callers just pass the real final actual
+    and ESPN's projection as those two — the traditional "beat/missed
+    your projection" read. For the week CURRENTLY being played, callers
+    instead pass a live-adjusted estimate (real actual-so-far, or ESPN's
+    own continuously-updating in-game projection if that's currently
+    higher — see `build.py`'s `side_json`/`optimal_week_projection` below,
+    both revised 2026-09-10) against the PRE-GAME projection specifically
+    (pinned before kickoff, not the live number) — otherwise a player
+    reads as ice-cold the SECOND their game kicks off, before they've had
+    a chance to score anything: `live_estimate` would be 0 (nothing's
+    happened yet) against a projection that's already however many points
+    high, an instant false-negative every single week. Tommy, 2026-09-10:
+    "we shouldn't assign the ice indicator to a player whose game just
+    started... the time to add the icons... is when that player's live
+    projection exceeds their pre-game projected by whatever amount we
+    determined qualifies."
 
     `played=False` (hasn't played that week yet): EACH of the last 3 real
     games in `recent` (parse.recent_player_performance()'s shape, newest
@@ -426,10 +442,10 @@ def hot_cold_status(
     Never both True — a fire margin and an ice margin can't both be met
     (they're opposite signs of the same comparison)."""
     if played:
-        if week_actual is None or week_projected is None:
+        if live_estimate is None or baseline_projected is None:
             return False, False
         margin = IN_GAME_MARGIN.get(position, _DEFAULT_IN_GAME_MARGIN)
-        diff = week_actual - week_projected
+        diff = live_estimate - baseline_projected
         return diff >= margin, diff <= -margin
     margin = PRE_GAME_MARGIN.get(position, _DEFAULT_PRE_GAME_MARGIN)
     if len(recent) < 3:
@@ -674,10 +690,23 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
     haven't played, for an "N of M left to play" display. `lineup[]` is one
     entry per real starting slot, in the league's real slot order:
     `{player_id, name, position, slot, actual, projected, played}` —
-    `actual` is null until that player has a real stat line, `projected`
-    is ESPN's pre-game number (kept even after the player's played, so a
-    card can still show beat/missed-projection the way the real completed-
-    week box scores already do).
+    `actual` is null until that player has a real stat line. `projected`
+    is ESPN's OWN number for `statSourceId: 1`, which — despite this
+    field's name and an earlier, wrong version of this docstring's claim
+    that it "stays at the pre-game number" — ESPN keeps live-updating
+    for a game actually in progress (confirmed live, 2026-09-10: a QB
+    with a 0.0 actual seconds after kickoff already had a real, non-zero
+    live projection sitting right next to it). `projected_final` (below)
+    now takes advantage of that: `max(actual, projected)` per played
+    lineup member, not `actual` alone — using `actual` alone meant a
+    team's whole projected score would instantly drop by a starter's
+    entire pregame projection the SECOND their game kicked off (0 real
+    points yet, nothing left to fall back on), then only climb back as
+    they actually scored, instead of tracking ESPN's own live estimate
+    of where they're headed the rest of the way. Tommy, 2026-09-10: "ESPN
+    does live projections for players whose games are in progress. can
+    we pull those values and use them to inform the team's projected
+    score during the games?"
 
     Reads straight from that week's box-score cache — `fetch_season()`
     fetches the current week even before anything in it is decided
@@ -688,6 +717,19 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
     if not box:
         return {}
     from metrics import best_lineup  # local import: metrics imports from parse, so this has to be deferred to call time to dodge a circular import at module load
+
+    def _best_estimate(entry: dict) -> float:
+        """This player's best current estimate for the week — real
+        actual-so-far if their game's started, but never less than
+        ESPN's own live projection (see this function's docstring). Used
+        everywhere below that needs "how good is this player right now,"
+        not just the final `projected_final` sum: filling a genuinely
+        blank starting slot and the joke-lineup bench comparison both
+        need the same live-adjusted number, not a value that craters to
+        0 the instant a real starter's game kicks off."""
+        if entry["actual"] is None:
+            return entry["projected"]
+        return max(entry["actual"], entry["projected"])
 
     pro = pro_team_schedule(season)
     out: dict[int, dict] = {}
@@ -746,7 +788,7 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
             if empty_indices and bench:
                 empty_slot_ids = [starting_slots[i] for i in empty_indices]
                 candidates = [
-                    (b["player_id"], b["eligible"], b["actual"] if b["actual"] is not None else b["projected"])
+                    (b["player_id"], b["eligible"], _best_estimate(b))
                     for b in bench
                 ]
                 _, _assigned, rel_index_by_player = best_lineup(candidates, empty_slot_ids)
@@ -764,12 +806,12 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
                 entry = lineup_by_index[i]
                 if entry is None or entry["played"]:
                     continue
-                entry_value = entry["actual"] if entry["actual"] is not None else entry["projected"]
+                entry_value = _best_estimate(entry)
                 best_pid, best_value = None, entry_value
                 for b in bench:
                     if b["player_id"] in used_bench_pids or slot_id not in b["eligible"]:
                         continue
-                    b_value = b["actual"] if b["actual"] is not None else b["projected"]
+                    b_value = _best_estimate(b)
                     if b_value > best_value:
                         best_pid, best_value = b["player_id"], b_value
                 if best_pid is not None and best_value - entry_value >= JOKE_LINEUP_GAP:
@@ -803,9 +845,7 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
                 for i, slot_id in enumerate(starting_slots)
             ]
             current = sum(p["actual"] for p in lineup if p["played"])
-            projected_final = sum(
-                (p["actual"] if p["played"] else p["projected"]) for p in lineup if p["player_id"] is not None
-            )
+            projected_final = sum(_best_estimate(p) for p in lineup if p["player_id"] is not None)
             started = any(p["played"] for p in lineup)
             filled = [p for p in lineup if p["player_id"] is not None]
             out[side["teamId"]] = {

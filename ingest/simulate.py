@@ -270,7 +270,8 @@ def _division_bracket(seeded3: list[int], playoff_game) -> int:
 
 
 def run(league: LeagueData, history: LeagueData | None = None,
-       redraft_values: dict[str, int] | None = None) -> dict | None:
+       redraft_values: dict[str, int] | None = None,
+       pregame_by_pid: dict[int, float] | None = None) -> dict | None:
     remaining = [
         e for e in league.full_schedule
         if e.winner == "UNDECIDED" and e.away_id is not None
@@ -429,16 +430,30 @@ def run(league: LeagueData, history: LeagueData | None = None,
         # per-week upto_week scope) since this is always THE live/current
         # week, never a past one.
         recent_by_pid = recent_player_performance(league)
+        pregame_by_pid = pregame_by_pid or {}
 
         def _with_hot_cold(lineup):
+            # Live-adjusted current estimate against the PRE-GAME
+            # projection (pinned by build.py before kickoff, passed in
+            # here), not the raw actual/live-projected pair — same
+            # "don't read a player as ice-cold the second their game
+            # starts" fix as roster.json/matchups/week-N.json. See
+            # `parse.hot_cold_status`'s docstring for the full reasoning.
             out_lineup = []
             for p in lineup:
+                pregame = pregame_by_pid.get(p["player_id"], p["projected"])
+                if not p["played"]:
+                    live_estimate = p["projected"]
+                else:
+                    live_estimate = max(p["actual"], p["projected"])
                 on_fire, on_ice = hot_cold_status(
-                    p["position"], p["played"],
-                    p["actual"] if p["played"] else None, p["projected"],
+                    p["position"], p["played"], live_estimate, pregame,
                     recent_by_pid.get(p["player_id"], []),
                 )
-                out_lineup.append({**p, "on_fire": on_fire, "on_ice": on_ice})
+                # Written back out so build.py can read it back on the
+                # NEXT build and keep the pin held still — see the
+                # `pregame_by_pid` param note above.
+                out_lineup.append({**p, "pregame_projected": pregame, "on_fire": on_fire, "on_ice": on_ice})
             return out_lineup
         for i, e in enumerate(remaining):
             if e.matchup_period != this_week_period:

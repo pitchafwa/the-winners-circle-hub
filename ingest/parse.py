@@ -437,6 +437,47 @@ def pregame_projection_locked(kickoff_ms: int | None, now: datetime | None = Non
     return now.timestamp() * 1000 >= kickoff_ms - PREGAME_FREEZE_MINUTES * 60_000
 
 
+# Confirmed live, 2026-09-11 (Tommy caught it — a fully-finished game
+# still reading a live-vs-projection comparison that never moved off the
+# pregame number): ESPN's `statSourceId: 1` projection for the CURRENT
+# week does NOT actually live-update during a game the way this app
+# assumed when the pregame-projection pin shipped the day before — a
+# player's real final `actual` (2 points) sat right next to an unchanged
+# `projected` (17, identical to the pregame number) well after his game
+# had ended. The one candidate for a real "is this game over" flag in
+# what this app fetches, `statsOfficial` on the pro schedule, doesn't
+# help either — confirmed it's still `false` for that same finished game,
+# but `true` for every game in a season that wrapped up months ago,
+# meaning it tracks OFFICIAL corrected stats posting (which happens well
+# after a game ends), not the game ending itself.
+#
+# With no real "final" signal available, this is a time-based guess
+# instead: NFL games are reliably decided well within 4 hours of kickoff
+# (a normal game runs close to 3; this pads generously for weather
+# delays/overtime rather than risk calling a still-live game "over" too
+# early, which would show a deflated score before it's actually final —
+# a false "still waiting" beats a false "final" here).
+GAME_LIKELY_OVER_HOURS = 4
+
+
+def pro_game_likely_over(kickoff_ms: int | None, now: datetime | None = None) -> bool:
+    """Best available guess at whether a player's real NFL game has
+    actually finished — see the comment above GAME_LIKELY_OVER_HOURS for
+    why this is a time-based guess rather than a real ESPN "final" flag.
+    Once true, callers should trust the player's real `actual` alone,
+    never blended with `projected` (which, confirmed live, can sit
+    completely unchanged from its pregame value long after the real game
+    is over — blending would let a real bust hide behind a stale rosy
+    number forever). `kickoff_ms` missing reads as "can't tell" — not yet
+    over, so a player without a known kickoff just keeps using the
+    in-progress blend rather than snapping to a possibly-incomplete
+    actual too early."""
+    if kickoff_ms is None:
+        return False
+    now = now or datetime.now(timezone.utc)
+    return now.timestamp() * 1000 >= kickoff_ms + GAME_LIKELY_OVER_HOURS * 3600_000
+
+
 def hot_cold_status(
     position: str, played: bool, live_estimate: float | None,
     baseline_projected: float | None, recent: list[dict],
@@ -718,22 +759,25 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
     entry per real starting slot, in the league's real slot order:
     `{player_id, name, position, slot, actual, projected, played}` —
     `actual` is null until that player has a real stat line. `projected`
-    is ESPN's OWN number for `statSourceId: 1`, which — despite this
-    field's name and an earlier, wrong version of this docstring's claim
-    that it "stays at the pre-game number" — ESPN keeps live-updating
-    for a game actually in progress (confirmed live, 2026-09-10: a QB
-    with a 0.0 actual seconds after kickoff already had a real, non-zero
-    live projection sitting right next to it). `projected_final` (below)
-    now takes advantage of that: `max(actual, projected)` per played
-    lineup member, not `actual` alone — using `actual` alone meant a
-    team's whole projected score would instantly drop by a starter's
-    entire pregame projection the SECOND their game kicked off (0 real
-    points yet, nothing left to fall back on), then only climb back as
-    they actually scored, instead of tracking ESPN's own live estimate
-    of where they're headed the rest of the way. Tommy, 2026-09-10: "ESPN
-    does live projections for players whose games are in progress. can
-    we pull those values and use them to inform the team's projected
-    score during the games?"
+    is ESPN's OWN number for `statSourceId: 1` — despite this field's
+    name (and Tommy's original, reasonable assumption that ESPN
+    live-updates it during a game, and an earlier version of this
+    docstring that agreed), confirmed live 2026-09-11 that it does NOT
+    move at all once a game starts: a player who finished his real game
+    with 2 actual points still showed the exact same `projected` number
+    (17) he had before kickoff. `_best_estimate()` (below) accounts for
+    both real failure modes this app has now hit: right after kickoff,
+    `actual` alone would crater a team's projected score to 0 for anyone
+    who'd started scoring nothing yet (fixed 2026-09-10, `max(actual,
+    projected)`); but once a game's actually OVER, blending in that same
+    frozen `projected` number forever would let a real bust hide behind
+    his old rosy pregame number (caught by Tommy: "I'm seeing Puka Nacua
+    8.1 points below projection... and none have an icon. All those
+    games are finished"). So: not played yet -> `projected`; played and
+    the game's still genuinely live -> `max(actual, projected)`; played
+    and the game's over (`pro_game_likely_over()`, time-based — see that
+    function's own docstring for why there's no real "final" flag to
+    read instead) -> `actual` alone, full stop.
 
     Reads straight from that week's box-score cache — `fetch_season()`
     fetches the current week even before anything in it is decided
@@ -745,17 +789,20 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
         return {}
     from metrics import best_lineup  # local import: metrics imports from parse, so this has to be deferred to call time to dodge a circular import at module load
 
+    game_dates = pro_game_dates(season, week)
+
     def _best_estimate(entry: dict) -> float:
-        """This player's best current estimate for the week — real
-        actual-so-far if their game's started, but never less than
-        ESPN's own live projection (see this function's docstring). Used
-        everywhere below that needs "how good is this player right now,"
-        not just the final `projected_final` sum: filling a genuinely
-        blank starting slot and the joke-lineup bench comparison both
-        need the same live-adjusted number, not a value that craters to
-        0 the instant a real starter's game kicks off."""
+        """This player's best current estimate for the week (see this
+        function's docstring for the three regimes: not played yet,
+        still genuinely live, or the game's over). Used everywhere below
+        that needs "how good is this player right now," not just the
+        final `projected_final` sum: filling a genuinely blank starting
+        slot and the joke-lineup bench comparison both need the same
+        number."""
         if entry["actual"] is None:
             return entry["projected"]
+        if pro_game_likely_over(game_dates.get(entry["pro_team_id"])):
+            return entry["actual"]
         return max(entry["actual"], entry["projected"])
 
     pro = pro_team_schedule(season)

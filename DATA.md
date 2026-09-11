@@ -191,14 +191,15 @@ this file's `is_live_week` case, for the rare moment `current_week`
 still points at a week that JUST became fully decided (build.py hasn't
 rolled `current_matchup_period` forward yet) — there, and always for the
 real live view on `sim.json`'s `this_week_matchups` below, ESPN's OWN
-`projected` number (`statSourceId: 1`) keeps live-updating as the real
-game unfolds (confirmed live — not the frozen pregame number an earlier
-version of this doc, and this app's own code, wrongly assumed), so
-`pregame_projected` is a separate, PINNED number: `projected` gets copied
-into it on every build, right up until `parse.PREGAME_FREEZE_MINUTES`
-(30) before that player's real kickoff — at that point it locks and
-every later build holds the same value, even as `projected` itself keeps
-moving. Revised 2026-09-10 from an earlier version that pinned whatever
+`projected` number (`statSourceId: 1`) CAN move in the days/hours
+leading up to a player's real kickoff (roster news, injury reports) —
+though, confirmed live 2026-09-11, it does NOT move again once that
+game actually starts, contrary to what an earlier version of this app
+(and this doc) assumed — so `pregame_projected` is a separate, PINNED
+number: `projected` gets copied into it on every build, right up until
+`parse.PREGAME_FREEZE_MINUTES` (30) before that player's real kickoff —
+at that point it locks and every later build holds the same value.
+Revised 2026-09-10 from an earlier version that pinned whatever
 `projected` read the very FIRST time a player was seen that week — Tommy:
 "I wouldn't freeze the first projection you see, I think you'd want to
 compare against the projection closest to the game start... freeze the
@@ -215,7 +216,7 @@ file that's actually rebuilt throughout the live window) — the committed
 output is the durable memory across runs, not `ingest/.cache/`, same
 pattern `frozen_history.py`/`frozen_ownership.py` use for a different
 reason. Exists specifically so `on_fire`/`on_ice` (below) has a stable
-baseline instead of the constantly-moving live number.
+baseline instead of a number that could still move right up to kickoff.
 
 `on_fire`/`on_ice` (also on `sim.json`'s `home_lineup`/`away_lineup` and
 `roster.json`'s player cards — same fields, same rule, computed once in
@@ -223,16 +224,26 @@ baseline instead of the constantly-moving live number.
 or cold relative to projection, in one of two regimes depending on
 `played`:
 - **`played: true`** (that week's game has started or finished): a
-  live-adjusted current estimate (real `actual` once a game's decided;
-  while a game's still in progress, `max(actual, projected)` — ESPN's
-  own live-updating projection, never just the raw actual-so-far, which
-  sits at 0 for the first several real-world minutes of a game and would
-  read every in-progress player as ice-cold the instant their game
-  starts) minus `pregame_projected`, vs `IN_GAME_MARGIN[position]`.
-  Tommy, 2026-09-10: "we shouldn't assign the ice indicator to a player
-  whose game just started... the time to add the icons... is when that
-  player's live projection exceeds their pre-game projected by whatever
-  amount we determined qualifies."
+  live-adjusted current estimate, minus `pregame_projected`, vs
+  `IN_GAME_MARGIN[position]`. That estimate is one of three things
+  depending on where the game actually is (`parse.pro_game_likely_over()`
+  — a time-based guess, 4 hours from kickoff; ESPN's API has no real
+  "game is final" flag this app has found): the game hasn't started ->
+  `projected`; the game's genuinely still live -> `max(actual,
+  projected)`, never just the raw actual-so-far (which sits at 0 for the
+  first several real-world minutes of a game and would read every
+  in-progress player as ice-cold the instant their game starts); the
+  game's over -> real `actual` alone, full stop, never blended with
+  `projected` — confirmed live 2026-09-11 that ESPN's `projected` number
+  does NOT move again once a game starts, so blending it in after the
+  game ends would let a real bust hide behind their unchanged pregame
+  number forever (caught by Tommy checking real results: "I'm seeing
+  Puka Nacua 8.1 points below projection... and none have an icon. All
+  those games are finished"). Tommy, 2026-09-10, on the original ask:
+  "we shouldn't assign the ice indicator to a player whose game just
+  started... the time to add the icons... is when that player's live
+  projection exceeds their pre-game projected by whatever amount we
+  determined qualifies."
 - **`played: false`** (hasn't played that week yet): EACH of the player's
   last 3 real games (`recent_player_performance()`, newest first) beat/
   missed ITS OWN projection by `PRE_GAME_MARGIN[position]` — a genuine
@@ -474,17 +485,24 @@ team with NO real lineup set at all (routine right up until kickoff) ends
 up close to fully bench-optimal-filled, which is what stops an unset
 lineup from reading as "projected for 0." Each player's value (real or
 bench-filled) is their ESPN PROJECTED score (`statSourceId: 1`) if they
-haven't played yet, else `max(actual, projected)` — revised 2026-09-10:
+haven't played yet; `max(actual, projected)` if their game's still
+genuinely in progress; their real `actual` alone, full stop, once their
+game's actually over (`parse.pro_game_likely_over()` — a time-based
+guess, 4 hours from kickoff, since ESPN's API has no real "game is
+final" flag this app has found — see that function's own docstring).
+Two real bugs, fixed a day apart (revised 2026-09-10, then 2026-09-11 —
+see `parse.optimal_week_projection()`'s docstring for the full story):
 using `actual` ALONE the moment a player's game starts used to make a
 whole team's `home_projected`/`away_projected` instantly drop by that
 player's entire pregame projection at kickoff (0 real points yet,
-nothing left to fall back on), then only climb back as they actually
-scored, instead of tracking ESPN's own live-updating in-game projection
-(confirmed live: ESPN keeps recalculating `statSourceId: 1` for a game
-actually in progress, not just pregame — see `parse.optimal_week_
-projection()`'s docstring). Tommy: "ESPN does live projections for
+nothing left to fall back on) — Tommy: "ESPN does live projections for
 players whose games are in progress. can we pull those values and use
-them to inform the team's projected score during the games?"
+them to inform the team's projected score during the games?" The first
+fix (`max(actual, projected)` unconditionally) then over-corrected:
+ESPN's `projected` number, confirmed live, does NOT move again once a
+game starts, so blending it in FOREVER — even after the real game
+ended — let a real bust's team total stay inflated by a frozen,
+unchanged pregame number indefinitely.
 `home_current`/`away_current` sum only the already-played
 members of that same lineup (`0.0` before anyone's played);
 `started` is true the moment either team has a real stat line, so the
@@ -811,24 +829,25 @@ fp_projection, recent[], recent_avg_diff, on_fire, on_ice, suggested}`.
 - `week_projection`: ESPN's real projection for `current_week`
   (`statSourceId: 1`), read straight off the live roster snapshot — no
   separate fetch needed, the projection is already embedded in the same
-  `league.json` response the roster itself comes from. Despite the name,
-  this is NOT frozen at the pregame number — ESPN keeps live-updating it
-  for a game actually in progress (confirmed live, 2026-09-10), so this
-  field moves throughout that player's real game.
+  `league.json` response the roster itself comes from. Can move in the
+  days/hours leading up to that player's real kickoff (roster news,
+  injury reports) — but confirmed live 2026-09-11, does NOT move again
+  once that game actually starts, contrary to what an earlier version of
+  this app (and this doc) assumed.
 - `pregame_projection` (added 2026-09-10, revised the same day): copied
   from `week_projection` on every build, right up until 30 minutes before
   this player's real kickoff (`parse.PREGAME_FREEZE_MINUTES`,
   `parse.pregame_projection_locked()`) — then locks and holds that exact
-  value forever after, even as `week_projection` keeps moving. NOT
-  pinned at the first-ever-seen value (an earlier version of this field
-  did that, for less than a day): Tommy — "I wouldn't freeze the first
-  projection you see... freeze the pre game projection 30 minutes before
-  that game's kickoff," since a build often runs for the first time days
-  before kickoff, and freezing that early can miss real injury/inactive
-  news that lands closer to game time. Held by reading it back from
-  `roster.json`'s own previous build (the committed output is the
-  durable memory across runs, not `ingest/.cache/`, same pattern
-  `frozen_history.py`/`frozen_ownership.py` use for a different reason).
+  value forever after. NOT pinned at the first-ever-seen value (an
+  earlier version of this field did that, for less than a day): Tommy —
+  "I wouldn't freeze the first projection you see... freeze the pre game
+  projection 30 minutes before that game's kickoff," since a build often
+  runs for the first time days before kickoff, and freezing that early
+  can miss real injury/inactive news that lands closer to game time.
+  Held by reading it back from `roster.json`'s own previous build (the
+  committed output is the durable memory across runs, not
+  `ingest/.cache/`, same pattern `frozen_history.py`/`frozen_ownership.py`
+  use for a different reason).
   This, not the live-moving `week_projection`, is what `on_fire`/`on_ice`
   below is actually judged against — see `matchups/week-N.json`'s section
   for the full reasoning (same fix, same day, same root cause).

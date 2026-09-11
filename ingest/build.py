@@ -353,7 +353,14 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
                     pregame = p.projected
                 if not p.played:
                     live_estimate = p.projected
-                elif p.projected is None:
+                elif p.projected is None or parse.pro_game_likely_over(kickoff):
+                    # Once the game's actually over, trust the real
+                    # score alone — ESPN's own `projected` number
+                    # doesn't move during the game at all (confirmed
+                    # live, 2026-09-11), so blending it in forever would
+                    # let a real bust hide behind their old pregame
+                    # number. See `parse.pro_game_likely_over`'s
+                    # docstring.
                     live_estimate = p.actual
                 else:
                     live_estimate = max(p.actual, p.projected)

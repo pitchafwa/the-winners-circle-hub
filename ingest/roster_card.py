@@ -99,7 +99,13 @@ def build_roster_cards(season: int, league: parse.LeagueData,
                 pregame_projection = week_projection
             if not played_this_week:
                 live_estimate = week_projection
-            elif week_projection is None:
+            elif week_projection is None or parse.pro_game_likely_over(kickoff):
+                # Once the game's actually over, trust the real score
+                # alone — ESPN's own `week_projection` doesn't move
+                # during the game at all (confirmed live, 2026-09-11),
+                # so blending it in forever would let a real bust hide
+                # behind their old pregame number. See
+                # `parse.pro_game_likely_over`'s docstring.
                 live_estimate = week_actual
             else:
                 live_estimate = max(week_actual, week_projection)

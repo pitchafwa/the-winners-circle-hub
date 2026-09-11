@@ -3,6 +3,45 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: on_fire/on_ice never triggered for a finished game (2026-09-11)
+
+Same-day follow-up, caught by Tommy checking real results: "I'm seeing
+Puka Nacua 8.1 points below projection, Devante Adams 8.8 points below,
+Matthew stafford 13.1 points below, and AJ brown 9 points below and none
+have an icon. All those games are finished."
+
+- **Root cause**: yesterday's fix assumed ESPN's `projected` number for
+  the current week keeps live-updating during a game (a reasonable read
+  of what Tommy described, and what an earlier version of this app's own
+  code/docs claimed) — confirmed live it does NOT move at all once a
+  game starts. Stafford's real final line: 2 actual points sitting right
+  next to a `projected` of 17, identical to his pregame number, well
+  after his game had ended. Every place computing "current best
+  estimate" as `max(actual, projected)` was therefore permanently
+  blending in a frozen, stale rosy number for anyone whose game was
+  already over — real busts could never trigger the ice cube at all,
+  since the frozen `projected` almost always sat above their real final
+  score.
+- **No real "game is final" flag exists in what this app fetches** — the
+  one candidate, `statsOfficial` on the pro schedule, was confirmed
+  still `false` for a game Tommy confirmed was already over, but `true`
+  for every game in a season that ended months ago — it tracks OFFICIAL
+  corrected stats posting, not the game ending. Fell back to a
+  time-based guess instead: `parse.pro_game_likely_over()`, 4 hours from
+  kickoff (generous — a real NFL game is essentially always decided well
+  inside that, and calling a still-live game "over" too early would show
+  a deflated score before it's actually final, worse than the reverse).
+- Once a game's likely over, every place that used to blend
+  `max(actual, projected)` now uses `actual` alone, full stop — the
+  team's live projected score (`parse.optimal_week_projection`'s
+  `_best_estimate()`), and on_fire/on_ice in all three spots that read
+  it (`sim.json`'s live cards, `roster.json`, `matchups/week-N.json`'s
+  rare edge case).
+- Verified against the real players Tommy flagged: Stafford (2 actual vs.
+  17.09 frozen projected, QB margin 9) now reads on_ice once his game's
+  past the 4-hour mark, same for Nacua/Adams/Brown, without touching
+  anyone whose game is still genuinely in progress.
+
 ## Refine: pregame projection pin locks 30 min before kickoff, not first sight (2026-09-11)
 
 Same-day follow-up to the fix below. Tommy: "I wouldn't freeze the first

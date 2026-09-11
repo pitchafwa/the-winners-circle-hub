@@ -192,11 +192,14 @@ still points at a week that JUST became fully decided (build.py hasn't
 rolled `current_matchup_period` forward yet) — there, and always for the
 real live view on `sim.json`'s `this_week_matchups` below, ESPN's OWN
 `projected` number (`statSourceId: 1`) CAN move in the days/hours
-leading up to a player's real kickoff (roster news, injury reports) —
-though, confirmed live 2026-09-11, it does NOT move again once that
-game actually starts, contrary to what an earlier version of this app
-(and this doc) assumed — so `pregame_projected` is a separate, PINNED
-number: `projected` gets copied into it on every build, right up until
+leading up to a player's real kickoff (roster news, injury reports), and
+confirmed live 2026-09-11 that it sits unchanged from its pregame value
+well AFTER a game ends — whether it moves WHILE a game is still
+genuinely in progress is still unverified (Tommy: "I think espn does
+offer live projections... let's check again on Sunday" when several
+games run at once for hours) — so `pregame_projected` is a separate,
+PINNED number: `projected` gets copied into it on every build, right up
+until
 `parse.PREGAME_FREEZE_MINUTES` (30) before that player's real kickoff —
 at that point it locks and every later build holds the same value.
 Revised 2026-09-10 from an earlier version that pinned whatever
@@ -234,10 +237,12 @@ or cold relative to projection, in one of two regimes depending on
   first several real-world minutes of a game and would read every
   in-progress player as ice-cold the instant their game starts); the
   game's over -> real `actual` alone, full stop, never blended with
-  `projected` — confirmed live 2026-09-11 that ESPN's `projected` number
-  does NOT move again once a game starts, so blending it in after the
-  game ends would let a real bust hide behind their unchanged pregame
-  number forever (caught by Tommy checking real results: "I'm seeing
+  `projected` — confirmed live 2026-09-11 that `projected` sits unchanged
+  from its pregame value well AFTER a game ends (whether it moves WHILE
+  a game's still in progress is separately unverified, revisit Sunday),
+  so blending it in past that point would let a real bust hide behind
+  their unchanged pregame number forever (caught by Tommy checking real
+  results: "I'm seeing
   Puka Nacua 8.1 points below projection... and none have an icon. All
   those games are finished"). Tommy, 2026-09-10, on the original ask:
   "we shouldn't assign the ice indicator to a player whose game just
@@ -499,10 +504,12 @@ nothing left to fall back on) — Tommy: "ESPN does live projections for
 players whose games are in progress. can we pull those values and use
 them to inform the team's projected score during the games?" The first
 fix (`max(actual, projected)` unconditionally) then over-corrected:
-ESPN's `projected` number, confirmed live, does NOT move again once a
-game starts, so blending it in FOREVER — even after the real game
-ended — let a real bust's team total stay inflated by a frozen,
-unchanged pregame number indefinitely.
+confirmed live that ESPN's `projected` number sits unchanged from its
+pregame value well AFTER a game ends (whether it moves WHILE still in
+progress is separately unverified, revisit Sunday when several games run
+at once for hours to check properly) — so blending it in FOREVER, even
+after the real game ended, let a real bust's team total stay inflated by
+a frozen, unchanged pregame number indefinitely.
 `home_current`/`away_current` sum only the already-played
 members of that same lineup (`0.0` before anyone's played);
 `started` is true the moment either team has a real stat line, so the
@@ -831,9 +838,11 @@ fp_projection, recent[], recent_avg_diff, on_fire, on_ice, suggested}`.
   separate fetch needed, the projection is already embedded in the same
   `league.json` response the roster itself comes from. Can move in the
   days/hours leading up to that player's real kickoff (roster news,
-  injury reports) — but confirmed live 2026-09-11, does NOT move again
-  once that game actually starts, contrary to what an earlier version of
-  this app (and this doc) assumed.
+  injury reports); confirmed live 2026-09-11 that it sits unchanged from
+  its pregame value well AFTER a game ends, contrary to what an earlier
+  version of this app (and this doc) assumed — whether it moves WHILE a
+  game's still genuinely in progress is separately unverified (revisit
+  Sunday, when several games run at once for hours to check properly).
 - `pregame_projection` (added 2026-09-10, revised the same day): copied
   from `week_projection` on every build, right up until 30 minutes before
   this player's real kickoff (`parse.PREGAME_FREEZE_MINUTES`,

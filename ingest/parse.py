@@ -439,17 +439,24 @@ def pregame_projection_locked(kickoff_ms: int | None, now: datetime | None = Non
 
 # Confirmed live, 2026-09-11 (Tommy caught it — a fully-finished game
 # still reading a live-vs-projection comparison that never moved off the
-# pregame number): ESPN's `statSourceId: 1` projection for the CURRENT
-# week does NOT actually live-update during a game the way this app
-# assumed when the pregame-projection pin shipped the day before — a
-# player's real final `actual` (2 points) sat right next to an unchanged
-# `projected` (17, identical to the pregame number) well after his game
-# had ended. The one candidate for a real "is this game over" flag in
-# what this app fetches, `statsOfficial` on the pro schedule, doesn't
-# help either — confirmed it's still `false` for that same finished game,
-# but `true` for every game in a season that wrapped up months ago,
-# meaning it tracks OFFICIAL corrected stats posting (which happens well
-# after a game ends), not the game ending itself.
+# pregame number): a player's real final `actual` (2 points) sat right
+# next to an unchanged `projected` (17, identical to his pregame number)
+# well AFTER his game had ended. What's NOT fully confirmed either way:
+# whether ESPN's `statSourceId: 1` projection updates WHILE a game is
+# still genuinely in progress — every check behind the line above was a
+# before-kickoff-vs-after-the-game pair, never two snapshots both taken
+# mid-game with real time between them (Tommy: "I think espn does offer
+# live projections... let's check again on Sunday"). Doesn't matter for
+# what this function needs to answer, though: once a game's over,
+# `projected` going forward is stale by definition — confirmed — so
+# blending it into a "current best estimate" past that point is wrong
+# regardless of how it behaved earlier. The one candidate for a real "is
+# this game over" flag in what this app fetches, `statsOfficial` on the
+# pro schedule, doesn't help either — confirmed it's still `false` for
+# that same finished game, but `true` for every game in a season that
+# wrapped up months ago, meaning it tracks OFFICIAL corrected stats
+# posting (which happens well after a game ends), not the game ending
+# itself.
 #
 # With no real "final" signal available, this is a time-based guess
 # instead: NFL games are reliably decided well within 4 hours of kickoff

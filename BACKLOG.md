@@ -3,6 +3,29 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## To verify Sunday: does ESPN's live projection actually update mid-game? (2026-09-11)
+
+Follow-up to the fix right below — Tommy pushed back on how confident
+that fix's own writeup was: "I think espn does offer live projections.
+You might not be able to see them now because there are no games
+ongoing but there was one when you built that feature last night...
+espn does live update the team's total projection." Fair catch: every
+comparison behind that fix's "confirmed live, does NOT move" claim was
+really a BEFORE-kickoff vs. AFTER-the-game-ended pair, never two
+snapshots both taken while a game was still genuinely in progress with
+real time between them — narrower evidence than the writeup claimed.
+
+Plan: Sunday, with several games running at once for hours, grab a
+snapshot, let real time pass while games are actively being played,
+grab another, and diff the SAME players' `projected` number to see if
+anything actually moved mid-game.
+
+Not urgent — the fix below is correct either way this turns out: once a
+game's over, it always trusts the real final score now, full stop,
+regardless of what `projected` does. The open question is only whether
+the "still playing" numbers could track ESPN's own live number more
+precisely, not whether anything currently shipped is wrong.
+
 ## Fix: on_fire/on_ice never triggered for a finished game (2026-09-11)
 
 Same-day follow-up, caught by Tommy checking real results: "I'm seeing
@@ -13,15 +36,21 @@ have an icon. All those games are finished."
 - **Root cause**: yesterday's fix assumed ESPN's `projected` number for
   the current week keeps live-updating during a game (a reasonable read
   of what Tommy described, and what an earlier version of this app's own
-  code/docs claimed) — confirmed live it does NOT move at all once a
-  game starts. Stafford's real final line: 2 actual points sitting right
-  next to a `projected` of 17, identical to his pregame number, well
-  after his game had ended. Every place computing "current best
-  estimate" as `max(actual, projected)` was therefore permanently
-  blending in a frozen, stale rosy number for anyone whose game was
-  already over — real busts could never trigger the ice cube at all,
-  since the frozen `projected` almost always sat above their real final
-  score.
+  code/docs claimed). What's actually confirmed: Stafford's real final
+  line — 2 actual points sitting right next to a `projected` of 17,
+  identical to his pregame number — well AFTER his game had ended. Every
+  comparison behind this was a before-kickoff-vs-after-the-game pair,
+  never two snapshots both taken while a game was still genuinely live
+  with real time between them, so "ESPN never updates this" is a
+  narrower claim than it sounds — flagged as still-unverified above,
+  revisit Sunday. What's certain regardless: the moment a game's over,
+  blending in `projected` at all is wrong, since that number was — at
+  minimum — stale by kickoff+4h in the one case actually checked. Every
+  place computing "current best estimate" as `max(actual, projected)`
+  was therefore permanently blending in a frozen, stale rosy number for
+  anyone whose game was already over — real busts could never trigger
+  the ice cube at all, since the frozen `projected` almost always sat
+  above their real final score.
 - **No real "game is final" flag exists in what this app fetches** — the
   one candidate, `statsOfficial` on the pro schedule, was confirmed
   still `false` for a game Tommy confirmed was already over, but `true`

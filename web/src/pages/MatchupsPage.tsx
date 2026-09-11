@@ -26,10 +26,12 @@ const AWARD_ICON: Record<string, string> = {
   blowout: "💥",
   projection_buster: "🚀",
   waiver_hero: "🦸",
+  mvp: "⭐",
   nail_biter: "😬",
   luckiest: "🍀",
   unluckiest: "💔",
   bust: "📉",
+  lvp: "🪫",
   worst_benching: "🪑",
   lowest_score: "🥶",
 };
@@ -41,6 +43,13 @@ function headlineValue(award: Award): string {
   // "beat projection by this much" read clearly at a glance. bust's value
   // is always negative, so plain pts() already renders its own "-".
   if (award.key === "projection_buster") return signed(award.value);
+  // mvp/lvp are win-probability-added, not points — a whole-season MVP
+  // Race total can run past 1, but a single WEEK's swing is usually well
+  // under 0.1, so pts()'s default 1 decimal would round almost every
+  // real value to "0.0" or "0.1" and lose the number entirely. 3
+  // decimals matches the precision the MVP Race chart's own tooltip
+  // already uses for the same reason.
+  if (award.key === "mvp" || award.key === "lvp") return signed(award.value, 3);
   return pts(award.value);
 }
 

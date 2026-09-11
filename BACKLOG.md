@@ -3,6 +3,38 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Week MVP / LVP awards (2026-09-14)
+
+Tommy: "can we add that week's MVP and LVP (meaning the player with the
+highest and lowest WPA) to the cards at the top? same way we have
+projection buster."
+
+- New `mvp`/`lvp` weekly award types (`metrics.compute_superlatives()`),
+  built the exact same way `projection_buster`/`bust` already are —
+  biggest single-player swing that week, one per team-of-real-matchups,
+  playoffs included — just swapping "actual minus projected" for real
+  win-probability-added (`metrics.weekly_wpa()`, the same shared
+  computation the MVP Race chart/Players page/franchise leaderboards
+  already use, so this is genuinely free — one more read of a
+  computation this app already had, not a new one).
+- Needed no new frontend wiring for the actual ribbons/headline cards —
+  `mvp`/`lvp` are just two more entries in the same `Award` list every
+  other weekly award already flows through end to end. Only real
+  frontend change: WPA values are tiny compared to points (a single
+  week's swing is usually well under ±0.3), so the value display needed
+  3-decimal precision instead of the default 1 — same fix in
+  `MatchupsPage.tsx`'s headline cards and `SuperlativeCard.tsx`'s trophy
+  certificates, matching what the MVP Race chart's own tooltip already
+  does for the same stat. Also added to `TrophyCasePage.tsx`'s season
+  tally table/column order, which has its own explicit award allowlist.
+- Verified live: real 2025 data showed sensible MVPs/LVPs (Derrick Henry,
+  C.J. Stroud, Jonathan Taylor, Puka Nacua...) appearing correctly in
+  both the headline row at the top of the Matchups page AND as a ribbon
+  badge on the actual matchup card — same two places Projection Buster
+  already shows, as asked. Confirmed back to 2017 (as far back as this
+  app has real box-score data to compute WPA from at all) and a full
+  rebuild of every season stayed clean.
+
 ## Fix: home-field bonus missing from the live running score (2026-09-14)
 
 Tommy: "my team has only puka nacua who has played and scored 12 points,

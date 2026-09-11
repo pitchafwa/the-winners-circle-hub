@@ -174,11 +174,28 @@ components {all_play, points_for, trend, roster}}`.
 full season history, one entry per award per completed week (absent if no
 qualifying candidate that week). `player_id`/`player_name` are only set for
 the player-specific award types (`projection_buster`, `bust`,
-`worst_benching`, `waiver_hero`) — `null` on the team-level ones
-(`highest_score`, `lowest_score`, `best_coach`, `blowout`, `nail_biter`,
-`luckiest`, `unluckiest`), which have no individual player to name. Lets the
-frontend show "Player Name (Team)" instead of just a team name on cards
-where the real story is about one player's game, not the team's.
+`worst_benching`, `waiver_hero`, `mvp`, `lvp`) — `null` on the team-level
+ones (`highest_score`, `lowest_score`, `best_coach`, `blowout`,
+`nail_biter`, `luckiest`, `unluckiest`), which have no individual player
+to name. Lets the frontend show "Player Name (Team)" instead of just a
+team name on cards where the real story is about one player's game, not
+the team's.
+
+**`mvp`/`lvp` (added 2026-09-14)**: the week's single biggest
+win-probability swing, positive and negative — `metrics.weekly_wpa()`
+(the same real per-player-week WPA `mvp_race.json`/`ownership.json`'s
+`points_wpa`/the Players page's WPA report already share), restricted to
+whoever's actually in that week's real matchups (`WINNERS_BRACKET`-only
+during the playoffs, same filter every other single-player award here
+already respects) — highest `wpa` gets `mvp`, lowest gets `lvp`. `value`
+is the raw WPA number (small — usually well under ±0.3 for a single
+week, unlike a whole season's cumulative total), rounded to 3 decimals.
+Player-specific and single-decision like `projection_buster`/`bust`/
+`waiver_hero`, so — unlike the whole-league-pool awards above — these
+stay live every week a real game exists, playoffs included. Tommy: "can
+we add that week's MVP and LVP (meaning the player with the highest and
+lowest WPA) to the cards at the top? same way we have projection
+buster."
 
 ## `{season}/matchups/week-N.json`
 

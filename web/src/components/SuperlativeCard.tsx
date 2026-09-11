@@ -1,11 +1,17 @@
 import { useApp } from "../state/AppContext";
-import { pts, pct } from "../lib/format";
+import { pts, pct, signed } from "../lib/format";
 import TeamLink from "./TeamLink";
 import type { Award, AwardMeta } from "../types/data";
 
 function formatValue(award: Award, meta: AwardMeta | undefined): string {
   if (award.key === "best_coach") return pct(award.value / 100, 1);
   if (award.key === "bust") return pts(award.value);
+  // Win-probability-added, not points — a single week's swing is usually
+  // well under 0.1, so the default 1 decimal would round almost every
+  // real value to "0.0" or "0.1" and lose the number entirely. 3
+  // decimals matches the MVP Race chart's own tooltip (same underlying
+  // stat, same reason).
+  if (award.key === "mvp" || award.key === "lvp") return signed(award.value, 3);
   void meta;
   return pts(award.value);
 }

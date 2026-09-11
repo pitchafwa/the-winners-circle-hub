@@ -66,6 +66,9 @@ AWARD_META = {
     "waiver_hero":       {"label": "Waiver Hero",       "points": 2,
                           "description": "Best-scoring starter picked up off waivers or free agency in the last two weeks.",
                           "tone": "positive"},
+    "mvp":               {"label": "Week MVP",          "points": 2,
+                          "description": "Highest single-player win-probability-added performance this week.",
+                          "tone": "positive"},
     "nail_biter":        {"label": "Nail-biter",        "points": 1,
                           "description": "Smallest margin of victory in a single matchup this week.",
                           "tone": "positive"},
@@ -77,6 +80,9 @@ AWARD_META = {
                           "tone": "neutral"},
     "bust":              {"label": "The Bust",          "points": -1,
                           "description": "Biggest single-player underperformance vs. their projection (min. 10 projected points).",
+                          "tone": "negative"},
+    "lvp":               {"label": "Week LVP",          "points": -1,
+                          "description": "Lowest single-player win-probability-added performance this week.",
                           "tone": "negative"},
     "worst_benching":    {"label": "Worst Benching",    "points": -2,
                           "description": "Largest-scoring benched player who outscored a starter eligible for their slot.",
@@ -754,6 +760,12 @@ def _fmt(x: float) -> str:
 def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Award]:
     awards: list[Award] = []
     tname = {tid: t.name for tid, t in league.teams.items()}
+    # Real per-player-week win-probability-added (playoffs included,
+    # K/D-ST already excluded) — same shared computation mvp_race.json,
+    # ownership.json's points_wpa, and the Players page's WPA report all
+    # already use. Computed once here (it walks the whole season itself)
+    # rather than per-week below.
+    wpa_by_week = weekly_wpa(league)
 
     for week in league.completed_weeks():
         matchups = league.weeks[week]
@@ -908,6 +920,30 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
                                         f"{p.name} was projected {_fmt(p.projected)} "
                                         f"but scored {_fmt(p.actual)} for {tname[tid]}",
                                         player_id=p.player_id, player_name=p.name))
+
+        # Week MVP / LVP — biggest single-player win-probability swing
+        # this week (see `wpa_by_week` above), restricted to whoever's
+        # actually in `matchups` (WINNERS_BRACKET-only during the
+        # playoffs, same filter every other single-player award here
+        # already respects). Single-player, not a whole-league
+        # comparison, so — like projection_buster/bust/waiver_hero —
+        # this stays live every week a real game exists, playoffs
+        # included, unlike the reg-season-only awards above. Tommy,
+        # 2026-09-14: "can we add that week's MVP and LVP (meaning the
+        # player with the highest and lowest WPA) to the cards at the
+        # top? same way we have projection buster."
+        playing_ids = {tw.team_id for tw in team_weeks}
+        wpa_candidates = [(pid, w) for pid, w in wpa_by_week.get(week, {}).items()
+                          if w["team_id"] in playing_ids]
+        if wpa_candidates:
+            pid, w = max(wpa_candidates, key=lambda kv: kv[1]["wpa"])
+            awards.append(Award(week, "mvp", w["team_id"], round(w["wpa"], 3),
+                                f"{w['name']} added {w['wpa']:.3f} win probability for {tname[w['team_id']]}",
+                                player_id=pid, player_name=w["name"]))
+            pid, w = min(wpa_candidates, key=lambda kv: kv[1]["wpa"])
+            awards.append(Award(week, "lvp", w["team_id"], round(w["wpa"], 3),
+                                f"{w['name']} cost {tname[w['team_id']]} {abs(w['wpa']):.3f} win probability",
+                                player_id=pid, player_name=w["name"]))
 
         # Waiver hero — best starter added via waivers/FA in the last 14 days.
         # Single-player, not a whole-league comparison, so this stays live

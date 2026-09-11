@@ -17,8 +17,8 @@ interface TallyRow {
 }
 
 const AWARD_ORDER = [
-  "highest_score", "best_coach", "blowout", "projection_buster", "waiver_hero",
-  "nail_biter", "luckiest", "unluckiest", "bust", "worst_benching", "lowest_score",
+  "highest_score", "best_coach", "blowout", "projection_buster", "waiver_hero", "mvp",
+  "nail_biter", "luckiest", "unluckiest", "bust", "lvp", "worst_benching", "lowest_score",
 ];
 
 const SHORT_LABEL: Record<string, string> = {
@@ -27,10 +27,12 @@ const SHORT_LABEL: Record<string, string> = {
   blowout: "Blowout",
   projection_buster: "Buster",
   waiver_hero: "Hero",
+  mvp: "MVP",
   nail_biter: "Nail-biter",
   luckiest: "Lucky",
   unluckiest: "Unlucky",
   bust: "Bust",
+  lvp: "LVP",
   worst_benching: "Benched",
   lowest_score: "Low",
 };

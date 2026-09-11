@@ -44,6 +44,7 @@ def build_roster_cards(season: int, league: parse.LeagueData,
     current_week = parse.current_fantasy_week(league)
     fp_points = fp_points or {}
     pregame_by_pid = pregame_by_pid or {}
+    game_dates = parse.pro_game_dates(season, current_week) if current_week else {}
 
     out: dict[int, dict] = {}
     for t in raw.get("teams", []):
@@ -81,16 +82,21 @@ def build_roster_cards(season: int, league: parse.LeagueData,
             diffs = [r["points"] - r["projected"] for r in player_recent if r["projected"] is not None]
             position = parse.POSITION_NAMES.get(player.get("defaultPositionId", 0), "?")
             played_this_week = week_actual is not None
-            # Pinned before kickoff, carried forward from last build (see
-            # this function's own docstring) — never the live-updating
-            # `week_projection` itself, or a player would read as ice-cold
-            # the instant their game starts (0 real points yet, nothing
-            # left to compare against but however many points high their
-            # projection already sits). Falls back to today's live number
-            # on first sight, which in practice IS the real pre-game
-            # number almost always (this build runs long before kickoff,
-            # not for the first time mid-game).
-            pregame_projection = pregame_by_pid.get(pid, week_projection)
+            # Keeps refreshing to the latest ESPN number right up until
+            # PREGAME_FREEZE_MINUTES before this player's real kickoff
+            # (so late injury/inactive news still gets captured), then
+            # holds still — never the live-updating `week_projection`
+            # itself once the game's underway, or a player would read as
+            # ice-cold the instant their game starts (0 real points yet,
+            # nothing left to compare against but however many points
+            # high their projection already sits). See
+            # `parse.pregame_projection_locked`'s docstring.
+            existing_pin = pregame_by_pid.get(pid)
+            kickoff = game_dates.get(pro_team_id)
+            if existing_pin is not None and parse.pregame_projection_locked(kickoff):
+                pregame_projection = existing_pin
+            else:
+                pregame_projection = week_projection
             if not played_this_week:
                 live_estimate = week_projection
             elif week_projection is None:

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 import config
@@ -409,6 +410,32 @@ PRE_GAME_MARGIN = {"QB": 5.5, "RB": 5.0, "WR": 5.0, "TE": 3.0, "D/ST": 3.0, "K":
 _DEFAULT_IN_GAME_MARGIN = 7.0
 _DEFAULT_PRE_GAME_MARGIN = 4.5
 
+# How close to a player's real kickoff the "pregame projection" pin keeps
+# refreshing before it locks in place. Tommy, 2026-09-11: "I wouldn't
+# freeze the first projection you see, I think you'd want to compare
+# against the projection closest to the game start... freeze the pre
+# game projection 30 minutes before that game's kickoff." Before this
+# window, every build keeps updating the pin to the latest number ESPN
+# has (so late inactive-list/injury news still gets captured); once
+# inside it, later builds hold whatever was last recorded instead of
+# letting it drift any further — the closest real look at "healthy
+# starter, about to play" ESPN ever published for that game.
+PREGAME_FREEZE_MINUTES = 30
+
+
+def pregame_projection_locked(kickoff_ms: int | None, now: datetime | None = None) -> bool:
+    """True once a player's pregame-projection pin should stop moving —
+    within PREGAME_FREEZE_MINUTES of their real kickoff, or past it (see
+    PREGAME_FREEZE_MINUTES above for why 30 minutes, not the moment the
+    game starts or the first value ever seen). `kickoff_ms` missing (a
+    bye week, or next week's schedule not published yet) reads as "can't
+    tell" — never locked, so the pin just keeps refreshing rather than
+    getting stuck on a guess."""
+    if kickoff_ms is None:
+        return False
+    now = now or datetime.now(timezone.utc)
+    return now.timestamp() * 1000 >= kickoff_ms - PREGAME_FREEZE_MINUTES * 60_000
+
 
 def hot_cold_status(
     position: str, played: bool, live_estimate: float | None,
@@ -759,6 +786,7 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
                     "name": player.get("fullName", ""),
                     "position": POSITION_NAMES.get(player.get("defaultPositionId", 0), ""),
                     "pro_team": pro.get(player.get("proTeamId", 0), {}).get("abbrev", ""),
+                    "pro_team_id": player.get("proTeamId", 0),
                     "actual": actual, "projected": projected, "played": actual is not None,
                 }
                 lineup_slot = e.get("lineupSlotId", BENCH_SLOT)
@@ -830,7 +858,7 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
             lineup = [
                 {
                     "player_id": entry["player_id"], "name": entry["name"], "position": entry["position"],
-                    "pro_team": entry["pro_team"],
+                    "pro_team": entry["pro_team"], "pro_team_id": entry["pro_team_id"],
                     "slot": SLOT_NAMES.get(slot_id, ""),
                     "actual": round(entry["actual"], 2) if entry["actual"] is not None else None,
                     "projected": round(entry["projected"], 2),
@@ -839,7 +867,7 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
                     "replaced_name": assumed_by_index.get(i),
                 }
                 if (entry := lineup_by_index[i]) else
-                {"player_id": None, "name": None, "position": None, "pro_team": None,
+                {"player_id": None, "name": None, "position": None, "pro_team": None, "pro_team_id": None,
                  "slot": SLOT_NAMES.get(slot_id, ""), "actual": None, "projected": None, "played": False,
                  "assumed_start": False, "replaced_name": None}
                 for i, slot_id in enumerate(starting_slots)

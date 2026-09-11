@@ -3,6 +3,34 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Refine: pregame projection pin locks 30 min before kickoff, not first sight (2026-09-11)
+
+Same-day follow-up to the fix below. Tommy: "I wouldn't freeze the first
+projection you see, I think you'd want to compare against the projection
+closest to the game start. Like maybe freeze the pre game projection 30
+minutes before that games kickoff or something." Real gap in the
+original version: a build often runs for the first time days before
+kickoff, so pinning right then could lock in a stale number and miss
+real injury/inactive news that comes out closer to game time.
+
+- New `parse.PREGAME_FREEZE_MINUTES` (30) and
+  `parse.pregame_projection_locked(kickoff_ms, now)`: the pin now keeps
+  copying the live ESPN number on every build until 30 minutes before
+  that player's real kickoff (from `parse.pro_game_dates()`, already
+  cached), then holds whatever it last recorded. A player whose kickoff
+  time isn't known yet (bye week, schedule not published) never locks.
+  Threaded through all three places that read/write the pin
+  (`sim.json`'s live cards, `roster.json`, `matchups/week-N.json`'s rare
+  edge case) — `parse.optimal_week_projection()`'s lineup entries also
+  gained `pro_team_id` so the two downstream consumers that didn't
+  already have it could look up kickoff time.
+- Verified the boundary math directly (2 hours before: not locked; 31
+  minutes before: not locked; 29 minutes before: locked; at and after
+  kickoff: locked; unknown kickoff: never locked) before touching real
+  data, then ran a real live build (in-progress week 1 games) and a full
+  rebuild of every season — nothing broke, in-progress players' pins
+  matched their already-locked pregame numbers as expected.
+
 ## Fix: live matchup scores/on_fire/on_ice broke the moment a game started (2026-09-10)
 
 Tommy, two related bugs in the same message: "when a play is mid game,

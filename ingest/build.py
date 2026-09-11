@@ -316,6 +316,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
     # wrongly try to apply live-game pinning logic to a season that's been
     # over for years and has no "pregame" state left to pin at all.
     current_week = parse.current_fantasy_week(league) if season == config.SEASON and not league.season_over else None
+    live_game_dates = parse.pro_game_dates(season, current_week) if current_week else {}
 
     def side_json(tw, week, recent_by_pid, pregame_by_pid):
         if tw is None:
@@ -336,7 +337,20 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             # — Tommy, 2026-09-10, flagged both this and the matching
             # team-projected-score bug the same day.
             if is_live_week:
-                pregame = pregame_by_pid.get(p.player_id, p.projected)
+                # Keeps refreshing to the latest ESPN number right up
+                # until PREGAME_FREEZE_MINUTES before this player's real
+                # kickoff (so late injury/inactive news still gets
+                # captured), then holds still. See
+                # `parse.pregame_projection_locked`'s docstring — Tommy,
+                # 2026-09-11: "I wouldn't freeze the first projection you
+                # see... freeze the pre game projection 30 minutes before
+                # that game's kickoff."
+                existing_pin = pregame_by_pid.get(p.player_id)
+                kickoff = live_game_dates.get(p.pro_team_id)
+                if existing_pin is not None and parse.pregame_projection_locked(kickoff):
+                    pregame = existing_pin
+                else:
+                    pregame = p.projected
                 if not p.played:
                     live_estimate = p.projected
                 elif p.projected is None:

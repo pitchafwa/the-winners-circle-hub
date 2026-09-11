@@ -46,6 +46,8 @@ from parse import (
     current_roster_players,
     hot_cold_status,
     optimal_week_projection,
+    pregame_projection_locked,
+    pro_game_dates,
     recent_player_performance,
     values_by_pid,
 )
@@ -431,17 +433,28 @@ def run(league: LeagueData, history: LeagueData | None = None,
         # week, never a past one.
         recent_by_pid = recent_player_performance(league)
         pregame_by_pid = pregame_by_pid or {}
+        game_dates = pro_game_dates(league.season, this_week_period)
 
         def _with_hot_cold(lineup):
             # Live-adjusted current estimate against the PRE-GAME
-            # projection (pinned by build.py before kickoff, passed in
-            # here), not the raw actual/live-projected pair — same
+            # projection, not the raw actual/live-projected pair — same
             # "don't read a player as ice-cold the second their game
-            # starts" fix as roster.json/matchups/week-N.json. See
-            # `parse.hot_cold_status`'s docstring for the full reasoning.
+            # starts" fix as roster.json/matchups/week-N.json. The pin
+            # itself keeps refreshing to the latest ESPN number right up
+            # until PREGAME_FREEZE_MINUTES before this player's real
+            # kickoff, then holds — Tommy, 2026-09-11: "I wouldn't freeze
+            # the first projection you see... freeze the pre game
+            # projection 30 minutes before that game's kickoff." See
+            # `parse.hot_cold_status`'s / `parse.pregame_projection_locked`'s
+            # docstrings for the full reasoning.
             out_lineup = []
             for p in lineup:
-                pregame = pregame_by_pid.get(p["player_id"], p["projected"])
+                existing_pin = pregame_by_pid.get(p["player_id"])
+                kickoff = game_dates.get(p.get("pro_team_id"))
+                if existing_pin is not None and pregame_projection_locked(kickoff):
+                    pregame = existing_pin
+                else:
+                    pregame = p["projected"]
                 if not p["played"]:
                     live_estimate = p["projected"]
                 else:

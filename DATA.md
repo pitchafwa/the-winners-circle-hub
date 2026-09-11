@@ -194,16 +194,28 @@ real live view on `sim.json`'s `this_week_matchups` below, ESPN's OWN
 `projected` number (`statSourceId: 1`) keeps live-updating as the real
 game unfolds (confirmed live — not the frozen pregame number an earlier
 version of this doc, and this app's own code, wrongly assumed), so
-`pregame_projected` is a separate, PINNED snapshot of what `projected`
-read the moment this player was first seen that week — almost always the
-real pre-game number, since a build almost always runs well before
-kickoff. Pinned once, held forever after, by reading it back from
-`sim.json`'s own previous build (the file that's actually rebuilt
-throughout the live window) — the committed output is the durable memory
-across runs, not `ingest/.cache/`, same pattern `frozen_history.py`/
-`frozen_ownership.py` use for a different reason. Exists specifically so
-`on_fire`/`on_ice` (below) has a stable baseline instead of the
-constantly-moving live number.
+`pregame_projected` is a separate, PINNED number: `projected` gets copied
+into it on every build, right up until `parse.PREGAME_FREEZE_MINUTES`
+(30) before that player's real kickoff — at that point it locks and
+every later build holds the same value, even as `projected` itself keeps
+moving. Revised 2026-09-10 from an earlier version that pinned whatever
+`projected` read the very FIRST time a player was seen that week — Tommy:
+"I wouldn't freeze the first projection you see, I think you'd want to
+compare against the projection closest to the game start... freeze the
+pre game projection 30 minutes before that game's kickoff" (catching a
+real gap: a build often runs for the first time days before kickoff, so
+the old rule could lock in a stale number and miss real injury/inactive
+news that lands closer to game time). `parse.pregame_projection_locked()`
+does the kickoff-time math (kickoff itself from `parse.pro_game_dates()`,
+already cached for the live season); a player whose kickoff time isn't
+known yet (bye week, schedule not published) never locks — the pin just
+keeps refreshing rather than getting stuck on a guess. Held forever once
+locked, by reading it back from `sim.json`'s own previous build (the
+file that's actually rebuilt throughout the live window) — the committed
+output is the durable memory across runs, not `ingest/.cache/`, same
+pattern `frozen_history.py`/`frozen_ownership.py` use for a different
+reason. Exists specifically so `on_fire`/`on_ice` (below) has a stable
+baseline instead of the constantly-moving live number.
 
 `on_fire`/`on_ice` (also on `sim.json`'s `home_lineup`/`away_lineup` and
 `roster.json`'s player cards — same fields, same rule, computed once in
@@ -803,16 +815,23 @@ fp_projection, recent[], recent_avg_diff, on_fire, on_ice, suggested}`.
   this is NOT frozen at the pregame number — ESPN keeps live-updating it
   for a game actually in progress (confirmed live, 2026-09-10), so this
   field moves throughout that player's real game.
-- `pregame_projection` (added 2026-09-10): what `week_projection` read
-  the FIRST time this player was seen this week — pinned then, held
-  forever after by reading it back from `roster.json`'s own previous
-  build (the committed output is the durable memory across runs, not
-  `ingest/.cache/`, same pattern `frozen_history.py`/`frozen_ownership.py`
-  use for a different reason). Almost always the real pre-game number,
-  since this build almost always runs well before kickoff. This, not the
-  live-moving `week_projection`, is what `on_fire`/`on_ice` below is
-  actually judged against — see `matchups/week-N.json`'s section for the
-  full reasoning (same fix, same day, same root cause).
+- `pregame_projection` (added 2026-09-10, revised the same day): copied
+  from `week_projection` on every build, right up until 30 minutes before
+  this player's real kickoff (`parse.PREGAME_FREEZE_MINUTES`,
+  `parse.pregame_projection_locked()`) — then locks and holds that exact
+  value forever after, even as `week_projection` keeps moving. NOT
+  pinned at the first-ever-seen value (an earlier version of this field
+  did that, for less than a day): Tommy — "I wouldn't freeze the first
+  projection you see... freeze the pre game projection 30 minutes before
+  that game's kickoff," since a build often runs for the first time days
+  before kickoff, and freezing that early can miss real injury/inactive
+  news that lands closer to game time. Held by reading it back from
+  `roster.json`'s own previous build (the committed output is the
+  durable memory across runs, not `ingest/.cache/`, same pattern
+  `frozen_history.py`/`frozen_ownership.py` use for a different reason).
+  This, not the live-moving `week_projection`, is what `on_fire`/`on_ice`
+  below is actually judged against — see `matchups/week-N.json`'s section
+  for the full reasoning (same fix, same day, same root cause).
 - `fp_projection` (`ingest/fp_projections.py`, new 2026-08-31): FantasyPros'
   generic PPR consensus projection for the same week — a second opinion,
   not scored against this league's exact custom rules the way

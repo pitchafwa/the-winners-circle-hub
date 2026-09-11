@@ -161,8 +161,20 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
         "championship_week": config.FINAL_COUNTED_WEEK,
         "season_over": league.season_over,
         # started = games have been played; box-score caches may be absent for
-        # history seasons, so the decided schedule is the fallback evidence
-        "season_started": bool(completed) or any(
+        # history seasons, so the decided schedule is the fallback evidence.
+        # `league.scoring_period_id > 0` (added 2026-09-14) covers the real
+        # gap the other two miss: week 1 can have real NFL games under way
+        # — actual box scores coming in — for HOURS before the first
+        # fantasy matchup of the week is fully decided (`completed`/
+        # `winner` both need EVERY game in a week done, not just one).
+        # Confirmed live: real week 1 games playing, `season_started`
+        # still read `false`, which hid 2026 from the player card's
+        # season picker entirely. `scoring_period_id` stays 0 all
+        # preseason (see `parse.current_fantasy_week`'s docstring) and
+        # only ever turns nonzero once the real season has actually begun
+        # airing, same signal that function already trusts for "has this
+        # week really started."
+        "season_started": bool(completed) or league.scoring_period_id > 0 or any(
             s.winner != "UNDECIDED" for s in league.full_schedule),
         "completed_weeks": completed,
         "starting_slots": [parse.SLOT_NAMES[s] for s in league.starting_slots],

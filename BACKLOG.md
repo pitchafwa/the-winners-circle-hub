@@ -3,6 +3,63 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## Fix: home-field bonus missing from the live running score (2026-09-14)
+
+Tommy: "my team has only puka nacua who has played and scored 12 points,
+and my team's points are 12, but should be 15 since I start the matchup
+with 3 points right?"
+
+- **Root cause**: `simulate.py`'s live matchup-card builder always added
+  the home bonus to `home_projected` (the final projection) but
+  deliberately left it out of `home_current` (the live running score) —
+  reasoning at the time was that "current: 3.0" would look odd before
+  anyone had scored. Tommy's real complaint shows why that reasoning was
+  backwards: once real points ARE on the board, a home team's live score
+  that's missing its own real, already-banked bonus just reads as wrong.
+- **Caught in the same spot**: this league runs a bigger home-field bonus
+  in the playoffs (5 points) than the regular season (3) — the matchup's
+  own `is_playoff` flag was never checked here at all, so a playoff
+  week's home team was always getting the smaller regular-season number.
+- Verified against the real matchup Tommy described: Puka Nacua's real
+  12 points, home team, now shows `home_current: 15.0` exactly. A full
+  rebuild of every season came back clean.
+
+## Fix: 2026 game logs missing from player cards (2026-09-14)
+
+Tommy: "now that the 2026 season has started, can we add 2026 gamelogs
+to the cards?"
+
+- **Two stacked bugs, both from the same root cause this session kept
+  running into**: the app's usual signal for "has this week happened"
+  (`completed_weeks`/a matchup's real `winner`) needs EVERY game in a
+  fantasy week fully decided, not just some of them — so for hours after
+  real week 1 games had started, this season still read as having zero
+  completed weeks.
+  1. The player card's game log reads `matchups/week-N.json`, which (by
+     design) only gets written once a week's fully decided — so it had
+     nothing to show for the live week at all.
+  2. Worse: `meta.json`'s `season_started` used the exact same
+     all-decided check, so with real games actively being played, the
+     season still read as NOT STARTED — hiding 2026 from the player
+     card's own season picker entirely. Nobody could even get to the
+     game log to find bug #1.
+- **Fixes**: `season_started` now also turns `true` the moment
+  `league.scoring_period_id > 0` (real games airing this week — same
+  signal `parse.current_fantasy_week()` already trusts, just never
+  reused here). `playerGameLog.ts` now falls back to `roster.json` for
+  the one CURRENT week when the decided matchups file isn't there yet —
+  that file rebuilds continuously all season regardless of whether the
+  week's done. Needed one new field to make that work:
+  `roster.json` player cards gained `week_actual` (real points scored so
+  far this week) — existed internally already, just was never exposed on
+  the card itself.
+- Verified live end to end: 2026 now appears in the season picker,
+  defaults to it, and Puka Nacua's real week 1 line (12 actual, 20.1
+  projected, ice icon, "Remember the Process") shows up correctly while
+  every other week still honestly reads "data not available." Full
+  rebuild of every other season stayed clean — nobody's `season_started`
+  flipped unexpectedly.
+
 ## To verify Sunday: does ESPN's live projection actually update mid-game? (2026-09-11)
 
 Follow-up to the fix right below — Tommy pushed back on how confident

@@ -62,6 +62,18 @@ matchup in this week decides the title, full stop, regardless of how many
 other lower-stakes matchups (3rd place, consolation) are also being played
 that same week).
 
+`season_started` (revised 2026-09-14): `true` the moment
+`league.scoring_period_id > 0` — real NFL games airing this week — NOT
+just once a week is fully decided (`completed_weeks`/`winner`, the two
+older checks, both need EVERY game in a fantasy week done). Confirmed
+live: real week 1 games playing for hours, `season_started` still read
+`false`, which hid the just-started season from the player card's own
+season picker (`PlayerCardModal.tsx` only lists seasons where
+`season_started`) — nobody could see this season's game log at all.
+`scoring_period_id` stays 0 all preseason (same signal
+`parse.current_fantasy_week()` already trusts for "has this week really
+started") and only turns nonzero once the real season has actually begun.
+
 ## `{season}/standings.json`
 
 `rows[]`, pre-sorted by `standing_rank`; every column the standings table can sort on:
@@ -477,6 +489,20 @@ optimal_week_projection()`; `fetch_season()` fetches the current week even
 before anything in it is decided specifically so this data exists before
 kickoff) — `projection_source: "espn"` when both teams have this data.
 
+**Home-field bonus, in `home_current` too now (revised 2026-09-14)**: the
+home team's real bonus (`meta.json`'s `home_team_bonus`, or
+`playoff_home_team_bonus` for a playoff matchup — this league runs 3 and
+5 points respectively) is added into `home_current` as well as
+`home_projected`, not just the final projection. Tommy: "my team's
+points are 12, but should be 15 since I start the matchup with 3 points
+right?" — it's real and already "banked" for the home team from the
+opening whistle, not something that only becomes true once the game's
+over, so a live `home_current` that leaves it out reads as simply wrong
+once real points ARE on the board. Caught alongside this: the matchup's
+own `is_playoff` wasn't being checked at all here before — a playoff
+week's home team was always getting the regular-season 3-point bonus,
+never the real 5-point playoff one.
+
 The lineup itself reflects REALITY first: whoever the manager has actually
 entered in each starting slot on ESPN right now, read straight off each
 player's real `lineupSlotId`. Only a slot the manager has genuinely left
@@ -824,8 +850,9 @@ hold whatever's actually in those slots, no placeholders (they're not
 slot-count-limited the same way starters are).
 
 Each player card: `{player_id, name, position, pro_team, slot,
-injury_status, on_bye, next_game, week_projection, pregame_projection,
-fp_projection, recent[], recent_avg_diff, on_fire, on_ice, suggested}`.
+injury_status, on_bye, next_game, week_actual, week_projection,
+pregame_projection, fp_projection, recent[], recent_avg_diff, on_fire,
+on_ice, suggested}`.
 - `pro_team`: NFL team abbreviation (`parse.pro_team_schedule()`, sourced
   from the same cached `proschedule.json` the refresh-schedule generator
   uses for its own cron windows).
@@ -833,6 +860,14 @@ fp_projection, recent[], recent_avg_diff, on_fire, on_ice, suggested}`.
   if that team's schedule doesn't reach this far out yet. `on_bye` is `true`
   specifically when there's no game AND this IS that team's real bye week
   (distinct from "schedule not published yet").
+- `week_actual` (added 2026-09-14): real points scored so far this week
+  (`statSourceId: 0`) — `null` until this player's game has actually
+  started. Existed internally already (`live_estimate`/on_fire-on_ice
+  already used it) but was never exposed on the card itself until the
+  player card's game log needed a real score to show for the CURRENT
+  week, which has no decided `matchups/week-N.json` to read from yet
+  (see that file's own section — Tommy: "now that the 2026 season has
+  started, can we add 2026 gamelogs to the cards?").
 - `week_projection`: ESPN's real projection for `current_week`
   (`statSourceId: 1`), read straight off the live roster snapshot — no
   separate fetch needed, the projection is already embedded in the same

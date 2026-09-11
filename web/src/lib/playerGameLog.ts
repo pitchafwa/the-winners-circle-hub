@@ -1,5 +1,5 @@
 import { loadJson } from "./data";
-import type { LineupPlayer, WeekMatchups } from "../types/data";
+import type { LineupPlayer, Roster, RosterPlayerCard, WeekMatchups } from "../types/data";
 
 // The league's real season never runs past the championship week (17 for
 // this league, per config.FINAL_COUNTED_WEEK) — always shown in full,
@@ -65,6 +65,23 @@ export async function fetchPlayerSeasonData(
   // position -> player_id -> totals across real games played
   const positionTotals = new Map<string, Map<number, { points: number; games: number }>>();
 
+  // `played: true` alone isn't reliable — a player who was actually
+  // inactive/out that week can still show played:true with a real stat
+  // line of all zeros (confirmed live: a real 2025 injury week, actual 0
+  // AND projected 0). A genuine projection of exactly 0 is ESPN's own
+  // signal that the player wasn't expected to play, so that's the real
+  // "didn't play" check for PPG purposes, not the played flag on its own.
+  const addToPositionTotals = (position: string, pid: number, played: boolean, projected: number | null, actual: number) => {
+    const posMap = positionTotals.get(position) ?? new Map();
+    if (!posMap.has(pid)) posMap.set(pid, { points: 0, games: 0 });
+    if (played && projected !== 0) {
+      const entry = posMap.get(pid)!;
+      entry.points += actual;
+      entry.games += 1;
+    }
+    positionTotals.set(position, posMap);
+  };
+
   for (const wk of weeks) {
     if (!wk) continue;
     const sides: { teamId: number; lineup: LineupPlayer[] }[] = [];
@@ -74,22 +91,7 @@ export async function fetchPlayerSeasonData(
     }
     for (const side of sides) {
       for (const p of side.lineup) {
-        const posMap = positionTotals.get(p.position) ?? new Map();
-        if (!posMap.has(p.player_id)) posMap.set(p.player_id, { points: 0, games: 0 });
-        // `played: true` alone isn't reliable — a player who was actually
-        // inactive/out that week can still show played:true with a real
-        // stat line of all zeros (confirmed live: a real 2025 injury week,
-        // actual 0 AND projected 0). A genuine projection of exactly 0 is
-        // ESPN's own signal that the player wasn't expected to play, so
-        // that's the real "didn't play" check for PPG purposes, not the
-        // played flag on its own.
-        if (p.played && p.projected !== 0) {
-          const entry = posMap.get(p.player_id)!;
-          entry.points += p.actual;
-          entry.games += 1;
-        }
-        positionTotals.set(p.position, posMap);
-
+        addToPositionTotals(p.position, p.player_id, p.played, p.projected, p.actual);
         if (p.player_id === playerId) {
           targetPosition = p.position;
           byWeek.set(wk.week, {
@@ -97,6 +99,44 @@ export async function fetchPlayerSeasonData(
             started: p.started, played: p.played, actual: p.actual,
             projected: p.projected, onFire: p.on_fire, onIce: p.on_ice,
           });
+        }
+      }
+    }
+  }
+
+  // The week actually being played right now has no decided
+  // matchups/week-N.json yet — that file, by design, only gets written
+  // once every matchup in a week is fully decided (see that file's own
+  // DATA.md section). Fall back to roster.json instead, which rebuilds
+  // continuously all season long regardless of whether the current
+  // week's done, so a real in-progress score/projection/hot-cold status
+  // shows up here too, instead of reading "data not available" for a
+  // week that's actually happening right now. Tommy, 2026-09-14: "now
+  // that the 2026 season has started, can we add 2026 gamelogs to the
+  // cards?" Only ever fills in the ONE current week — every other week
+  // either already has a real decided file above, or genuinely hasn't
+  // happened yet.
+  const roster = await loadJson<Roster>(`${season}/roster.json`, true);
+  if (roster && !byWeek.has(roster.current_week)) {
+    for (const [teamIdStr, team] of Object.entries(roster.teams)) {
+      const teamId = Number(teamIdStr);
+      const groups: [RosterPlayerCard[], boolean][] = [
+        [team.starters, true], [team.bench, false], [team.ir, false],
+      ];
+      for (const [cards, isStarter] of groups) {
+        for (const card of cards) {
+          if (card.player_id === null || card.position === null) continue;
+          const played = card.week_actual !== null;
+          const actual = card.week_actual ?? 0;
+          addToPositionTotals(card.position, card.player_id, played, card.week_projection, actual);
+          if (card.player_id === playerId) {
+            targetPosition = card.position;
+            byWeek.set(roster.current_week, {
+              week: roster.current_week, hasData: true, teamId,
+              started: isStarter, played, actual,
+              projected: card.week_projection, onFire: card.on_fire, onIce: card.on_ice,
+            });
+          }
         }
       }
     }

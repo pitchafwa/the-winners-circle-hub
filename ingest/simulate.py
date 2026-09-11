@@ -481,15 +481,28 @@ def run(league: LeagueData, history: LeagueData | None = None,
         for i, e in enumerate(remaining):
             if e.matchup_period != this_week_period:
                 continue
+            # The real home-field bonus this specific matchup gets —
+            # bigger in the playoffs (`p_bonus`) than the regular season
+            # (`bonus`). Was always `bonus` here regardless of
+            # `e.is_playoff`, silently shorting a playoff home team's
+            # real bonus (5 pts this league, vs. 3 in the regular
+            # season) — caught alongside the fix right below it.
+            matchup_bonus = p_bonus if e.is_playoff else bonus
             home_week, away_week = week_proj.get(e.home_id), week_proj.get(e.away_id)
             if home_week is not None and away_week is not None:
-                # No home bonus on `current` — it's real accumulated play
-                # only, so "current: 3.0" can't show before anyone's
-                # actually scored a point. The bonus still belongs in the
-                # final total, so it's added to `projected_final` below.
-                home_current = round(home_week["current"], 1)
+                # Home bonus belongs in `current` too, not just the final
+                # projection — it's real and already "banked" for the
+                # home team from the opening whistle, not something that
+                # only becomes true once the game's over. Revised
+                # 2026-09-14: this used to leave it out of `current`
+                # specifically so "3.0" wouldn't show before anyone had
+                # played, but that reads as the home team's real running
+                # score being wrong once real points ARE on the board —
+                # Tommy: "my team's points are 12, but should be 15 since
+                # I start the matchup with 3 points right?"
+                home_current = round(home_week["current"] + matchup_bonus, 1)
                 away_current = round(away_week["current"], 1)
-                home_projected = round(home_week["projected_final"] + bonus, 1)
+                home_projected = round(home_week["projected_final"] + matchup_bonus, 1)
                 away_projected = round(away_week["projected_final"], 1)
                 home_win_pct = round(normal_cdf((home_projected - away_projected) / WIN_PROB_SIGMA), 4)
                 started = home_week["started"] or away_week["started"]
@@ -499,9 +512,16 @@ def run(league: LeagueData, history: LeagueData | None = None,
                 home_remaining, away_remaining = home_week["remaining"], away_week["remaining"]
                 home_total_starters, away_total_starters = home_week["total_starters"], away_week["total_starters"]
             else:
+                # No real box-score cache for this week at all yet (e.g.
+                # a fully offline build before any live fetch) — `current`
+                # stays None either way here (this branch already reads
+                # as "unknown," not "zero," and the frontend shows the
+                # projection instead of a live score whenever `started`
+                # is false, same as before), but `home_projected` still
+                # needs the real matchup-specific bonus.
                 home_current = None
                 away_current = None
-                home_projected = round(models[e.home_id][0] + bonus, 1)
+                home_projected = round(models[e.home_id][0] + matchup_bonus, 1)
                 away_projected = round(models[e.away_id][0], 1)
                 home_win_pct = pct(float(np.sum(draws[:, i, 0] >= draws[:, i, 1])))
                 started = False

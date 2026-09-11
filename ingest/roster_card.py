@@ -122,6 +122,12 @@ def build_roster_cards(season: int, league: parse.LeagueData,
                 "injury_status": player.get("injuryStatus"),
                 "on_bye": on_bye,
                 "next_game": next_game,
+                # Real points scored so far this week — null until the
+                # player's game has actually started. Added 2026-09-14 so
+                # the player card's game log (playerGameLog.ts) has a
+                # real score to fall back to for the CURRENT week, which
+                # has no decided matchups/week-N.json to read from yet.
+                "week_actual": week_actual,
                 "week_projection": week_projection,
                 # Pinned before kickoff — see the live_estimate/
                 # pregame_projection comment above. Carried forward on
@@ -185,8 +191,8 @@ def build_roster_cards(season: int, league: parse.LeagueData,
                     "player_id": None, "name": None, "position": None,
                     "pro_team": None, "slot": parse.SLOT_NAMES.get(slot_id, str(slot_id)),
                     "injury_status": None, "on_bye": False, "next_game": None,
-                    "week_projection": None, "pregame_projection": None, "fp_projection": None,
-                    "recent": [], "recent_avg_diff": None,
+                    "week_actual": None, "week_projection": None, "pregame_projection": None,
+                    "fp_projection": None, "recent": [], "recent_avg_diff": None,
                     "on_fire": False, "on_ice": False, "suggested": False,
                 }
 

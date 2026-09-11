@@ -772,6 +772,10 @@ export interface RosterPlayerCard {
   injury_status: string | null;
   on_bye: boolean;
   next_game: RosterNextGame | null;
+  // Real points scored so far this week — null until this player's game
+  // has actually started. Added 2026-09-14 for the player card's game
+  // log (playerGameLog.ts) to fall back on for the CURRENT week.
+  week_actual: number | null;
   week_projection: number | null;
   // Pinned before kickoff, carried forward across every live rebuild —
   // see parse.hot_cold_status's docstring (ingest/parse.py).

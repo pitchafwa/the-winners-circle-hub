@@ -842,9 +842,27 @@ def optimal_week_projection(
         back to that old blend when live touch data isn't available (a
         past week rebuilt with no override, D/ST/kickers, or a player
         `live_score.py` never fetched data for) — never a crash, just the
-        previous, still-correct-if-less-precise behavior."""
+        previous, still-correct-if-less-precise behavior.
+
+        A real bug caught live (2026-09-14, Tommy: still ~20 points high
+        after the first fix, correctly suspicious): `pro_game_likely_over`
+        is only a time-based GUESS (kickoff + 4 hours) — for a game that
+        finishes faster than that (common for an early Sunday slate
+        checked ~3h40m post-kickoff), it hadn't caught up yet, so
+        already-finished players were still running through
+        `project_rest_of_game`'s blend, which still pulls partway back
+        toward the pregame number even at 100% elapsed — there's no
+        remaining uncertainty once a game's genuinely over, so it
+        shouldn't blend at all. `live_elapsed_fraction == 1.0` (set in
+        `live_score.py` from ESPN's own `type.completed` flag, not a
+        guess) is checked first now — a real, confirmed "this exact game
+        is over" signal beats the time-based heuristic whenever it's
+        available, and skips straight to the player's own real final
+        score, no blending left to do."""
         if entry["actual"] is None:
             return entry["projected"]
+        if entry.get("live_elapsed_fraction") == 1.0:
+            return entry["actual"]
         if pro_game_likely_over(game_dates.get(entry["pro_team_id"])):
             return entry["actual"]
         touches, frac = entry.get("live_touches"), entry.get("live_elapsed_fraction")

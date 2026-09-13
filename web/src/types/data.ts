@@ -158,6 +158,10 @@ export interface LineupPlayer {
   // docstring (ingest/parse.py) for the full reasoning.
   pregame_projected: number | null;
   played: boolean;
+  // True while this player's real game has started but isn't decided yet
+  // (added 2026-09-14) — false both before kickoff and once the game's
+  // final, so it isolates exactly the "currently happening" window.
+  in_progress: boolean;
   on_fire: boolean;
   on_ice: boolean;
 }
@@ -393,6 +397,10 @@ export interface WeekLineupPlayer {
   // reasoning.
   pregame_projected: number | null;
   played: boolean;
+  // True while this player's real game has started but isn't decided yet
+  // (added 2026-09-14) — false both before kickoff and once the game's
+  // final, so it isolates exactly the "currently happening" window.
+  in_progress: boolean;
   on_fire: boolean;
   on_ice: boolean;
   assumed_start: boolean;

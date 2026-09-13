@@ -218,7 +218,7 @@ function LineupRow({ p }: { p: WeekLineupPlayer | undefined }) {
     <div className="mu-player">
       <span className="mu-name-group">
         <PlayerHeadshot playerId={p.player_id} position={p.position} proTeam={p.pro_team} className="mu-headshot" />
-        <span className="mu-name">
+        <span className={p.in_progress ? "mu-name mu-name-live" : "mu-name"} title={p.in_progress ? "Game in progress" : undefined}>
           <PlayerCardTrigger playerId={p.player_id} name={p.name} position={p.position} proTeam={p.pro_team}>
             {p.name}
           </PlayerCardTrigger>

@@ -15,6 +15,7 @@ export interface StackablePlayer {
   actual: number | null;
   projected: number | null;
   played: boolean;
+  in_progress: boolean;
   on_fire: boolean;
   on_ice: boolean;
 }
@@ -78,7 +79,7 @@ function StackedRow({ p }: { p: StackablePlayer | undefined }) {
         <>
           <PlayerHeadshot playerId={p.player_id} position={p.position} proTeam={p.pro_team} className="leaderboard-headshot" />
           <span className="c-name-wrap" ref={wrapRef}>
-            <span className="c-name">
+            <span className={p.in_progress ? "c-name mu-name-live" : "c-name"} title={p.in_progress ? "Game in progress" : undefined}>
               <PlayerCardTrigger playerId={p.player_id} name={p.name} position={p.position} proTeam={p.pro_team}>
                 {displayName}
               </PlayerCardTrigger>

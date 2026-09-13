@@ -870,6 +870,20 @@ def optimal_week_projection(
             return live_projection.project_rest_of_game(entry["actual"], touches, frac, entry["projected"])
         return max(entry["actual"], entry["projected"])
 
+    def _is_in_progress(entry: dict) -> bool:
+        """True while a player's real game has started but isn't decided
+        yet — added 2026-09-14 (Tommy: "some way to identify which players
+        are currently in game") so the frontend can visually flag them
+        (bold, e.g.) separately from a player who hasn't played yet or
+        whose game is already final. Reuses the exact same "is this game
+        definitely over" checks `_best_estimate` above already relies on,
+        rather than a third, potentially-drifting definition of "over.\""""
+        if entry["actual"] is None:
+            return False
+        if entry.get("live_elapsed_fraction") == 1.0:
+            return False
+        return not pro_game_likely_over(game_dates.get(entry["pro_team_id"]))
+
     pro = pro_team_schedule(season)
     out: dict[int, dict] = {}
     for m in box.get("schedule", []):
@@ -982,13 +996,14 @@ def optimal_week_projection(
                     "actual": round(entry["actual"], 2) if entry["actual"] is not None else None,
                     "projected": round(entry["projected"], 2),
                     "played": entry["played"],
+                    "in_progress": _is_in_progress(entry),
                     "assumed_start": i in assumed_by_index,
                     "replaced_name": assumed_by_index.get(i),
                 }
                 if (entry := lineup_by_index[i]) else
                 {"player_id": None, "name": None, "position": None, "pro_team": None, "pro_team_id": None,
                  "slot": SLOT_NAMES.get(slot_id, ""), "actual": None, "projected": None, "played": False,
-                 "assumed_start": False, "replaced_name": None}
+                 "in_progress": False, "assumed_start": False, "replaced_name": None}
                 for i, slot_id in enumerate(starting_slots)
             ]
             current = sum(p["actual"] for p in lineup if p["played"])

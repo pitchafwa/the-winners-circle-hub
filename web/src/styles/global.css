@@ -1283,6 +1283,11 @@ input.control::placeholder {
    attached to the name text exactly where it was. */
 .mu-col.right .mu-name-group { flex-direction: row-reverse; }
 .mu-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A player whose real game has started but isn't decided yet (Tommy,
+ * 2026-09-14: "some way to identify which players are currently in
+ * game") — bold is enough on its own; no icon, so it doesn't compete
+ * with on_fire/on_ice for attention right next to it. */
+.mu-name-live { font-weight: 800; }
 .mu-pos { font-size: 0.7rem; }
 .mu-proj { font-size: 0.72rem; }
 

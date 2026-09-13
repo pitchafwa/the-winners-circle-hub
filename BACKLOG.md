@@ -51,9 +51,28 @@ private-feed numbers — same page could show two different "current"
 scores for the same player until that's done too, flagged in the
 research doc.
 
-Next: the original opportunity-share + shrinkage projection model on
-top of this. Research doc's "Next steps" checklist is exactly where to
-pick back up.
+**The projection model itself is now built, real-backtested, and tuned**
+— not just scoring. `ingest/backtest_live_projection.py` replays a full
+real 2025 NFL season, play by play (free nflverse data), reconstructing
+exactly how 985 real skill players' scores actually accumulated —
+proving out any formula against reality, not plausibility. Caught
+another real bug this way: bucketing each play's yardage separately
+instead of the running total (ESPN buckets the cumulative game total)
+was silently cutting real scores roughly in half.
+
+Backtested three approaches head to head: naive pace (MAE 4.18, and the
+literal failure mode Tommy named — one real case projected 68 points off
+a 5-touch hot start; the player finished at 17), this app's CURRENT
+frozen-at-pregame behavior (MAE 4.85, actually worse than naive on
+average), and a new shrink-toward-pregame-by-real-touches-plus-cap model
+(MAE 3.44, beats both — the same 68-point blowup case now projects to
+exactly 17.0). The model's two constants were tuned by sweeping real
+values against backtest error, not guessed. Built as
+`ingest/live_projection.py`. **Not yet wired into the live build** — it
+needs touch counts (carries+targets) as an input, which the already-
+working live-score pipeline doesn't currently track, though the raw data
+for it is already sitting in the same public feed already in use. Full
+methodology and numbers in the research doc.
 
 ## Week MVP / LVP awards (2026-09-14)
 

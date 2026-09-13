@@ -314,11 +314,66 @@ was actually inspected — no play-by-play scanning needed at all:
       even with `--offline` before this gate existed), wrapped
       defensively so a hiccup in this external feed falls back to the
       private feed's own slower numbers rather than breaking the build.
-- [ ] THEN: revisit the original "live projection" model (opportunity-
-      share + shrinkage, backtested via nflverse's free historical
-      play-by-play, `play_by_play_{year}.csv.gz` — confirmed downloadable
-      2026-09-13) — now that we can compute the "actual" half of that
-      question ourselves, live, this becomes the next real layer on top.
+- [x] ~~Revisit the original "live projection" model~~ — built, tuned,
+      and validated against a real backtest. See the new section below.
+
+## The live projection model — built, backtested, tuned (2026-09-13)
+
+`ingest/backtest_live_projection.py` replays real 2025-season play-by-
+play (nflverse, `play_by_play_2025.csv.gz`) to reconstruct exactly how
+every real skill-position player's fantasy score actually accumulated
+over the course of real games — the ground truth needed to check any
+candidate projection formula against reality instead of plausibility.
+
+**Real bug caught by this validation, not by inspection**: the first
+version bucketed each individual play's yardage separately (matching
+the per-play mental model, but wrong) instead of bucketing the RUNNING
+TOTAL — ESPN's real scoring buckets a whole game's accumulated yards,
+confirmed empirically earlier this session against the private feed
+(statId 28/48 are pre-bucketed totals, not per-play sums). This
+undercounted real scores by up to half: Jonathan Taylor's real week 1
+2025 score came out as 6 instead of the real 12, because his yardage
+arrived across many plays that each individually undershot a 10-yard
+boundary even though the cumulative total crossed it several times.
+Fixed by tracking cumulative yardage per player per game and bucketing
+THAT. Re-validated after the fix: 981/985 real skill-position
+player-weeks across the full 2025 season matched ESPN's own known-
+correct score exactly (99.6%) — the 4 misses were all genuinely rare,
+unusual scoring plays (e.g. a fumbled-snap recovery run in for a
+touchdown, which doesn't fit the normal rush/pass-touchdown pattern),
+each individually diagnosed and confirmed rare rather than assumed.
+
+**The backtest itself** (985 real player-weeks, checkpoints at 25%/50%/
+75% through each game, real "pregame projection" stood in for by each
+player's own expanding season average entering that week, since real
+ESPN pregame numbers aren't in this historical dataset):
+
+| Method | MAE | Notes |
+|---|---|---|
+| Naive pace (points ÷ % elapsed) | 4.18 | Tommy's named failure mode: one real case projected 68 points off 17 real points on 5 touches through the first quarter; the player finished at 17. |
+| Frozen at pregame (this app's CURRENT behavior) | 4.85 | Worse than naive on average — it never uses any real signal from the game actually being played. |
+| **Shrinkage + cap (built here)** | **3.44** | Beats both. The same 68-point blowup case now projects to exactly 17.0. |
+
+**The model** (`ingest/live_projection.py`, `project_rest_of_game()`):
+shrink the in-game naive pace toward the pregame baseline by REAL SAMPLE
+SIZE (touches so far — carries + targets, a target counting even when
+incomplete, since that's the real opportunity signal) rather than by
+clock time, AND cap the raw in-game pace at 2x the pregame number
+(floor 15) before blending it in at all — shrinkage alone wasn't enough
+on its own; a large-enough early outlier still dragged a low-touch blend
+upward (found via the backtest: an uncapped version passed the
+aggregate-MAE test but still produced a 53-point projection on the exact
+case above). Both pieces' constants (`SHRINK_K=3`, `CAP_MULTIPLIER=2.0`)
+were swept against real backtest error, not guessed — see that module's
+own docstring for the full reasoning and numbers.
+
+**Not yet wired into the live build**: the model needs `touches_so_far`
+(carries+targets) as an input, which `live_score.py` doesn't currently
+track (it computes POINTS from the public feed, not touch counts) — but
+the raw data for it is already sitting in that same feed's per-player
+`rushingAttempts`/`receivingTargets` stat groups (confirmed present
+while building `live_public_stats.py` earlier), so this is new plumbing
+on an already-proven data source, not a new integration.
 
 ## Scope note: `roster_card.py` NOT yet switched over (2026-09-13)
 

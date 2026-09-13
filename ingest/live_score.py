@@ -37,7 +37,25 @@ def _elapsed_fraction(status: dict) -> float:
     validated against. `period` 1-4 is a normal quarter; 5+ is OT, which
     this app's backtest never modeled specifically — by OT there's
     already a full game's worth of real sample size, so this just clips
-    at 1.0 rather than trying to model OT's own separate clock."""
+    at 1.0 rather than trying to model OT's own separate clock.
+
+    A real bug caught live (2026-09-14, Tommy: "a little surprised to
+    see my team is projected for 147ish... on ESPN it expects 126"):
+    once a game reaches STATUS_FINAL, this feed stops including
+    `period`/`displayClock` at all — `status.get("period")` silently
+    reads as 0, identical to "hasn't started yet," and
+    `project_rest_of_game()`'s own `elapsed_fraction <= 0` guard then
+    returned several already-finished players' PREGAME number outright,
+    discarding their real final score entirely (not even floored by
+    `max(actual, ...)` — that floor only applies inside the normal
+    blend, not this early-return path). A player who badly missed their
+    pregame projection (Drake London: 4 actual vs. 14.9 pregame) got
+    silently replaced by the higher, wrong number, inflating the whole
+    team's projection. `type.completed` is checked first now — ESPN
+    tells us directly when a game is over, a strictly better signal
+    than guessing from clock fields that may not even be present."""
+    if status.get("type", {}).get("completed"):
+        return 1.0
     period = status.get("period") or 0
     if period <= 0:
         return 0.0

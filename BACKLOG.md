@@ -3,6 +3,30 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
+## IN PROGRESS: build our own live in-game player projection (2026-09-13)
+
+Tommy noticed ESPN's iPhone app shows a real live-recalculating
+projection (confirmed this session as app-exclusive — not on ESPN's
+website, not in the data feed this app pulls from). He asked to build
+League Hub's own version instead of chasing ESPN's app-only number,
+explicitly flagging the hard part: points come in bunches (a 20-yard
+catch 10 seconds into the game isn't a 300-point pace), so this needs a
+real, backtested, defensible formula, not a guess.
+
+**Full research/design writeup started at
+`ingest/LIVE_PROJECTION_RESEARCH.md`** — read that file before continuing
+this. Short version: project remaining OPPORTUNITY (targets/carries,
+driven by game script + pace) rather than remaining points, shrink any
+in-game observation toward the pregame baseline using real sample size
+(touches so far, not clock time) so one early big play can't distort
+anything, and backtest against nflverse's free public play-by-play data
+(confirmed downloadable, no login: one full season already checked and
+accessible at
+`github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_{year}.csv.gz`)
+before shipping any formula. Session ran out of usage right after
+confirming that data source exists — the research doc's own "Next steps"
+checklist is exactly where to pick back up.
+
 ## Week MVP / LVP awards (2026-09-14)
 
 Tommy: "can we add that week's MVP and LVP (meaning the player with the

@@ -25,6 +25,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch: {}
+  # refresh.yml dispatches this (not a plain workflow_dispatch) so it can
+  # pin the EXACT commit it just pushed via the checkout step below —
+  # see that workflow's own "Trigger deploy" step for the real bug this
+  # fixes (a one-refresh-cycle-stale deploy, caught live 2026-09-14).
+  repository_dispatch:
+    types: [refresh-deploy]
 
 concurrency:
   group: pages
@@ -39,7 +45,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # A repository_dispatch (from refresh.yml) carries the exact commit
+      # to deploy in its payload — falls back to the normal push/
+      # workflow_dispatch behavior (github.sha) otherwise.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.client_payload.sha || github.sha }}
 
       - uses: pnpm/action-setup@v4
         with:

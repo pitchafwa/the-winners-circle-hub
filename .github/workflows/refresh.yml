@@ -139,8 +139,8 @@ on:
     # (24 game(s) still startTimeTBD as of 2026-09-13 — picked up automatically once the weekly regenerate job sees a real kickoff time for them. Every-6h fallback above covers them until then.)
 
 permissions:
-  contents: write
-  actions: write  # lets the "Trigger deploy" step below dispatch deploy-pages.yml directly
+  contents: write  # also what the "Trigger deploy" step's repository_dispatch call needs
+  actions: write
 
 jobs:
   refresh:
@@ -264,13 +264,31 @@ jobs:
             fi
           done
           echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # Explicit dispatch instead of relying on the push above to trigger
       # deploy-pages.yml's own `on: push` — see this job's first step for
       # why a GITHUB_TOKEN-authenticated push never fires that trigger.
       # Only worth doing when there was actually a new commit to deploy.
+      #
+      # A `repository_dispatch` carrying the EXACT sha this job just
+      # pushed, not a plain `gh workflow run deploy-pages.yml` (caught
+      # live, 2026-09-14 — Tommy: "no players are showing up bold for me
+      # yet" right after a real feature shipped, traced to this). Why:
+      # `gh workflow run`'s `--ref` only accepts a branch/tag name, not a
+      # commit sha — passing no ref at all resolves against the default
+      # branch as GitHub's API sees it AT DISPATCH TIME, which two
+      # consecutive real refresh runs both showed resolving to the
+      # PREVIOUS commit, not this run's own freshly-pushed one (a real,
+      # reproducible one-cycle lag, not a one-off timing fluke).
+      # `repository_dispatch` sidesteps the ref-resolution race entirely:
+      # deploy-pages.yml's own checkout step explicitly uses the sha from
+      # this payload rather than trusting whatever "main" resolves to.
       - name: Trigger deploy
         if: steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy-pages.yml --repo ${{ github.repository }}
+        run: |
+          gh api "repos/${{ github.repository }}/dispatches" \
+            -f event_type=refresh-deploy \
+            -f "client_payload[sha]=${{ steps.commit.outputs.sha }}"

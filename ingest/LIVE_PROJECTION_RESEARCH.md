@@ -166,29 +166,116 @@ real problems worth planning around, not re-discovering the hard way):
     general-purpose multi-league tool — but don't assume, verify against
     this league's real settings before shipping.
 
+## Scope pivot (2026-09-13): compute OUR OWN live scores, not just live projections
+
+Tommy's own read, after seeing this public feed exists: rather than only
+using it as an input signal to a projection MODEL, just use it to
+compute this league's real fantasy points ourselves directly — we
+already know this league's exact scoring rules, so there's no reason to
+keep depending on the private fantasy API's own (slow, cookie-gated,
+~15-minute-cadence) `actual` score at all. Both the "what's the real
+score right now" number and the eventual "live projection" can be built
+on the same free, fast, public feed. Agreed and built out below.
+
+### `ingest/scoring.py` — built and validated (2026-09-13)
+
+Computes this league's real fantasy points from raw per-statId counts,
+using the league's actual cached `scoringSettings.scoringItems`
+(46 real rules, including D/ST tiers and position-specific overrides).
+
+**Validated against every real player-week ESPN has ever scored for this
+league across 2024 and 2025 — 5,312 player-weeks, exact match (within
+float rounding) in 100% of cases.** The key discovery that made this
+simple: ESPN's raw per-statId stat counts in the PRIVATE feed are
+already the exact scoring unit for bucketed categories (e.g. the raw
+value at statId 28 is already `floor(rushingYards / 10)`, not the raw
+yardage) — so scoring from the private feed's raw stats is purely
+linear, `raw_count * points_per_unit` summed, no bucketing math needed
+on our end there at all.
+
+### `ingest/live_public_stats.py` — built and validated (2026-09-13)
+
+Translates the PUBLIC feed's `boxscore.players` (named stat groups, not
+pre-bucketed like the private feed) into the same statId-space
+`scoring.py` expects, for skill positions (passing/rushing/receiving/
+fumbles) so far.
+
+- **Empirically confirmed the real yards-per-point divisors** (don't
+  have to guess): compared the private feed's own pre-bucketed statId
+  (e.g. 28) against its plain yardage stat (e.g. 24) across thousands of
+  real 2024-2025 samples. Confirmed exact: passing 1 point per 25 yards,
+  rushing and receiving both 1 point per 10 yards.
+- **Found and fixed a real bug via validation, not by inspection**:
+  Python's `//` floors toward -infinity, so a player with negative
+  rushing yards (a QB kneel, a busted scramble) was getting docked an
+  extra point it shouldn't have (`-3 // 10 == -1`, when the correct
+  bucket is 0). Caught because Matthew Stafford's computed score came
+  out 1 point below the real, already-known-correct number — exactly
+  the kind of quiet, plausible-looking error this validate-against-
+  reality approach exists to catch. Fixed with a proper
+  truncate-toward-zero bucket function.
+- **End-to-end validated against two real, fully-finished games from
+  today** (Rams @ 49ers, Patriots @ Seahawks) — pulled the public feed's
+  raw box score for every one of this league's rostered skill players in
+  those games (9 players: Puka Nacua, Matthew Stafford, Davante Adams,
+  Kyren Williams, Christian McCaffrey, Mike Evans, Rhamondre Stevenson,
+  A.J. Brown, Jaxon Smith-Njigba), ran them through
+  `live_public_stats.py` → `scoring.py`, and compared against each
+  player's real, already-known-correct fantasy score. **9 for 9 exact
+  matches.** This is now a proven, working pipeline for offensive skill
+  positions — public feed in, our own correctly-scored fantasy points
+  out, matching ESPN's own number exactly.
+- **Confirmed NOT needed for this league**: forced fumbles (statId 106)
+  has zero points in this league's real scoring settings — one of the
+  Reddit thread's flagged gaps in this feed turns out not to matter
+  here at all.
+
+### Still not built — the real remaining gap is D/ST + kicking
+
+- **D/ST (team-level defense scoring)**: this league scores D/ST as ONE
+  team unit (position id 16), never individual defenders — so what's
+  needed is team-level points-allowed and yards-allowed, not per-
+  defender stats. Confirmed derivable from this same public feed's
+  `boxscore.teams` (team-level game totals, e.g. `totalYards`) — a
+  team's defense's "yards allowed" is simply the OPPONENT team's own
+  `totalYards` in the same game, and "points allowed" is the opponent's
+  live score. Sacks/INTs/fumble-recoveries for D/ST scoring purposes are
+  the OPPONENT's own "sacksYardsLost"/interceptions-thrown/fumbles-lost
+  numbers (a defense's sack is the other team's QB being sacked) — not
+  yet wired up, but the data needed is confirmed present, just needs the
+  cross-team lookup logic written.
+- **Kicking distance tiers**: this feed's `kicking` stat group only
+  gives a combined "made/attempted" count, no per-kick distance — but
+  this league's real scoring IS tiered by distance (FG80 items nonzero
+  at multiple distance brackets). Needs each made field goal's real
+  distance parsed out of the drive `plays[].text` strings (e.g.
+  "E.McPherson 43 Yd Field Goal") — not yet built.
+- **2-point conversions**: confirmed still missing from this feed's
+  structured stats entirely (matches what the Reddit thread flagged) —
+  this league DOES score these (2 points each, passing/rushing/
+  receiving all nonzero in real scoring settings) — needs the same
+  drive `plays[].text` parsing approach as kicking distance.
+
 ## Next steps (pick up here)
 
-- [ ] Confirm this league's real scoring settings don't lean heavily on
-      the stat categories this feed gets wrong/misses (forced fumbles,
-      2-point conversions, fumble recovery attribution) — check
-      `league.scoring_settings` (already fetched, see `parse.py`).
-- [ ] Poll this endpoint for one full live game start-to-finish (a
-      Thursday or early Sunday window) at the same ~cadence we'd run in
-      production, and diff `boxscore.players` snapshots over time to
-      confirm per-player stat deltas make sense and land in a reasonable
-      timeframe after real plays happen (i.e. how "live" is it really).
-  - [ ] Decide whether to still pull nflverse's free historical
-      play_by_play (`play_by_play_{year}.csv.gz`, confirmed downloadable
-      2026-09-13) for BACKTESTING specifically — it's a different,
-      already-labeled, easier-to-bulk-process dataset for replaying past
-      seasons than re-deriving the same thing from ESPN's live endpoint
-      after the fact. The two sources can coexist: ESPN's public API for
-      live production data, nflverse for offline backtesting against
-      real historical games.
-- [ ] Build the backtest harness against 2-3 historical seasons (via
-      nflverse) to validate the opportunity-share + shrinkage model
-      proposed above against real games before shipping any formula.
-- [ ] Prototype and tune the shrinkage model against real backtest error.
-- [ ] Write a small parser for the drive `plays[].text` strings to catch
-      2-point conversions and forced fumbles (the two real gaps in the
-      structured stat data), if this league's scoring settings need them.
+- [ ] Build the D/ST team-defense scoring piece (points/yards-allowed +
+      opponent-derived sacks/INTs/fumble-recoveries), per the plan above
+      — the data is confirmed present, this is just wiring.
+- [ ] Build the `drives[].plays[].text` parser for made-field-goal
+      distance (kicking tiers) and 2-point conversions — both needed for
+      this league's real scoring, neither in the structured stat groups.
+- [ ] Once skill positions + D/ST + kicking are all covered: validate a
+      FULL real team's live score (every starter, one real team, one
+      real week) against the known-correct final, the same
+      validate-against-reality approach used above.
+- [ ] Decide how self-computed live scores reconcile with ESPN's own
+      official number once available (Tommy's call, already made,
+      2026-09-13): treat our own number as the fast "right now" score,
+      then quietly replace it with ESPN's official number once a game is
+      actually over — nobody should ever see a wrong FINAL score, only a
+      provisional live one.
+- [ ] THEN: revisit the original "live projection" model (opportunity-
+      share + shrinkage, backtested via nflverse's free historical
+      play-by-play, `play_by_play_{year}.csv.gz` — confirmed downloadable
+      2026-09-13) — now that we can compute the "actual" half of that
+      question ourselves, live, this becomes the next real layer on top.

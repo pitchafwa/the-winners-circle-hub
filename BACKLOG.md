@@ -3,29 +3,34 @@
 Ideas parked for later. Nothing here gets built until Tommy says which ones
 to pull off this list. Roughly grouped; not priority-ordered.
 
-## IN PROGRESS: build our own live in-game player projection (2026-09-13)
+## IN PROGRESS: build our own live in-game scoring + projection (2026-09-13)
 
 Tommy noticed ESPN's iPhone app shows a real live-recalculating
-projection (confirmed this session as app-exclusive — not on ESPN's
-website, not in the data feed this app pulls from). He asked to build
-League Hub's own version instead of chasing ESPN's app-only number,
-explicitly flagging the hard part: points come in bunches (a 20-yard
-catch 10 seconds into the game isn't a 300-point pace), so this needs a
-real, backtested, defensible formula, not a guess.
+projection (confirmed app-exclusive — not on ESPN's website, not in the
+data feed this app pulls from). Asked to build League Hub's own version
+instead of chasing ESPN's app-only number, flagging the hard part:
+points come in bunches (a 20-yard catch 10 seconds into the game isn't a
+300-point pace), so this needs a real, backtested, defensible formula.
 
-**Full research/design writeup started at
-`ingest/LIVE_PROJECTION_RESEARCH.md`** — read that file before continuing
-this. Short version: project remaining OPPORTUNITY (targets/carries,
-driven by game script + pace) rather than remaining points, shrink any
-in-game observation toward the pregame baseline using real sample size
-(touches so far, not clock time) so one early big play can't distort
-anything, and backtest against nflverse's free public play-by-play data
-(confirmed downloadable, no login: one full season already checked and
-accessible at
-`github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_{year}.csv.gz`)
-before shipping any formula. Session ran out of usage right after
-confirming that data source exists — the research doc's own "Next steps"
-checklist is exactly where to pick back up.
+**Full writeup: `ingest/LIVE_PROJECTION_RESEARCH.md`** — read that file
+before continuing this. Scope grew mid-session (Tommy's call, agreed):
+rather than only using the newly-found public ESPN feed as a projection
+MODEL input, compute this league's real live "actual" scores ourselves
+too, directly from that feed — no more waiting on the slow, cookie-gated
+private fantasy API for live scores at all.
+
+**Real progress, not just research now**: `ingest/scoring.py` (this
+league's real scoring rules applied to raw stats — validated exact
+against 5,312 real ESPN-scored player-weeks) and
+`ingest/live_public_stats.py` (translates the new public feed's raw
+stats into that same format — validated exact against 9 real players
+across 2 fully-finished games today, including catching and fixing a
+real negative-yardage bucketing bug along the way) are both built and
+committed. Still missing: D/ST team-defense scoring and kicking-distance
+tiers (data confirmed available, just not wired up yet), then the
+original opportunity-share + shrinkage projection model on top,
+backtested via nflverse's free historical play-by-play. Research doc's
+"Next steps" checklist is exactly where to pick back up.
 
 ## Week MVP / LVP awards (2026-09-14)
 

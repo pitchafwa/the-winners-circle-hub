@@ -113,3 +113,28 @@ def player_raw_stats_from_public_boxscore(team_stat_groups: list[dict]) -> dict[
                 raw[FUMBLES_LOST_STAT_ID] = _num(values.get("fumblesLost"))
 
     return out
+
+
+def player_touches_from_public_boxscore(team_stat_groups: list[dict]) -> dict[str, int]:
+    """One team's stat groups -> {player_id: real touches so far this
+    game} — carries + targets (a target counts even when incomplete,
+    since it's the real opportunity signal `live_projection.py`'s model
+    needs, not just a catch). Used only for the live projection model's
+    sample-size weighting, never for scoring."""
+    out: dict[str, int] = {}
+
+    def add(pid: str, n: float):
+        out[pid] = out.get(pid, 0) + int(n)
+
+    for group in team_stat_groups:
+        name = group.get("name")
+        keys = group.get("keys", [])
+        for athlete_row in group.get("athletes", []):
+            pid = athlete_row["athlete"]["id"]
+            values = dict(zip(keys, athlete_row.get("stats", [])))
+            if name == "rushing":
+                add(pid, _num(values.get("rushingAttempts")))
+            elif name == "receiving":
+                add(pid, _num(values.get("receivingTargets")))
+
+    return out

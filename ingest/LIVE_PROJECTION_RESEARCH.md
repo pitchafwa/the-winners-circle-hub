@@ -367,13 +367,38 @@ case above). Both pieces' constants (`SHRINK_K=3`, `CAP_MULTIPLIER=2.0`)
 were swept against real backtest error, not guessed — see that module's
 own docstring for the full reasoning and numbers.
 
-**Not yet wired into the live build**: the model needs `touches_so_far`
-(carries+targets) as an input, which `live_score.py` doesn't currently
-track (it computes POINTS from the public feed, not touch counts) — but
-the raw data for it is already sitting in that same feed's per-player
-`rushingAttempts`/`receivingTargets` stat groups (confirmed present
-while building `live_public_stats.py` earlier), so this is new plumbing
-on an already-proven data source, not a new integration.
+**Now wired into the live build (2026-09-14)**: `live_public_stats.py`
+gained `player_touches_from_public_boxscore()` (carries + targets, a
+target counting even when incomplete); `live_score.py`'s
+`compute_live_scores_for_week()` now returns
+`{player_id: {points, touches, elapsed_fraction}}` instead of a flat
+points dict, reading each game's real live clock (`period`/
+`displayClock` off the public feed's own status object) to compute
+`elapsed_fraction` the SAME game-clock-based way the backtest itself was
+built and validated (not an approximation via wall-clock time since
+kickoff — that would be a different, unvalidated proxy). D/ST and
+kickers carry `touches: None` (the model is scoped to skill positions —
+see `live_projection.py`'s own docstring for why).
+
+`parse.optimal_week_projection()`'s `_best_estimate()` now calls
+`live_projection.project_rest_of_game()` whenever real touch data is
+available for a still-in-progress player, in place of the old
+`max(actual, projected)` blend — falling back to that old blend
+whenever live touch data isn't available (a past week, D/ST/kickers, or
+any gap in the live fetch), never a crash. Because `projected_final`
+(and from it, `home_projected`/`away_projected`/`home_win_pct`) is built
+by summing `_best_estimate()` across a team's whole lineup, this single
+change is what makes a team's live projected score and win probability
+actually react to how the games in progress are going — Tommy's
+explicit requirement (2026-09-14) for this wiring, not an afterthought.
+
+**Verified the real effect, not just that it runs**: ran the actual
+`simulate.run()` with and without the live override applied against
+today's real live games and diffed every team's `projected_final`/
+`home_win_pct`. All 10 teams' projected score AND win probability
+changed under the new model (e.g. one team moved from 52% to 67% to win
+its matchup once its players' live in-game pace was actually factored
+in) — confirmed this isn't a no-op, it's genuinely live.
 
 ## Scope note: `roster_card.py` NOT yet switched over (2026-09-13)
 

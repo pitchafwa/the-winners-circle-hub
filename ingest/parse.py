@@ -726,7 +726,7 @@ JOKE_LINEUP_GAP = 10.0
 
 def optimal_week_projection(
     season: int, week: int, starting_slots: list[int],
-    live_score_override: dict[int, float] | None = None,
+    live_score_override: dict[int, dict] | None = None,
 ) -> dict[int, dict]:
     """team_id -> {current, projected_final, started, remaining,
     total_starters, lineup} for a week that hasn't been played yet, or is
@@ -796,18 +796,31 @@ def optimal_week_projection(
     pulled this week).
 
     `live_score_override` (added 2026-09-13, see `live_score.py` /
-    LIVE_PROJECTION_RESEARCH.md): optional {player_id: points} computed
-    ourselves from ESPN's free public feed, refreshable far more often
-    than the private fantasy API this function otherwise depends on.
-    Applied only while a player's own real game is still genuinely in
-    progress (`not pro_game_likely_over`) — once a game's actually over,
-    ESPN's own official `actual` (the private feed's number, already
-    read above) wins instead. Our own number is the fast "right now"
-    approximation; theirs is the real record once a game is decided."""
+    LIVE_PROJECTION_RESEARCH.md): optional {player_id: {points, touches,
+    elapsed_fraction}} computed ourselves from ESPN's free public feed,
+    refreshable far more often than the private fantasy API this
+    function otherwise depends on. Applied only while a player's own
+    real game is still genuinely in progress (`not pro_game_likely_over`)
+    — once a game's actually over, ESPN's own official `actual` (the
+    private feed's number, already read above) wins instead. Our own
+    `points` is the fast "right now" approximation; theirs is the real
+    record once a game is decided.
+
+    `touches`/`elapsed_fraction` (skill positions only — `None` for D/ST
+    and kickers, see `live_score.py`) feed `live_projection.py`'s real,
+    backtested rest-of-game model in `_best_estimate()` below, in place
+    of the old `max(actual, projected)` blend — a real projection of what
+    the player's REMAINING production will be, not just "at least what
+    they've already scored." This is what makes a team's live projected
+    score and win probability actually react to how the games in
+    progress are going, per Tommy's explicit ask (2026-09-14) — before
+    this, `projected_final` only ever moved when a player's own `actual`
+    changed, never from a live re-projection of what's left in their game."""
     box = _load(season, f"boxscores-week{week}")
     if not box:
         return {}
     from metrics import best_lineup  # local import: metrics imports from parse, so this has to be deferred to call time to dodge a circular import at module load
+    import live_projection  # local import: same reasoning as `best_lineup` above, and keeps this optional dependency out of every other caller of parse.py that never touches a live week
 
     game_dates = pro_game_dates(season, week)
     live_score_override = live_score_override or {}
@@ -819,11 +832,24 @@ def optimal_week_projection(
         that needs "how good is this player right now," not just the
         final `projected_final` sum: filling a genuinely blank starting
         slot and the joke-lineup bench comparison both need the same
-        number."""
+        number.
+
+        While a game's genuinely in progress AND real touch data is
+        available (`live_touches`/`live_elapsed_fraction`, set below from
+        `live_score_override` — `None` for D/ST/kickers, who don't have
+        a "touches" concept), this calls the real, backtested rest-of-game
+        model instead of the old `max(actual, projected)` blend. Falls
+        back to that old blend when live touch data isn't available (a
+        past week rebuilt with no override, D/ST/kickers, or a player
+        `live_score.py` never fetched data for) — never a crash, just the
+        previous, still-correct-if-less-precise behavior."""
         if entry["actual"] is None:
             return entry["projected"]
         if pro_game_likely_over(game_dates.get(entry["pro_team_id"])):
             return entry["actual"]
+        touches, frac = entry.get("live_touches"), entry.get("live_elapsed_fraction")
+        if touches is not None and frac is not None:
+            return live_projection.project_rest_of_game(entry["actual"], touches, frac, entry["projected"])
         return max(entry["actual"], entry["projected"])
 
     pro = pro_team_schedule(season)
@@ -849,8 +875,12 @@ def optimal_week_projection(
                         actual = stat.get("appliedTotal", 0.0)
                     elif stat.get("statSourceId") == 1:
                         projected = stat.get("appliedTotal", 0.0)
-                if pid in live_score_override and not pro_game_likely_over(game_dates.get(player.get("proTeamId", 0))):
-                    actual = live_score_override[pid]
+                live_touches, live_elapsed_fraction = None, None
+                override_entry = live_score_override.get(pid)
+                if override_entry is not None and not pro_game_likely_over(game_dates.get(player.get("proTeamId", 0))):
+                    actual = override_entry["points"]
+                    live_touches = override_entry.get("touches")
+                    live_elapsed_fraction = override_entry.get("elapsed_fraction")
                 entry = {
                     "player_id": pid, "eligible": eligible,
                     "name": player.get("fullName", ""),
@@ -858,6 +888,7 @@ def optimal_week_projection(
                     "pro_team": pro.get(player.get("proTeamId", 0), {}).get("abbrev", ""),
                     "pro_team_id": player.get("proTeamId", 0),
                     "actual": actual, "projected": projected, "played": actual is not None,
+                    "live_touches": live_touches, "live_elapsed_fraction": live_elapsed_fraction,
                 }
                 lineup_slot = e.get("lineupSlotId", BENCH_SLOT)
                 if lineup_slot in NON_STARTING:
@@ -943,7 +974,12 @@ def optimal_week_projection(
                 for i, slot_id in enumerate(starting_slots)
             ]
             current = sum(p["actual"] for p in lineup if p["played"])
-            projected_final = sum(_best_estimate(p) for p in lineup if p["player_id"] is not None)
+            # From `lineup_by_index` (the full entry dicts, still carrying
+            # `live_touches`/`live_elapsed_fraction`), not the trimmed
+            # `lineup` list above — those two fields are internal to this
+            # computation, not part of the public lineup-entry shape this
+            # function documents and the frontend reads.
+            projected_final = sum(_best_estimate(e) for e in lineup_by_index if e is not None)
             started = any(p["played"] for p in lineup)
             filled = [p for p in lineup if p["player_id"] is not None]
             out[side["teamId"]] = {

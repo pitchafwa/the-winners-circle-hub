@@ -68,11 +68,20 @@ average), and a new shrink-toward-pregame-by-real-touches-plus-cap model
 (MAE 3.44, beats both — the same 68-point blowup case now projects to
 exactly 17.0). The model's two constants were tuned by sweeping real
 values against backtest error, not guessed. Built as
-`ingest/live_projection.py`. **Not yet wired into the live build** — it
-needs touch counts (carries+targets) as an input, which the already-
-working live-score pipeline doesn't currently track, though the raw data
-for it is already sitting in the same public feed already in use. Full
-methodology and numbers in the research doc.
+`ingest/live_projection.py`.
+
+**Now wired into the live build (2026-09-14)**, per Tommy's explicit
+requirement that this actually move a team's projected score and win
+probability, not just sit there computed: `live_score.py` now also
+tracks each player's real touches and each game's live clock (the exact
+same definition the backtest was validated against), and
+`parse.optimal_week_projection()` calls the real projection model for
+any in-progress player instead of the old frozen-blend behavior.
+Verified the real effect directly — ran the actual production sim with
+and without the model and confirmed all 10 teams' projected score AND
+win probability genuinely moved (one team's win odds shifted from 52%
+to 67% once its players' live pace was factored in), not just that the
+code runs without erroring.
 
 ## Week MVP / LVP awards (2026-09-14)
 

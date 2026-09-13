@@ -7,10 +7,15 @@ validated against real, known-correct scores already.
 
 This is deliberately a thin orchestrator: fetch the week's real games,
 run each team's box score through the position-specific translators, and
-hand back one flat {player_id: points} dict. The caller decides how to
-use it (see `parse.optimal_week_projection`'s `live_score_override`
-param) — this module doesn't know anything about lineups, matchups, or
-reconciliation with ESPN's own official number.
+hand back one flat {player_id: {points, touches, elapsed_fraction}}
+dict. The caller decides how to use it (see
+`parse.optimal_week_projection`'s `live_score_override` param) — this
+module doesn't know anything about lineups, matchups, or reconciliation
+with ESPN's own official number.
+
+`touches`/`elapsed_fraction` (added 2026-09-13) feed
+`live_projection.py`'s rest-of-game model, on top of the points this
+module was already computing — see LIVE_PROJECTION_RESEARCH.md.
 """
 import requests
 
@@ -21,6 +26,31 @@ import live_public_dst_kicking as dst_kicking
 
 SCOREBOARD_URL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
 SUMMARY_URL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/summary"
+
+REGULATION_SECONDS = 3600  # 4 x 15-minute quarters — same definition `live_projection.py`'s backtest was built and validated against (nflverse's own game_seconds_remaining), so this has to match, not approximate via wall-clock time since kickoff
+
+
+def _elapsed_fraction(status: dict) -> float:
+    """How far through REGULATION this game is (0, 1] — the same
+    game-clock-based definition `backtest_live_projection.py` used, so
+    the live model gets fed the same kind of input it was actually
+    validated against. `period` 1-4 is a normal quarter; 5+ is OT, which
+    this app's backtest never modeled specifically — by OT there's
+    already a full game's worth of real sample size, so this just clips
+    at 1.0 rather than trying to model OT's own separate clock."""
+    period = status.get("period") or 0
+    if period <= 0:
+        return 0.0
+    if period > 4:
+        return 1.0
+    display_clock = status.get("displayClock") or "0:00"
+    try:
+        minutes, seconds = display_clock.split(":")
+        remaining_in_quarter = int(minutes) * 60 + int(seconds)
+    except ValueError:
+        remaining_in_quarter = 0
+    elapsed = (period - 1) * 900 + (900 - remaining_in_quarter)
+    return max(0.0, min(1.0, elapsed / REGULATION_SECONDS))
 
 # ESPN fantasy's own convention for a team D/ST's "player" id — confirmed
 # against this app's real data (e.g. Chargers D/ST, pro_team_id 24, has
@@ -44,23 +74,26 @@ def fetch_game_summary(event_id: str) -> dict:
     return resp.json()
 
 
-def _team_players_scores(team_statistics: list[dict], position_id_by_pid: dict, rules: dict) -> dict[int, float]:
-    """One team's skill-position players -> {player_id: points}.
+def _team_players_scores(team_statistics: list[dict], position_id_by_pid: dict, rules: dict) -> dict[int, dict]:
+    """One team's skill-position players -> {player_id: {points, touches}}.
     `position_id_by_pid` is only consulted for players whose position
     actually needs it (this league has no overrides outside D/ST, so a
-    reasonable default works for anyone not already known)."""
+    reasonable default works for anyone not already known). `touches` is
+    carries+targets, the real sample-size signal `live_projection.py`'s
+    model needs — not used for scoring itself."""
     raw_by_player = live_public_stats.player_raw_stats_from_public_boxscore(team_statistics)
-    out: dict[int, float] = {}
+    touches_by_player = live_public_stats.player_touches_from_public_boxscore(team_statistics)
+    out: dict[int, dict] = {}
     for pid_str, raw in raw_by_player.items():
         pid = int(pid_str)
         position_id = position_id_by_pid.get(pid, 4)  # default: no override applies to any offensive skill position anyway
         pts, _ = scoring.compute_fantasy_points(raw, position_id, rules)
-        out[pid] = pts
+        out[pid] = {"points": pts, "touches": touches_by_player.get(pid_str, 0)}
     return out
 
 
-def _kicker_scores(team_players_stats: list[dict], scoring_plays: list[dict], rules: dict) -> dict[int, float]:
-    out: dict[int, float] = {}
+def _kicker_scores(team_players_stats: list[dict], scoring_plays: list[dict], rules: dict) -> dict[int, dict]:
+    out: dict[int, dict] = {}
     for group in team_players_stats:
         if group.get("name") != "kicking":
             continue
@@ -76,20 +109,32 @@ def _kicker_scores(team_players_stats: list[dict], scoring_plays: list[dict], ru
             distances = [d for d in distances if d is not None]
             raw = dst_kicking.kicker_raw_stats(kicking_stats, distances)
             pts, _ = scoring.compute_fantasy_points(raw, 17, rules)
-            out[pid] = pts
+            out[pid] = {"points": pts, "touches": None}  # no "touches" concept for a kicker — live_projection.py is scoped to skill positions only
     return out
 
 
-def compute_live_scores_for_week(season: int, week: int, rules: dict) -> dict[int, float]:
-    """{player_id: live fantasy points} for every player (offense, D/ST,
-    kicker) in every real NFL game scheduled this fantasy week, across
-    whatever real status each game is currently in (not started, live,
-    or final). Missing pieces (2-point conversions, blocked kicks,
-    safeties — see LIVE_PROJECTION_RESEARCH.md) are simply absent from
-    the raw stats fed into `scoring.py`, so they contribute 0 rather than
-    erroring — a real, known, documented undercount for the rare cases
-    they'd apply, not a crash."""
-    out: dict[int, float] = {}
+def compute_live_scores_for_week(season: int, week: int, rules: dict) -> dict[int, dict]:
+    """{player_id: {points, touches, elapsed_fraction}} for every player
+    (offense, D/ST, kicker) in every real NFL game scheduled this
+    fantasy week, across whatever real status each game is currently in
+    (not started, live, or final).
+
+    `touches` is `None` for D/ST and kickers (see `live_projection.py`'s
+    own docstring — it's scoped to skill positions only, a kicker or a
+    defense doesn't have the same "opportunity pace" concept a receiver
+    or running back does). `elapsed_fraction` (added 2026-09-13, see
+    LIVE_PROJECTION_RESEARCH.md's projection-model section) is the same
+    game for every player in it, read straight off this game's real live
+    clock (`_elapsed_fraction`) — the SAME game-clock-based definition
+    the projection model was actually backtested against, not an
+    approximation via wall-clock time since kickoff.
+
+    Missing pieces (2-point conversions, blocked kicks, safeties — see
+    LIVE_PROJECTION_RESEARCH.md) are simply absent from the raw stats fed
+    into `scoring.py`, so they contribute 0 rather than erroring — a
+    real, known, documented undercount for the rare cases they'd apply,
+    not a crash."""
+    out: dict[int, dict] = {}
 
     for event in fetch_week_events(season, week):
         event_id = event["id"]
@@ -109,10 +154,13 @@ def compute_live_scores_for_week(season: int, week: int, rules: dict) -> dict[in
             for c in summary["header"]["competitions"][0]["competitors"]
         }
         scoring_plays = summary.get("scoringPlays", [])
+        elapsed_fraction = _elapsed_fraction(summary["header"]["competitions"][0].get("status", {}))
 
         for abbrev, team_stats in players_by_team.items():
-            out.update(_team_players_scores(team_stats, {}, rules))
-            out.update(_kicker_scores(team_stats, scoring_plays, rules))
+            for pid, entry in _team_players_scores(team_stats, {}, rules).items():
+                out[pid] = {**entry, "elapsed_fraction": elapsed_fraction}
+            for pid, entry in _kicker_scores(team_stats, scoring_plays, rules).items():
+                out[pid] = {**entry, "elapsed_fraction": elapsed_fraction}
 
             opponent_abbrevs = [a for a in players_by_team if a != abbrev]
             if not opponent_abbrevs:
@@ -127,6 +175,8 @@ def compute_live_scores_for_week(season: int, week: int, rules: dict) -> dict[in
             dst_pts, _ = scoring.compute_fantasy_points(dst_raw, 16, rules)
             pro_team_id = ABBREV_TO_PRO_TEAM_ID.get(abbrev)
             if pro_team_id is not None:
-                out[DST_PLAYER_ID_OFFSET - pro_team_id] = dst_pts
+                out[DST_PLAYER_ID_OFFSET - pro_team_id] = {
+                    "points": dst_pts, "touches": None, "elapsed_fraction": elapsed_fraction,
+                }
 
     return out

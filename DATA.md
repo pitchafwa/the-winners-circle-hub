@@ -562,14 +562,43 @@ members of that same lineup (`0.0` before anyone's played);
 `started` is true the moment either team has a real stat line, so the
 frontend can switch from "projected score" to "current score, projected
 final below." Win probability is `normal_cdf((home_projected −
-away_projected) / WIN_PROB_SIGMA)` (`simulate.py`, sigma = 35, hand-fit
-against 8 real win-probability numbers pulled from ESPN's own app, matching
-all 8 within about a percentage point) — a separate, simpler model from
-the season-long Monte Carlo sim, since it only needs to answer "who's
-favored this one week." Fed the projected-FINAL numbers throughout the
-week, so it naturally sharpens toward 0%/100% as real results replace
-projections inside that same optimal lineup — no separate in-week
-recalibration of `WIN_PROB_SIGMA` itself.
+away_projected) / live_sigma)` (`simulate.py`) — a separate, simpler model
+from the season-long Monte Carlo sim, since it only needs to answer "who's
+favored this one week."
+
+`live_sigma` (revised 2026-09-14 — was a flat `WIN_PROB_SIGMA` always;
+see below) shrinks as the matchup actually gets decided, rather than
+treating a near-final score with the same real-world spread as a
+pregame one. `WIN_PROB_SIGMA = 35` (hand-fit against 8 real
+win-probability numbers pulled from ESPN's own app, matching all 8
+within about a percentage point) was calibrated purely against PREGAME
+matchups, where every starter's outcome is still fully open — applying
+it unchanged to a mostly-decided week overstates a trailing team's real
+comeback odds. Caught live by Tommy (2026-09-14): a team down 50+ points
+with only 3 of 10 starters left, each already midway through their own
+game, was still reading as a real 14% chance to win.
+
+Fix: each team's `remaining_uncertainty_fraction` (`parse.
+optimal_week_projection()`, new field) is the average, across that
+team's real starting lineup, of how much of EACH player's own game is
+still undecided — `1.0` for a player who hasn't played at all (the
+honest pregame default), shrinking toward `0` the further along their
+real game is, and exactly `0` once it's confirmed final. Averaging both
+teams' fractions and taking the square root scales `WIN_PROB_SIGMA` the
+way the standard deviation of a sum of independent not-yet-decided
+outcomes actually shrinks as fewer of them are left:
+`live_sigma = WIN_PROB_SIGMA * sqrt((home_fraction + away_fraction) / 2)`.
+This reduces to the exact original pregame behavior when both teams'
+fractions are `1.0` (unchanged sigma), and correctly collapses toward a
+near-certain outcome once a week is nearly or fully decided — once
+`live_sigma` hits exactly `0` (both teams' weeks fully decided),
+whoever's ahead is simply read as the winner outright rather than
+dividing by zero.
+
+Fed the projected-FINAL numbers throughout the week either way, so the
+raw margin itself also naturally sharpens toward 0%/100% as real results
+replace projections inside that same optimal lineup — `live_sigma`
+compounds on top of that, not instead of it.
 
 When that cache isn't available yet (a fully offline build before any live
 fetch has pulled this week), falls back to `projection_source: "model"` —

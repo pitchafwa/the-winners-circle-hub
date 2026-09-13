@@ -1000,12 +1000,41 @@ def optimal_week_projection(
             projected_final = sum(_best_estimate(e) for e in lineup_by_index if e is not None)
             started = any(p["played"] for p in lineup)
             filled = [p for p in lineup if p["player_id"] is not None]
+
+            # How much REAL uncertainty this team's own score still has left
+            # — used by simulate.py to shrink the win-probability model's
+            # sigma as the week actually gets decided, instead of treating a
+            # near-final score with the same spread as a pregame one (see
+            # that module's own comment for the bug this fixes, caught live
+            # by Tommy 2026-09-14: a team down 50+ points with only 3 of 10
+            # starters left, each already midway through their own games,
+            # was still reading as a real 14% chance to win). 1.0 per real
+            # starting slot when nothing about that player is decided yet
+            # (hasn't played, or no live data at all — the honest pregame
+            # default), shrinking toward 0 the further along their actual
+            # game is, and exactly 0 once it's genuinely final — so this
+            # naturally reduces to the ORIGINAL pregame behavior (fraction
+            # 1.0, no change to the sigma) and only kicks in as real games
+            # actually progress.
+            def _remaining_uncertainty(e: dict | None) -> float:
+                if e is None or not e["played"]:
+                    return 1.0
+                frac = e.get("live_elapsed_fraction")
+                if frac is not None:
+                    return 1.0 - frac
+                return 0.0 if pro_game_likely_over(game_dates.get(e["pro_team_id"])) else 0.5
+            remaining_uncertainty_fraction = (
+                sum(_remaining_uncertainty(e) for e in lineup_by_index) / len(lineup_by_index)
+                if lineup_by_index else 1.0
+            )
+
             out[side["teamId"]] = {
                 "current": round(current, 2),
                 "projected_final": round(projected_final, 2),
                 "started": started,
                 "remaining": sum(1 for p in filled if not p["played"]),
                 "total_starters": len(filled),
+                "remaining_uncertainty_fraction": round(remaining_uncertainty_fraction, 4),
                 "lineup": lineup,
             }
     return out

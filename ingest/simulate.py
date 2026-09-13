@@ -34,6 +34,7 @@ tells the reader how stale that is).
 from __future__ import annotations
 
 import dataclasses
+import math
 import random
 import statistics
 from collections import defaultdict
@@ -507,7 +508,33 @@ def run(league: LeagueData, history: LeagueData | None = None,
                 away_current = round(away_week["current"], 1)
                 home_projected = round(home_week["projected_final"] + matchup_bonus, 1)
                 away_projected = round(away_week["projected_final"], 1)
-                home_win_pct = round(normal_cdf((home_projected - away_projected) / WIN_PROB_SIGMA), 4)
+                # Shrink the win-probability model's spread as this matchup
+                # actually gets decided, instead of treating a near-final
+                # score with the same real-world spread as a pregame one —
+                # WIN_PROB_SIGMA was calibrated purely against PREGAME real
+                # win probabilities, where every starter's outcome is still
+                # fully open. Averaging both teams' own remaining real
+                # uncertainty (`remaining_uncertainty_fraction`, see
+                # `optimal_week_projection`'s own comment for the bug this
+                # fixes) and taking its square root scales the spread the
+                # way the standard deviation of a sum of independent
+                # not-yet-decided outcomes actually shrinks as fewer of them
+                # are left — reduces to the exact original pregame behavior
+                # (fraction 1.0 either team, sigma unchanged) and only pulls
+                # the spread in as real games actually progress.
+                remaining_fraction = (
+                    home_week["remaining_uncertainty_fraction"] + away_week["remaining_uncertainty_fraction"]
+                ) / 2
+                live_sigma = WIN_PROB_SIGMA * math.sqrt(remaining_fraction)
+                home_win_pct = (
+                    round(normal_cdf((home_projected - away_projected) / live_sigma), 4)
+                    if live_sigma > 0
+                    # No real uncertainty left for either team (the week's
+                    # fully decided) — an actual tie is vanishingly rare and
+                    # not worth a real probability split; whoever's ahead
+                    # right now has in effect already won.
+                    else (1.0 if home_projected >= away_projected else 0.0)
+                )
                 started = home_week["started"] or away_week["started"]
                 projection_source = "espn"
                 home_lineup = _with_hot_cold(home_week["lineup"])

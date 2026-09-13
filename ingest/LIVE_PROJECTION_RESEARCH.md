@@ -230,46 +230,80 @@ fumbles) so far.
   Reddit thread's flagged gaps in this feed turns out not to matter
   here at all.
 
-### Still not built — the real remaining gap is D/ST + kicking
+### `ingest/live_public_dst_kicking.py` — built and validated (2026-09-13)
 
-- **D/ST (team-level defense scoring)**: this league scores D/ST as ONE
-  team unit (position id 16), never individual defenders — so what's
-  needed is team-level points-allowed and yards-allowed, not per-
-  defender stats. Confirmed derivable from this same public feed's
-  `boxscore.teams` (team-level game totals, e.g. `totalYards`) — a
-  team's defense's "yards allowed" is simply the OPPONENT team's own
-  `totalYards` in the same game, and "points allowed" is the opponent's
-  live score. Sacks/INTs/fumble-recoveries for D/ST scoring purposes are
-  the OPPONENT's own "sacksYardsLost"/interceptions-thrown/fumbles-lost
-  numbers (a defense's sack is the other team's QB being sacked) — not
-  yet wired up, but the data needed is confirmed present, just needs the
-  cross-team lookup logic written.
-- **Kicking distance tiers**: this feed's `kicking` stat group only
-  gives a combined "made/attempted" count, no per-kick distance — but
-  this league's real scoring IS tiered by distance (FG80 items nonzero
-  at multiple distance brackets). Needs each made field goal's real
-  distance parsed out of the drive `plays[].text` strings (e.g.
-  "E.McPherson 43 Yd Field Goal") — not yet built.
+D/ST turned out simpler than planned once the real team-level stat shape
+was actually inspected — no play-by-play scanning needed at all:
+
+- **D/ST is fully derivable from `boxscore.teams` alone.** A team's
+  "yards allowed" is just the OPPONENT's own `totalYards` in the same
+  game; "points allowed" is the opponent's own score. Sacks/interceptions/
+  fumble-recoveries credited to a defense are the OPPONENT's own conceded
+  numbers (confirmed real, not inferred: ESPN's own team-stat block lists
+  "interceptions" under two entries with the IDENTICAL label
+  "Interceptions thrown" — an actual duplicate in their feed, not a
+  separate "defensive interceptions" stat, so the opponent's thrown-INT
+  count IS the right number to credit). Defensive/special-teams
+  touchdowns are given directly per-team (`defensiveTouchdowns`) — didn't
+  even need to scan for pick-sixes/fumble-return TDs individually, much
+  simpler than the original plan.
+- **Validated exact against the one real answer available**: LAR's D/ST
+  (Rams, today's finished game) computed to 1.0 points — matching the
+  already-known-correct value exactly.
+- **This league's real points-allowed/yards-allowed tier ladders have
+  genuine gaps**, confirmed by dumping every one of the league's 46 real
+  scoring rules directly rather than assuming a standard template: no
+  rule exists at all for 18-27 points allowed, or for 300-349 yards
+  allowed. Those ranges correctly score 0 now, matching what's actually
+  configured — almost got this wrong by assuming a continuous ladder.
+
+- **Kicker: built and validated against 2 real kickers, both exact
+  matches** (Harrison Mevis 1.0, Jason Myers 7.0). Made-field-goal
+  distance turned out NOT to need play-text parsing after all — each
+  field-goal `scoringPlays` entry carries a clean `statYardage` field...
+  except when it doesn't: found this missing/null on a second real game
+  checked during validation (Patriots @ Seahawks) despite the exact same
+  distance being present in that play's `text` ("Jason Myers 30 Yd Field
+  Goal") — so `made_field_goal_distance()` tries the structured field
+  first and falls back to parsing text, since real data proved neither
+  alone was reliable.
+- Confirmed **statId 198 = the 50-59 yard field goal tier** — a real gap
+  in espn_api's own community-maintained stat map (jumps straight from
+  40-49 to 60+) — inferred from this league's own tier progression
+  (<40=3pts, 40-49=4pts, 198=5pts, 60+=6pts) and confirmed consistent
+  once a real 50-yard make (Andy Borregales, NE) scored exactly 5+1=6.
+
+### Still not built — no real example seen yet to validate against
+
 - **2-point conversions**: confirmed still missing from this feed's
   structured stats entirely (matches what the Reddit thread flagged) —
   this league DOES score these (2 points each, passing/rushing/
-  receiving all nonzero in real scoring settings) — needs the same
-  drive `plays[].text` parsing approach as kicking distance.
+  receiving all nonzero in real settings). No 2-point conversion has
+  happened in any game checked so far this week, so there's nothing real
+  to validate a parser against yet — would need `drives[].plays[].text`
+  parsing once one occurs.
+- **Blocked kicks and safeties** (statId 97, 98): not present as a direct
+  team-level stat in this feed, and neither occurred in any live game
+  checked while building this. Same situation as 2-point conversions —
+  flagged rather than guessed at, pick up once a real example exists.
 
 ## Next steps (pick up here)
 
-- [ ] Build the D/ST team-defense scoring piece (points/yards-allowed +
-      opponent-derived sacks/INTs/fumble-recoveries), per the plan above
-      — the data is confirmed present, this is just wiring.
-- [ ] Build the `drives[].plays[].text` parser for made-field-goal
-      distance (kicking tiers) and 2-point conversions — both needed for
-      this league's real scoring, neither in the structured stat groups.
-- [ ] Once skill positions + D/ST + kicking are all covered: validate a
-      FULL real team's live score (every starter, one real team, one
-      real week) against the known-correct final, the same
-      validate-against-reality approach used above.
-- [ ] Decide how self-computed live scores reconcile with ESPN's own
-      official number once available (Tommy's call, already made,
+- [x] ~~Build the D/ST team-defense scoring piece~~ — done, validated.
+- [x] ~~Build kicker scoring~~ — done, validated.
+- [ ] Build the `drives[].plays[].text` parser for 2-point conversions
+      and blocked-kicks/safeties, once a real example of each occurs in a
+      live game to validate the parser against — don't ship unvalidated
+      text-parsing for rare events.
+- [ ] Validate a FULL real team's live score (every starter on one real
+      roster, one real week) against the known-correct final, the same
+      validate-against-reality approach used throughout this doc — the
+      pieces are now all individually validated, this is the integration
+      check.
+- [ ] Wire this into the actual live build pipeline (`build.py`/
+      `simulate.py`) as the new source of truth for `actual`, replacing
+      the private feed's own (slow, cookie-gated) number for live weeks.
+      Decide reconciliation behavior (Tommy's call, already made,
       2026-09-13): treat our own number as the fast "right now" score,
       then quietly replace it with ESPN's official number once a game is
       actually over — nobody should ever see a wrong FINAL score, only a

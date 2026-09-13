@@ -19,17 +19,22 @@ MODEL input, compute this league's real live "actual" scores ourselves
 too, directly from that feed — no more waiting on the slow, cookie-gated
 private fantasy API for live scores at all.
 
-**Real progress, not just research now**: `ingest/scoring.py` (this
-league's real scoring rules applied to raw stats — validated exact
-against 5,312 real ESPN-scored player-weeks) and
-`ingest/live_public_stats.py` (translates the new public feed's raw
-stats into that same format — validated exact against 9 real players
-across 2 fully-finished games today, including catching and fixing a
-real negative-yardage bucketing bug along the way) are both built and
-committed. Still missing: D/ST team-defense scoring and kicking-distance
-tiers (data confirmed available, just not wired up yet), then the
-original opportunity-share + shrinkage projection model on top,
-backtested via nflverse's free historical play-by-play. Research doc's
+**Every position is now built and validated, not just researched**:
+`ingest/scoring.py` (this league's real scoring rules applied to raw
+stats — validated exact against 5,312 real ESPN-scored player-weeks),
+`ingest/live_public_stats.py` (skill positions from the new public feed
+— validated exact against 9 real players across 2 fully-finished games,
+including catching and fixing a real negative-yardage bucketing bug),
+and `ingest/live_public_dst_kicking.py` (D/ST and kickers — validated
+exact against 3 more real known scores: Rams D/ST, Harrison Mevis,
+Jason Myers). Every scorable position in this league now has a proven,
+validated path from the free public feed to the correct fantasy point
+total. Two rare categories (2-point conversions, blocked kicks/safeties)
+are still unhandled — no real example of either has happened in any game
+checked yet, so there's nothing real to validate a parser against; not
+guessing at those until one occurs. Next: wire this into the live build
+pipeline as the new source of truth for live scores, then the original
+opportunity-share + shrinkage projection model on top. Research doc's
 "Next steps" checklist is exactly where to pick back up.
 
 ## Week MVP / LVP awards (2026-09-14)

@@ -32,10 +32,28 @@ validated path from the free public feed to the correct fantasy point
 total. Two rare categories (2-point conversions, blocked kicks/safeties)
 are still unhandled — no real example of either has happened in any game
 checked yet, so there's nothing real to validate a parser against; not
-guessing at those until one occurs. Next: wire this into the live build
-pipeline as the new source of truth for live scores, then the original
-opportunity-share + shrinkage projection model on top. Research doc's
-"Next steps" checklist is exactly where to pick back up.
+guessing at those until one occurs.
+
+**Now wired into the real live build, not just standalone modules**:
+`ingest/live_score.py` computes a whole week's scores from the public
+feed; `simulate.run()`/`parse.optimal_week_projection()` use it for the
+Matchups page and My Team's live scores while a game is still in
+progress, falling back to ESPN's own official number once a game's
+decided. Validated through the actual production code path (not just
+the pieces standalone) — 12 known-correct scores across every position
+came out exact via a real `simulate.run()` call. Caught and fixed a real
+bug during this wiring: the live fetch was firing even during
+`--offline` builds before it got gated on that flag. Live on `main` now,
+so the currently-running Sunday refresh cycle should already be picking
+it up. NOT yet switched over: each player's own card
+(`roster_card.py`'s `week_actual`/`week_projection`) still reads the old
+private-feed numbers — same page could show two different "current"
+scores for the same player until that's done too, flagged in the
+research doc.
+
+Next: the original opportunity-share + shrinkage projection model on
+top of this. Research doc's "Next steps" checklist is exactly where to
+pick back up.
 
 ## Week MVP / LVP awards (2026-09-14)
 

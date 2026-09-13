@@ -295,21 +295,58 @@ was actually inspected — no play-by-play scanning needed at all:
       and blocked-kicks/safeties, once a real example of each occurs in a
       live game to validate the parser against — don't ship unvalidated
       text-parsing for rare events.
-- [ ] Validate a FULL real team's live score (every starter on one real
-      roster, one real week) against the known-correct final, the same
-      validate-against-reality approach used throughout this doc — the
-      pieces are now all individually validated, this is the integration
-      check.
-- [ ] Wire this into the actual live build pipeline (`build.py`/
-      `simulate.py`) as the new source of truth for `actual`, replacing
-      the private feed's own (slow, cookie-gated) number for live weeks.
-      Decide reconciliation behavior (Tommy's call, already made,
-      2026-09-13): treat our own number as the fast "right now" score,
-      then quietly replace it with ESPN's official number once a game is
-      actually over — nobody should ever see a wrong FINAL score, only a
-      provisional live one.
+- [x] ~~Validate a FULL real team's live score~~ — done via the full
+      integration test below, not just one team: ran the real
+      `simulate.run()` with a live override applied against all of this
+      week's rostered players and confirmed 12 known-correct real scores
+      (across every position type) came out exact through the actual
+      production code path.
+- [x] ~~Wire this into the actual live build pipeline~~ — done.
+      `ingest/live_score.py` orchestrates the whole week into one
+      {player_id: points} dict; `parse.optimal_week_projection()` takes
+      an optional `live_score_override` param, applied only while a
+      player's game is genuinely still in progress (once a game's over,
+      ESPN's own official number wins — the reconciliation behavior
+      Tommy already decided, 2026-09-13); threaded through
+      `simulate.run()` and called from `build.py`, gated on the live
+      current week and skipped entirely in `--offline` mode (caught and
+      fixed a real bug during testing where the live fetch was firing
+      even with `--offline` before this gate existed), wrapped
+      defensively so a hiccup in this external feed falls back to the
+      private feed's own slower numbers rather than breaking the build.
 - [ ] THEN: revisit the original "live projection" model (opportunity-
       share + shrinkage, backtested via nflverse's free historical
       play-by-play, `play_by_play_{year}.csv.gz` — confirmed downloadable
       2026-09-13) — now that we can compute the "actual" half of that
       question ourselves, live, this becomes the next real layer on top.
+
+## Scope note: `roster_card.py` NOT yet switched over (2026-09-13)
+
+`this_week_matchups`/`sim.json` (the Matchups page, My Team's live
+score) now use the self-computed live score — but each player card's own
+`week_actual`/`week_projection` fields (`roster_card.py`) still read
+straight from the private feed's own `statSourceId` stat lines,
+untouched by this session's work. Deliberate scoping call, not an
+oversight: Tommy's ask and this session's testing were both about the
+Matchups page specifically. Worth doing the same swap there later for
+consistency (a player's card and the matchup card showing two different
+"current" numbers mid-game would be a real, confusing bug once someone
+notices) — flagged here so it isn't forgotten, not started yet.
+
+## Refresh cadence — what this new feed does and doesn't unlock (2026-09-13)
+
+Tommy asked whether this new source lets the site update more often on
+game days. Two separate things:
+
+- **The live-score computation itself has no rate limit or login tied to
+  it** — unlike the private fantasy API (cookie-gated, and this whole
+  app already rate-limits itself to be polite to it), ESPN's public
+  boxscore feed could be polled much more often than every ~15 minutes
+  with no new constraint on OUR side.
+- **The actual bottleneck was never really the data source — it's the
+  GitHub Actions schedule** (`refresh.yml`'s generated cron windows,
+  `generate_refresh_schedule.py`). Polling more often means more
+  workflow runs, which costs more CI minutes and pushes more commits.
+  That's a real, separate decision (how often, what it costs) that
+  deserves an explicit yes rather than a silent change to shared CI
+  config — not made as a side effect of this work.

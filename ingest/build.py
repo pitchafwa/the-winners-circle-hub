@@ -688,7 +688,30 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             if (config.CACHE_DIR / str(prev) / "league.json").exists():
                 history = parse.load_league(prev)
                 break
-        sim = simulate.run(league, history, redraft_values, live_week_pregame_by_pid)
+
+        # Live scores computed ourselves from ESPN's free public boxscore
+        # feed, refreshable far more often than the private fantasy API
+        # this whole build otherwise depends on — see live_score.py /
+        # LIVE_PROJECTION_RESEARCH.md. Only attempted for the live current
+        # week (current_week is None for a past/offline/preseason build);
+        # wrapped defensively since this hits an external service this
+        # app doesn't control — a hiccup here must fall back to the
+        # private feed's own (slower but already-working) numbers, never
+        # break the build.
+        live_score_override = {}
+        if current_week and not offline:
+            try:
+                import fetch
+                import scoring as fantasy_scoring
+                import live_score
+                raw_league = fetch.read_cache("league", season=season)
+                scoring_items = raw_league["data"]["settings"]["scoringSettings"]["scoringItems"]
+                rules = fantasy_scoring.build_rules(scoring_items)
+                live_score_override = live_score.compute_live_scores_for_week(season, current_week, rules)
+            except Exception as exc:  # noqa: BLE001 — any failure here must not break the build, private-feed numbers are still correct, just slower
+                print(f"  live score fetch failed, falling back to private feed only: {exc}", file=sys.stderr)
+
+        sim = simulate.run(league, history, redraft_values, live_week_pregame_by_pid, live_score_override)
         if sim:
             _write(out_dir / "sim.json", {"generated_at": generated_at, **sim})
 

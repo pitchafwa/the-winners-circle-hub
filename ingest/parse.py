@@ -724,7 +724,10 @@ def ages_by_pid(market_ages: dict[str, float]) -> dict[int, float]:
 JOKE_LINEUP_GAP = 10.0
 
 
-def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -> dict[int, dict]:
+def optimal_week_projection(
+    season: int, week: int, starting_slots: list[int],
+    live_score_override: dict[int, float] | None = None,
+) -> dict[int, dict]:
     """team_id -> {current, projected_final, started, remaining,
     total_starters, lineup} for a week that hasn't been played yet, or is
     only partially played.
@@ -790,13 +793,24 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
     fetches the current week even before anything in it is decided
     specifically so this has something to read. {} if that cache doesn't
     exist yet (e.g. a fully offline build before any live fetch has ever
-    pulled this week)."""
+    pulled this week).
+
+    `live_score_override` (added 2026-09-13, see `live_score.py` /
+    LIVE_PROJECTION_RESEARCH.md): optional {player_id: points} computed
+    ourselves from ESPN's free public feed, refreshable far more often
+    than the private fantasy API this function otherwise depends on.
+    Applied only while a player's own real game is still genuinely in
+    progress (`not pro_game_likely_over`) — once a game's actually over,
+    ESPN's own official `actual` (the private feed's number, already
+    read above) wins instead. Our own number is the fast "right now"
+    approximation; theirs is the real record once a game is decided."""
     box = _load(season, f"boxscores-week{week}")
     if not box:
         return {}
     from metrics import best_lineup  # local import: metrics imports from parse, so this has to be deferred to call time to dodge a circular import at module load
 
     game_dates = pro_game_dates(season, week)
+    live_score_override = live_score_override or {}
 
     def _best_estimate(entry: dict) -> float:
         """This player's best current estimate for the week (see this
@@ -835,6 +849,8 @@ def optimal_week_projection(season: int, week: int, starting_slots: list[int]) -
                         actual = stat.get("appliedTotal", 0.0)
                     elif stat.get("statSourceId") == 1:
                         projected = stat.get("appliedTotal", 0.0)
+                if pid in live_score_override and not pro_game_likely_over(game_dates.get(player.get("proTeamId", 0))):
+                    actual = live_score_override[pid]
                 entry = {
                     "player_id": pid, "eligible": eligible,
                     "name": player.get("fullName", ""),

@@ -274,7 +274,8 @@ def _division_bracket(seeded3: list[int], playoff_game) -> int:
 
 def run(league: LeagueData, history: LeagueData | None = None,
        redraft_values: dict[str, int] | None = None,
-       pregame_by_pid: dict[int, float] | None = None) -> dict | None:
+       pregame_by_pid: dict[int, float] | None = None,
+       live_score_override: dict[int, float] | None = None) -> dict | None:
     remaining = [
         e for e in league.full_schedule
         if e.winner == "UNDECIDED" and e.away_id is not None
@@ -423,7 +424,9 @@ def run(league: LeagueData, history: LeagueData | None = None,
     this_week_period = min((e.matchup_period for e in remaining), default=None)
     this_week_matchups = []
     if this_week_period is not None:
-        week_proj = optimal_week_projection(league.season, this_week_period, league.starting_slots)
+        week_proj = optimal_week_projection(
+            league.season, this_week_period, league.starting_slots, live_score_override,
+        )
         # on_fire/on_ice (parse.hot_cold_status) computed once here, same
         # as roster.json, and merged into each lineup entry below rather
         # than threading it through optimal_week_projection() itself —

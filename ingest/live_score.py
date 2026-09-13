@@ -1,0 +1,132 @@
+"""Compute this league's real fantasy scores for a live/in-progress week,
+using ESPN's free public boxscore feed instead of the slow, cookie-gated
+private fantasy API. See LIVE_PROJECTION_RESEARCH.md for the full story
+— every piece this module orchestrates (`scoring.py`,
+`live_public_stats.py`, `live_public_dst_kicking.py`) is individually
+validated against real, known-correct scores already.
+
+This is deliberately a thin orchestrator: fetch the week's real games,
+run each team's box score through the position-specific translators, and
+hand back one flat {player_id: points} dict. The caller decides how to
+use it (see `parse.optimal_week_projection`'s `live_score_override`
+param) — this module doesn't know anything about lineups, matchups, or
+reconciliation with ESPN's own official number.
+"""
+import requests
+
+import scoring
+from espn_api.football.constant import PRO_TEAM_MAP
+import live_public_stats
+import live_public_dst_kicking as dst_kicking
+
+SCOREBOARD_URL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
+SUMMARY_URL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/summary"
+
+# ESPN fantasy's own convention for a team D/ST's "player" id — confirmed
+# against this app's real data (e.g. Chargers D/ST, pro_team_id 24, has
+# player_id -16024 throughout sim.json/roster.json already).
+DST_PLAYER_ID_OFFSET = -16000
+
+ABBREV_TO_PRO_TEAM_ID = {v: k for k, v in PRO_TEAM_MAP.items() if v != "None"}
+
+
+def fetch_week_events(season: int, week: int) -> list[dict]:
+    """This week's real NFL games (any status — scheduled, in progress,
+    or final), from the public scoreboard endpoint."""
+    resp = requests.get(SCOREBOARD_URL, params={"year": season, "seasontype": 2, "week": week}, timeout=10)
+    resp.raise_for_status()
+    return resp.json().get("events", [])
+
+
+def fetch_game_summary(event_id: str) -> dict:
+    resp = requests.get(SUMMARY_URL, params={"event": event_id}, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _team_players_scores(team_statistics: list[dict], position_id_by_pid: dict, rules: dict) -> dict[int, float]:
+    """One team's skill-position players -> {player_id: points}.
+    `position_id_by_pid` is only consulted for players whose position
+    actually needs it (this league has no overrides outside D/ST, so a
+    reasonable default works for anyone not already known)."""
+    raw_by_player = live_public_stats.player_raw_stats_from_public_boxscore(team_statistics)
+    out: dict[int, float] = {}
+    for pid_str, raw in raw_by_player.items():
+        pid = int(pid_str)
+        position_id = position_id_by_pid.get(pid, 4)  # default: no override applies to any offensive skill position anyway
+        pts, _ = scoring.compute_fantasy_points(raw, position_id, rules)
+        out[pid] = pts
+    return out
+
+
+def _kicker_scores(team_players_stats: list[dict], scoring_plays: list[dict], rules: dict) -> dict[int, float]:
+    out: dict[int, float] = {}
+    for group in team_players_stats:
+        if group.get("name") != "kicking":
+            continue
+        for row in group.get("athletes", []):
+            pid = int(row["athlete"]["id"])
+            name = row["athlete"]["displayName"]
+            kicking_stats = dict(zip(group.get("keys", []), row.get("stats", [])))
+            distances = [
+                dst_kicking.made_field_goal_distance(sp)
+                for sp in scoring_plays
+                if sp.get("type", {}).get("text") == "Field Goal Good" and name.split()[-1] in sp.get("text", "")
+            ]
+            distances = [d for d in distances if d is not None]
+            raw = dst_kicking.kicker_raw_stats(kicking_stats, distances)
+            pts, _ = scoring.compute_fantasy_points(raw, 17, rules)
+            out[pid] = pts
+    return out
+
+
+def compute_live_scores_for_week(season: int, week: int, rules: dict) -> dict[int, float]:
+    """{player_id: live fantasy points} for every player (offense, D/ST,
+    kicker) in every real NFL game scheduled this fantasy week, across
+    whatever real status each game is currently in (not started, live,
+    or final). Missing pieces (2-point conversions, blocked kicks,
+    safeties — see LIVE_PROJECTION_RESEARCH.md) are simply absent from
+    the raw stats fed into `scoring.py`, so they contribute 0 rather than
+    erroring — a real, known, documented undercount for the rare cases
+    they'd apply, not a crash."""
+    out: dict[int, float] = {}
+
+    for event in fetch_week_events(season, week):
+        event_id = event["id"]
+        try:
+            summary = fetch_game_summary(event_id)
+        except requests.RequestException:
+            continue  # one game's fetch failing shouldn't take down the whole week
+
+        boxscore = summary.get("boxscore") or {}
+        if not boxscore.get("players"):
+            continue  # game hasn't started yet — no box score exists at all
+
+        players_by_team = {t["team"]["abbreviation"]: t["statistics"] for t in boxscore["players"]}
+        teams_by_abbrev = {t["team"]["abbreviation"]: t["statistics"] for t in boxscore.get("teams", [])}
+        scores_by_abbrev = {
+            c["team"]["abbreviation"]: float(c.get("score", 0) or 0)
+            for c in summary["header"]["competitions"][0]["competitors"]
+        }
+        scoring_plays = summary.get("scoringPlays", [])
+
+        for abbrev, team_stats in players_by_team.items():
+            out.update(_team_players_scores(team_stats, {}, rules))
+            out.update(_kicker_scores(team_stats, scoring_plays, rules))
+
+            opponent_abbrevs = [a for a in players_by_team if a != abbrev]
+            if not opponent_abbrevs:
+                continue
+            opponent_abbrev = opponent_abbrevs[0]
+            if abbrev not in teams_by_abbrev or opponent_abbrev not in teams_by_abbrev:
+                continue
+            dst_raw = dst_kicking.dst_raw_stats(
+                teams_by_abbrev[abbrev], teams_by_abbrev[opponent_abbrev],
+                scores_by_abbrev.get(opponent_abbrev, 0.0),
+            )
+            dst_pts, _ = scoring.compute_fantasy_points(dst_raw, 16, rules)
+            pro_team_id = ABBREV_TO_PRO_TEAM_ID.get(abbrev)
+            if pro_team_id is not None:
+                out[DST_PLAYER_ID_OFFSET - pro_team_id] = dst_pts
+
+    return out

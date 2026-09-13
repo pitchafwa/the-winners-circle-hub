@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRefreshTick } from "./refresh";
 
 /**
  * Typed fetch for the static JSON contract. Fails loudly: a missing or
@@ -20,10 +21,12 @@ export interface Loaded<T> {
   loading: boolean;
 }
 
-async function fetchJson(path: string, optional: boolean): Promise<unknown> {
+async function fetchJson(path: string, optional: boolean, bypassCache = false): Promise<unknown> {
   const key = `${path}|${optional}`;
-  const cached = cache.get(key);
-  if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
+  if (!bypassCache) {
+    const cached = cache.get(key);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
+  }
   const res = await fetch(`${import.meta.env.BASE_URL}data/${path}`);
   // Dev server and Netlify SPA fallbacks answer missing files with index.html
   // and a 200 — a non-JSON content-type means the file does not exist.
@@ -42,21 +45,43 @@ async function fetchJson(path: string, optional: boolean): Promise<unknown> {
 
 function useFetch<T>(path: string | null, optional: boolean): Loaded<T> {
   const [state, setState] = useState<Loaded<T>>({ data: null, error: null, loading: path !== null });
+  // The path this hook last fetched (or is fetching) — compared against the
+  // current `path` synchronously inside the effect below to tell "this is a
+  // refresh of what's already showing" apart from "this is a genuinely new
+  // path," before any async work starts.
+  const lastPath = useRef<string | null>(null);
+  const tick = useRefreshTick();
 
   useEffect(() => {
     if (path === null) {
+      lastPath.current = null;
       setState({ data: null, error: null, loading: false });
       return;
     }
+    // A background refresh (auto-poll or the header button) should never
+    // flash the page back to a loading/blank state — that would make a
+    // silently-successful refresh look like a glitch. Only a genuinely new
+    // path shows the loading state; refreshing the SAME path keeps showing
+    // the current data until the new fetch resolves, and bypasses the cache
+    // outright so a manual refresh always hits the network rather than
+    // waiting out the remainder of the 60s TTL.
+    const isRefresh = lastPath.current === path;
+    lastPath.current = path;
     let alive = true;
-    setState({ data: null, error: null, loading: true });
-    fetchJson(path, optional)
+    if (!isRefresh) setState({ data: null, error: null, loading: true });
+    fetchJson(path, optional, isRefresh)
       .then((json) => alive && setState({ data: json as T, error: null, loading: false }))
-      .catch((e: Error) => alive && setState({ data: null, error: e.message, loading: false }));
+      .catch((e: Error) => {
+        if (!alive) return;
+        // A failed background refresh keeps whatever data was already on
+        // screen rather than wiping it out over one bad poll — the error
+        // still surfaces to `Loaded.error` for the rare page that renders it.
+        setState((s) => (isRefresh ? { ...s, error: e.message } : { data: null, error: e.message, loading: false }));
+      });
     return () => {
       alive = false;
     };
-  }, [path, optional]);
+  }, [path, optional, tick]);
 
   return state;
 }

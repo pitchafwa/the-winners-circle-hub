@@ -1,6 +1,7 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useJson } from "../lib/data";
+import { startAutoRefresh } from "../lib/refresh";
 import type { Meta, SeasonsIndex, TeamRef } from "../types/data";
 
 const SEASON_KEY = "league-hub:v1:season";
@@ -35,6 +36,13 @@ interface AppState {
 const Ctx = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  // One shared poll for the whole app's lifetime (not one per page/hook) —
+  // see lib/refresh.ts for why this exists: Tommy, 2026-09-14, "i don't
+  // like [having] to force quit the app/browser in order to get scores to
+  // refresh." Every `useJson`/`useOptionalJson` call site picks this up
+  // automatically via `useRefreshTick()`, no per-page wiring needed.
+  useEffect(() => startAutoRefresh(), []);
+
   const seasonsLoad = useJson<SeasonsIndex>("seasons.json");
   const seasonsIndex = seasonsLoad.data;
 

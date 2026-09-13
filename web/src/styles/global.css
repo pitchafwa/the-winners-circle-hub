@@ -358,6 +358,49 @@ hr,
   cursor: default;
 }
 
+/* Manual refresh button (RefreshButton.tsx) — sits in the masthead, on the
+ * navy background, so it needs its own colors rather than reusing
+ * .screenshot-btn's paper-toned ones. Visible at every width, not just
+ * mobile — this is a real action, not a smaller-screen convenience. */
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 243, 225, 0.3);
+  background: rgba(250, 243, 225, 0.08);
+  color: var(--paper);
+  cursor: pointer;
+}
+
+.refresh-btn:hover {
+  background: rgba(250, 243, 225, 0.16);
+}
+
+.refresh-icon {
+  display: inline-block;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.refresh-icon.spinning {
+  animation: refresh-spin 0.7s linear;
+}
+
+@keyframes refresh-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refresh-icon.spinning {
+    animation: none;
+  }
+}
+
 .screenshot-error {
   display: block;
   color: var(--negative);

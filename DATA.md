@@ -221,14 +221,18 @@ still points at a week that JUST became fully decided (build.py hasn't
 rolled `current_matchup_period` forward yet) — there, and always for the
 real live view on `sim.json`'s `this_week_matchups` below, ESPN's OWN
 `projected` number (`statSourceId: 1`) CAN move in the days/hours
-leading up to a player's real kickoff (roster news, injury reports), and
-confirmed live 2026-09-11 that it sits unchanged from its pregame value
-well AFTER a game ends — whether it moves WHILE a game is still
-genuinely in progress is still unverified (Tommy: "I think espn does
-offer live projections... let's check again on Sunday" when several
-games run at once for hours) — so `pregame_projected` is a separate,
-PINNED number: `projected` gets copied into it on every build, right up
-until
+leading up to a player's real kickoff (roster news, injury reports), but
+is otherwise frozen from that point on — confirmed live 2026-09-11 that
+it sits unchanged from its pregame value well AFTER a game ends, and
+confirmed again 2026-09-13 (real week-1 Sunday, 8 games in progress at
+once) that it ALSO never moves WHILE a game is still genuinely being
+played: two raw-API snapshots of all 189 rostered players, 13 real
+minutes apart, showed zero change in anyone's `projected` value even
+though 36 of those same players' real `actual` score changed in that
+same window (several by double digits). ESPN computes this number once,
+pregame, and never touches it again regardless of what actually happens
+in the game — so `pregame_projected` is a separate, PINNED number:
+`projected` gets copied into it on every build, right up until
 `parse.PREGAME_FREEZE_MINUTES` (30) before that player's real kickoff —
 at that point it locks and every later build holds the same value.
 Revised 2026-09-10 from an earlier version that pinned whatever

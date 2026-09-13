@@ -92,28 +92,41 @@ to the cards?"
   rebuild of every other season stayed clean — nobody's `season_started`
   flipped unexpectedly.
 
-## To verify Sunday: does ESPN's live projection actually update mid-game? (2026-09-11)
+## Resolved: ESPN's live projection does NOT update mid-game (2026-09-13, real Sunday test)
 
-Follow-up to the fix right below — Tommy pushed back on how confident
-that fix's own writeup was: "I think espn does offer live projections.
-You might not be able to see them now because there are no games
-ongoing but there was one when you built that feature last night...
-espn does live update the team's total projection." Fair catch: every
-comparison behind that fix's "confirmed live, does NOT move" claim was
-really a BEFORE-kickoff vs. AFTER-the-game-ended pair, never two
-snapshots both taken while a game was still genuinely in progress with
-real time between them — narrower evidence than the writeup claimed.
+Follow-up to the fix below — Tommy pushed back on how confident that
+fix's own writeup was: "I think espn does offer live projections... espn
+does live update the team's total projection." Fair catch at the time:
+every comparison behind the original "confirmed live, does NOT move"
+claim was really a BEFORE-kickoff vs. AFTER-the-game-ended pair, never
+two snapshots both taken while a game was still genuinely in progress
+with real time between them.
 
-Plan: Sunday, with several games running at once for hours, grab a
-snapshot, let real time pass while games are actively being played,
-grab another, and diff the SAME players' `projected` number to see if
-anything actually moved mid-game.
+**Now actually tested, real Sunday, week 1 of 2026, 8 games in progress**:
+pulled every rostered player's live ESPN numbers directly from the raw
+`mMatchupScore`/`mScoreboard` API response (not through the app's own
+cache), waited 13 real minutes while games kept being played, pulled the
+exact same numbers again, and diffed. Result: **zero movement** in the
+`statSourceId: 1` projected value for all 189 players compared — while
+36 of those same players' real `actual` score changed in that same
+window, several by double digits (e.g. Bijan Robinson 4 → 14 points,
+Joe Burrow 0 → 4). The `projected` figure sat at the identical value to
+7 decimal places before and after in every single case, regardless of
+how much the player's real score moved.
 
-Not urgent — the fix below is correct either way this turns out: once a
-game's over, it always trusts the real final score now, full stop,
-regardless of what `projected` does. The open question is only whether
-the "still playing" numbers could track ESPN's own live number more
-precisely, not whether anything currently shipped is wrong.
+**Conclusion, now confirmed rather than inferred**: ESPN's live
+"projected" number is computed once — before kickoff — and then frozen;
+it never reacts to what actually happens in the game, whether the game
+is still being played or has ended. The original fix (trust the real
+`actual` once a game is likely over, never blend in `projected`) was
+right, and the same logic could safely apply earlier too, since
+`projected` was never going to move regardless of game state. Not
+changing the shipped behavior over this — the `pro_game_likely_over`
+timing gate is still the correct "is this actually final" signal (a
+frozen `projected` blended with a still-accumulating `actual` mid-game
+is harmless, since `max(actual, projected)` just quietly defers to
+`actual` once it overtakes the frozen number anyway) — this entry exists
+to retire the open question with real evidence, not to prompt a change.
 
 ## Fix: on_fire/on_ice never triggered for a finished game (2026-09-11)
 

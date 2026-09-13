@@ -94,9 +94,19 @@ def cron_lines_for_window(start_et: datetime, end_et: datetime) -> list[str]:
     ]
 
 
+REFRESH_INTERVAL_MINUTES = 5  # GitHub Actions' own documented floor for
+# scheduled workflows — a shorter interval (e.g. */3) is accepted by cron
+# syntax but isn't actually honored: GitHub's own docs say the platform
+# won't run a scheduled workflow more often than every 5 minutes, and
+# can silently delay/coalesce runs that ask for more than that,
+# especially under load. Tommy asked for every 3 minutes (2026-09-14);
+# 5 is the fastest this can genuinely, reliably deliver on GitHub's own
+# infrastructure — not a choice made on our end.
+
+
 def _line(date, hour_start: int, hour_end: int, start_et: datetime) -> str:
     weekday = start_et.strftime("%a")
-    return f'    - cron: "*/15 {hour_start}-{hour_end} {date.day} {date.month} *"  # {weekday} {start_et.date()} ET games'
+    return f'    - cron: "*/{REFRESH_INTERVAL_MINUTES} {hour_start}-{hour_end} {date.day} {date.month} *"  # {weekday} {start_et.date()} ET games'
 
 
 def write_in_place(lines: list[str], skipped_tbd: int) -> bool:

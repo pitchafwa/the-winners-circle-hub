@@ -948,9 +948,26 @@ def optimal_week_projection(
             used_bench_pids: set[int] = set()
             if empty_indices and bench:
                 empty_slot_ids = [starting_slots[i] for i in empty_indices]
+                # A bench player whose own game has ALREADY started is
+                # excluded here too, not just from the joke-lineup swap
+                # below — added 2026-09-14, the same real bug Tommy
+                # caught (Jalen Coker, genuinely benched — confirmed real
+                # lineupSlotId 20/BE in the raw data — still got pulled
+                # into a genuinely-blank second flex slot). ESPN locks a
+                # player's own roster slot the moment their real game
+                # kicks off; a manager can no longer move them at that
+                # point even if they wanted to, so a bench player still
+                # sitting there once their game starts is exactly as
+                # real and final a fact as an explicit bench assignment,
+                # for ANY slot, not only one they might have displaced a
+                # worse starter from. If that leaves no eligible
+                # candidate left at all, the slot correctly falls through
+                # to the `player_id: null` placeholder below — an honest
+                # "can't tell" is better than guessing wrong with someone
+                # real ESPN data already shows was never going to play.
                 candidates = [
                     (b["player_id"], b["eligible"], _best_estimate(b))
-                    for b in bench
+                    for b in bench if not b["played"]
                 ]
                 _, _assigned, rel_index_by_player = best_lineup(candidates, empty_slot_ids)
                 for pid, rel_i in rel_index_by_player.items():
@@ -962,6 +979,22 @@ def optimal_week_projection(
             # real result, not up for debate) and only against bench
             # players not already spent filling a genuinely blank slot
             # above.
+            #
+            # A bench candidate whose OWN game has already started
+            # (`b["played"]`) is skipped too — added 2026-09-14, a real
+            # bug caught live by Tommy: Deejay genuinely benched Jalen
+            # Coker for real (a deliberate decision, not an untouched
+            # lineup), but this loop kept pulling Coker INTO the lineup
+            # anyway because whoever Deejay actually started projected
+            # lower and hadn't played yet. Once a bench player's own real
+            # game kicks off, ESPN itself locks their roster slot — he
+            # can no longer move them into the lineup even if he wanted
+            # to — so a bench player still sitting there at that point is
+            # exactly as real and final a decision as the started player
+            # being evaluated for a swap, not a "hasn't been touched"
+            # situation this heuristic should keep overriding. Tommy:
+            # "once a player's game has actually started, it should lock
+            # in that they were either benched or started."
             assumed_by_index: dict[int, str] = {}
             for i, slot_id in enumerate(starting_slots):
                 entry = lineup_by_index[i]
@@ -970,7 +1003,7 @@ def optimal_week_projection(
                 entry_value = _best_estimate(entry)
                 best_pid, best_value = None, entry_value
                 for b in bench:
-                    if b["player_id"] in used_bench_pids or slot_id not in b["eligible"]:
+                    if b["player_id"] in used_bench_pids or slot_id not in b["eligible"] or b["played"]:
                         continue
                     b_value = _best_estimate(b)
                     if b_value > best_value:

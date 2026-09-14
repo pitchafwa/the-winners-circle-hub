@@ -70,7 +70,7 @@ AWARD_META = {
                           "description": "Highest single-player win-probability-added performance this week.",
                           "tone": "positive"},
     "surprise":          {"label": "Surprise Player",   "points": 2,
-                          "description": "Biggest gap between a player's real win-probability impact and what their pregame projection would have produced — a projected star scoring exactly as expected doesn't count.",
+                          "description": "Biggest win-probability value from a player who wasn't projected to provide much — weighted toward low pregame projections, so a projected star's big week (expected) counts far less than the same-size beat from someone nobody expected to matter.",
                           "tone": "positive"},
     "nail_biter":        {"label": "Nail-biter",        "points": 1,
                           "description": "Smallest margin of victory in a single matchup this week.",
@@ -948,21 +948,21 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
                                 f"{w['name']} cost {tname[w['team_id']]} {abs(w['wpa']):.3f} win probability",
                                 player_id=pid, player_name=w["name"]))
 
-        # Surprise Player — biggest gap between a player's REAL
-        # win-probability impact and what their own pregame projection
-        # would have produced, so a star projected for a big week who
-        # simply delivers it (real WPA high, but fully expected) doesn't
-        # win this — only genuine over-delivery relative to their own
-        # pregame number does. Same `wpa_candidates` pool/filter as
-        # MVP/LVP above; `surprise` is None for anyone ESPN had no real
-        # pregame projection for (see `weekly_wpa`'s own comment).
+        # Surprise Player — biggest win-probability value from a player
+        # who wasn't projected to provide much, weighted DOWN for anyone
+        # already projected for a big week (see `weekly_wpa`'s own
+        # comment for why a plain actual-vs-projected WPA gap converged
+        # too closely with MVP in practice, and the real 34-week
+        # before/after numbers backing this fix). Same `wpa_candidates`
+        # pool/filter as MVP/LVP above; `surprise` is None for anyone
+        # ESPN had no real pregame projection for.
         surprise_candidates = [(pid, w) for pid, w in wpa_candidates if w["surprise"] is not None]
         if surprise_candidates:
             pid, w = max(surprise_candidates, key=lambda kv: kv[1]["surprise"])
             if w["surprise"] > 0:
                 awards.append(Award(week, "surprise", w["team_id"], round(w["surprise"], 3),
-                                    f"{w['name']} added {w['surprise']:.3f} more win probability than their "
-                                    f"pregame projection would have for {tname[w['team_id']]}",
+                                    f"{w['name']} provided {w['surprise']:.3f} more win probability than anyone "
+                                    f"expected from them for {tname[w['team_id']]}",
                                     player_id=pid, player_name=w["name"]))
 
         # Waiver hero — best starter added via waivers/FA in the last 14 days.
@@ -1614,9 +1614,10 @@ def weekly_wpa(league: LeagueData) -> dict[int, dict[int, dict]]:
     "position", "pro_team_id"}}}` — a week with no qualifying games at
     all (shouldn't happen for any real completed week, but kept explicit
     rather than assumed) is simply absent, never an empty-but-present
-    entry. `surprise` (added 2026-09-14) is None when ESPN had no real
-    pregame projection for that player at all; see its own comment below
-    for what it measures."""
+    entry. `surprise` (added 2026-09-14, reweighted same day) is None
+    when ESPN had no real pregame projection for that player at all;
+    see its own comment below for what it measures and why it's
+    weighted rather than a plain actual-vs-projected WPA gap."""
     out: dict[int, dict[int, dict]] = {}
     for week in league.completed_weeks():
         matchups = league.weeks.get(week, [])
@@ -1666,20 +1667,54 @@ def weekly_wpa(league: LeagueData) -> dict[int, dict[int, dict]]:
                     # own projected field never moves once a game starts),
                     # so no separate pregame-specific field is needed here.
                     # The replacement-level counterfactual (`cf_wp`) cancels
-                    # out of the difference algebraically — surprise
+                    # out of the difference algebraically — the raw gap
                     # reduces to just real_wp minus "what the win
                     # probability would have been had this one player hit
                     # their own number exactly, everything else the same as
-                    # it actually happened" — so it's computed directly,
-                    # not as wpa-minus-an-expected-wpa (equivalent, just
-                    # skips a step). None when ESPN had no real projection
-                    # for them at all, same "can't compare against nothing"
-                    # gap `projected_buster`/`bust` above already leave.
+                    # it actually happened."
+                    #
+                    # Revised same-day, after checking real data against
+                    # Tommy's own read ("seems like there's almost never a
+                    # difference between the surprise player and the
+                    # mvp"): confirmed against 34 real weeks (2024-2025) —
+                    # 65% picked the same player, and EVERY one of those
+                    # had legitimately crushed their own projection by a
+                    # wide margin, so the raw gap wasn't wrong, just too
+                    # close a cousin of MVP to be an interesting separate
+                    # award — a league's biggest real WPA swing in a given
+                    # week is almost always ALSO a big beat-your-projection
+                    # story, since a player merely meeting a (possibly
+                    # already-high) projection rarely produces the
+                    # standout win-probability swing MVP is chasing in the
+                    # first place. Fix (Tommy's own pick, of three
+                    # options): weight the raw gap DOWN for anyone already
+                    # projected for a big week, and UP for anyone who
+                    # wasn't expected to matter at all — this is what
+                    # actually isolates "waiver-wire value nobody saw
+                    # coming" from "the week's biggest stat line, which
+                    # happened to also beat a modest projection." Weight
+                    # is 1.0 at `projected = 0`, tapering linearly to 0.0
+                    # at `projected = 2x` this week's real position
+                    # replacement level (already computed above) — reuses
+                    # a number already grounded in this week's real
+                    # scoring environment rather than an arbitrary
+                    # position-blind cutoff. Verified this actually works:
+                    # re-ran the same 34-week comparison and the
+                    # same-player rate dropped from 65% to 41%, surfacing
+                    # real under-the-radar names (Jakobi Meyers, Jaylen
+                    # Waddle, TreVeyon Henderson) instead of repeating
+                    # whoever had the week's biggest raw point total.
+                    #
+                    # None when ESPN had no real projection for them at
+                    # all, same "can't compare against nothing" gap
+                    # `projected_buster`/`bust` above already leave.
                     surprise = None
                     if p.projected is not None:
                         expected_side = real_side - p.actual + p.projected
                         expected_wp = normal_cdf((expected_side - opp_score) / WIN_PROB_SIGMA)
-                        surprise = real_wp - expected_wp
+                        raw_gap = real_wp - expected_wp
+                        weight = max(0.0, min(1.0, 1 - (p.projected / (2 * repl)))) if repl > 0 else 1.0
+                        surprise = raw_gap * weight
 
                     week_out[p.player_id] = {
                         "wpa": real_wp - cf_wp, "surprise": surprise, "team_id": side_tw.team_id,

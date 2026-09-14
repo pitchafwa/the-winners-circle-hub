@@ -197,25 +197,44 @@ we add that week's MVP and LVP (meaning the player with the highest and
 lowest WPA) to the cards at the top? same way we have projection
 buster."
 
-**`surprise` (added 2026-09-14)**: the week's biggest gap between a
-player's REAL win-probability impact and what their own PREGAME
-projection would have produced — a star projected for a big week who
-simply delivers it doesn't win this, only genuine over-delivery relative
-to their own number does. Computed inside `metrics.weekly_wpa()`
-alongside `wpa`: swap the player's real score for their own pregame
-projection (`PlayerWeek.projected` — already frozen at whatever ESPN had
-before kickoff for any completed week, confirmed live 2026-09-11 that
-field never moves once a game starts, so no separate pregame-specific
-field was needed) instead of the position's replacement level, and
-compare win probability against the same real outcome. Algebraically
-this is just `real_wp - expected_wp` (the replacement-level baseline
-cancels out of "wpa minus an equivalent expected-wpa", so it's computed
-directly rather than as a second full WPA calculation). Only awarded
-when positive (Tommy's framing was specifically "way more value than was
-expected pre-game," not a symmetric bust counterpart — `bust` above
-already covers "missed their number badly" from a different angle,
-raw points not win-probability). Same single-player/every-week-live
-treatment as `mvp`/`lvp`.
+**`surprise` (added 2026-09-14, reweighted same day)**: the week's
+biggest WIN-PROBABILITY VALUE FROM A PLAYER WHO WASN'T PROJECTED TO
+PROVIDE MUCH — not just "biggest gap vs. their own projection." Starts
+from the same gap `metrics.weekly_wpa()` computes for `wpa` (swap the
+player's real score for their own pregame projection —
+`PlayerWeek.projected`, already frozen at whatever ESPN had before
+kickoff for any completed week — instead of the position's replacement
+level, and compare win probability against the same real outcome;
+algebraically this raw gap is just `real_wp - expected_wp`, since the
+replacement-level baseline cancels out of "wpa minus an equivalent
+expected-wpa"), THEN multiplies that raw gap by a weight that tapers
+from 1.0 at a pregame projection of 0 down to 0.0 at 2x that week's real
+position replacement level (already computed for `wpa` above — reused
+rather than an arbitrary position-blind cutoff).
+
+**Why the weight was needed**: shipped first as the plain raw gap, then
+Tommy noticed real usage: "seems like there's almost never a difference
+between the surprise player and the mvp." Checked against 34 real weeks
+(2024-2025) and confirmed it — 65% picked the identical player. Every
+one of those matches WAS a legitimate double-win (a real, large beat of
+their own projection), not a bug — but the deeper reason is structural:
+a week's single biggest win-probability swing is almost never produced
+by a player calmly meeting a (possibly already-high) projection, so
+"biggest real WPA" and "biggest beat-your-own-number" naturally
+converge regardless of how the second one is defined. The weight fixes
+this by making the award specifically favor players who WEREN'T
+expected to matter, discounting a projected star's big (and thus
+partly-expected) week even when its raw WPA is large. Re-verified after
+the fix: same-player rate on the identical 34 weeks dropped to 41%,
+surfacing genuinely different, lower-profile names (e.g. Jakobi Meyers,
+Jaylen Waddle, TreVeyon Henderson) instead of repeating whoever had the
+week's single biggest point total.
+
+Only awarded when positive (Tommy's framing was specifically "way more
+value than was expected pre-game," not a symmetric bust counterpart —
+`bust` above already covers "missed their number badly" from a
+different angle, raw points not win-probability). Same
+single-player/every-week-live treatment as `mvp`/`lvp`.
 
 ## `{season}/matchups/week-N.json`
 

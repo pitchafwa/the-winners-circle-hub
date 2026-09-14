@@ -174,7 +174,7 @@ components {all_play, points_for, trend, roster}}`.
 full season history, one entry per award per completed week (absent if no
 qualifying candidate that week). `player_id`/`player_name` are only set for
 the player-specific award types (`projection_buster`, `bust`,
-`worst_benching`, `waiver_hero`, `mvp`, `lvp`) — `null` on the team-level
+`worst_benching`, `waiver_hero`, `mvp`, `lvp`, `surprise`) — `null` on the team-level
 ones (`highest_score`, `lowest_score`, `best_coach`, `blowout`,
 `nail_biter`, `luckiest`, `unluckiest`), which have no individual player
 to name. Lets the frontend show "Player Name (Team)" instead of just a
@@ -196,6 +196,26 @@ stay live every week a real game exists, playoffs included. Tommy: "can
 we add that week's MVP and LVP (meaning the player with the highest and
 lowest WPA) to the cards at the top? same way we have projection
 buster."
+
+**`surprise` (added 2026-09-14)**: the week's biggest gap between a
+player's REAL win-probability impact and what their own PREGAME
+projection would have produced — a star projected for a big week who
+simply delivers it doesn't win this, only genuine over-delivery relative
+to their own number does. Computed inside `metrics.weekly_wpa()`
+alongside `wpa`: swap the player's real score for their own pregame
+projection (`PlayerWeek.projected` — already frozen at whatever ESPN had
+before kickoff for any completed week, confirmed live 2026-09-11 that
+field never moves once a game starts, so no separate pregame-specific
+field was needed) instead of the position's replacement level, and
+compare win probability against the same real outcome. Algebraically
+this is just `real_wp - expected_wp` (the replacement-level baseline
+cancels out of "wpa minus an equivalent expected-wpa", so it's computed
+directly rather than as a second full WPA calculation). Only awarded
+when positive (Tommy's framing was specifically "way more value than was
+expected pre-game," not a symmetric bust counterpart — `bust` above
+already covers "missed their number badly" from a different angle,
+raw points not win-probability). Same single-player/every-week-live
+treatment as `mvp`/`lvp`.
 
 ## `{season}/matchups/week-N.json`
 
@@ -610,13 +630,33 @@ the normal-CDF calc.
 
 `home_lineup`/`away_lineup` are `optimal_week_projection()`'s real-first
 lineup, in the league's real slot order: `{player_id, name, position,
-pro_team, slot, actual, projected, pregame_projected, played, on_fire,
-on_ice, assumed_start, replaced_name}` (`on_fire`/`on_ice`/
-`pregame_projected` merged in at the `simulate.py` call site — see
-`matchups/week-N.json`'s section above for the full rule; this is the
-REAL live view that section's own `pregame_projected` pinning actually
-reads back from run to run, since this file is the one that's genuinely
-rebuilt throughout the live window).
+pro_team, slot, actual, projected, live_projected, pregame_projected,
+played, in_progress, on_fire, on_ice, assumed_start, replaced_name}`
+(`on_fire`/`on_ice`/`pregame_projected` merged in at the `simulate.py`
+call site — see `matchups/week-N.json`'s section above for the full
+rule; this is the REAL live view that section's own `pregame_projected`
+pinning actually reads back from run to run, since this file is the one
+that's genuinely rebuilt throughout the live window).
+
+`in_progress`/`live_projected` (both added 2026-09-14, Tommy: "some way
+to identify which players are currently in game" / "for players in
+game, show the players live projection instead of their pre-game one"):
+`in_progress` is true only while a player's real game has started but
+isn't decided yet — false both before kickoff and once the game's final
+(`parse._is_in_progress()`, reusing the exact same "is this game
+definitely over" checks `_best_estimate()` already relies on, not a
+third drifting definition). `live_projected` is that same
+`_best_estimate()` value exposed per-player — ESPN's frozen `projected`
+for anyone who hasn't played yet, the real, backtested rest-of-game
+model's output (`live_projection.project_rest_of_game()`) for anyone
+`in_progress`, and the real `actual` once a game's genuinely decided.
+Equal to `projected` for anyone not currently `in_progress`, so a
+frontend can always prefer `live_projected` over `projected` for
+DISPLAY purposes without needing to branch on `in_progress` itself —
+`projected`/`pregame_projected` stay exactly as before (ESPN's frozen
+number), unaffected by this, since on_fire/on_ice and every other
+"vs. pregame projection" comparison still needs to be judged against
+the ORIGINAL pregame expectation, not a live-adjusted one.
 Each slot holds the manager's real ESPN-entered player when one exists;
 only a genuinely blank slot gets the best available bench player instead
 — **except** a "joke lineup" swap (added 2026-09-02,

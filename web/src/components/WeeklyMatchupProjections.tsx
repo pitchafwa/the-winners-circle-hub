@@ -234,7 +234,9 @@ function LineupRow({ p }: { p: WeekLineupPlayer | undefined }) {
       </span>
       <span className="num mu-pts">
         {p.played ? pts(p.actual) : <span className="muted">{MISSING}</span>}
-        <span className="muted mu-proj"> /{pts(p.projected)}</span>
+        <span className="muted mu-proj" title={p.in_progress ? "Live projection — updates as their game plays out" : undefined}>
+          {" "}/{pts(p.live_projected)}
+        </span>
       </span>
     </div>
   );

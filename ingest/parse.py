@@ -995,6 +995,18 @@ def optimal_week_projection(
                     "slot": SLOT_NAMES.get(slot_id, ""),
                     "actual": round(entry["actual"], 2) if entry["actual"] is not None else None,
                     "projected": round(entry["projected"], 2),
+                    # The real, backtested rest-of-game re-projection
+                    # (added 2026-09-14, Tommy: "for players in game, show
+                    # the players live projection instead of their
+                    # pre-game one") — identical to `projected` for anyone
+                    # not currently `in_progress` (not played yet, or
+                    # already decided), so a caller can safely always
+                    # prefer this over `projected` for DISPLAY, while
+                    # `pregame_projected` (set in simulate.py's
+                    # `_with_hot_cold`, unaffected by this) stays the
+                    # frozen baseline on_fire/on_ice and every other
+                    # "vs. projection" comparison is still judged against.
+                    "live_projected": round(_best_estimate(entry), 2),
                     "played": entry["played"],
                     "in_progress": _is_in_progress(entry),
                     "assumed_start": i in assumed_by_index,
@@ -1002,8 +1014,8 @@ def optimal_week_projection(
                 }
                 if (entry := lineup_by_index[i]) else
                 {"player_id": None, "name": None, "position": None, "pro_team": None, "pro_team_id": None,
-                 "slot": SLOT_NAMES.get(slot_id, ""), "actual": None, "projected": None, "played": False,
-                 "in_progress": False, "assumed_start": False, "replaced_name": None}
+                 "slot": SLOT_NAMES.get(slot_id, ""), "actual": None, "projected": None, "live_projected": None,
+                 "played": False, "in_progress": False, "assumed_start": False, "replaced_name": None}
                 for i, slot_id in enumerate(starting_slots)
             ]
             current = sum(p["actual"] for p in lineup if p["played"])

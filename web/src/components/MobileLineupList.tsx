@@ -14,6 +14,7 @@ export interface StackablePlayer {
   slot: string;
   actual: number | null;
   projected: number | null;
+  live_projected: number | null;
   played: boolean;
   in_progress: boolean;
   on_fire: boolean;
@@ -89,7 +90,9 @@ function StackedRow({ p }: { p: StackablePlayer | undefined }) {
           </span>
           <span className="c-stat">
             {p.played ? pts(p.actual) : <span className="muted">—</span>}
-            <span className="muted"> /{pts(p.projected)}</span>
+            <span className="muted" title={p.in_progress ? "Live projection — updates as their game plays out" : undefined}>
+              {" "}/{pts(p.live_projected)}
+            </span>
           </span>
         </>
       )}

@@ -157,6 +157,13 @@ export interface LineupPlayer {
   // read as ice-cold the moment it kicks off. See parse.hot_cold_status's
   // docstring (ingest/parse.py) for the full reasoning.
   pregame_projected: number | null;
+  // The real, backtested rest-of-game re-projection (added 2026-09-14) —
+  // equal to `projected` for anyone not currently `in_progress`, so this
+  // is always the right one to DISPLAY as "projected" (`projected`
+  // itself is ESPN's own frozen pregame number, kept for anything that
+  // needs the ORIGINAL pregame expectation specifically, e.g.
+  // `pregame_projected`-based on_fire/on_ice above).
+  live_projected: number | null;
   played: boolean;
   // True while this player's real game has started but isn't decided yet
   // (added 2026-09-14) — false both before kickoff and once the game's
@@ -396,6 +403,10 @@ export interface WeekLineupPlayer {
   // parse.hot_cold_status's docstring (ingest/parse.py) for the full
   // reasoning.
   pregame_projected: number | null;
+  // The real, backtested rest-of-game re-projection (added 2026-09-14) —
+  // equal to `projected` for anyone not currently `in_progress`, so this
+  // is always the right one to DISPLAY as "projected".
+  live_projected: number | null;
   played: boolean;
   // True while this player's real game has started but isn't decided yet
   // (added 2026-09-14) — false both before kickoff and once the game's

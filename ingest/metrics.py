@@ -69,6 +69,9 @@ AWARD_META = {
     "mvp":               {"label": "Week MVP",          "points": 2,
                           "description": "Highest single-player win-probability-added performance this week.",
                           "tone": "positive"},
+    "surprise":          {"label": "Surprise Player",   "points": 2,
+                          "description": "Biggest gap between a player's real win-probability impact and what their pregame projection would have produced — a projected star scoring exactly as expected doesn't count.",
+                          "tone": "positive"},
     "nail_biter":        {"label": "Nail-biter",        "points": 1,
                           "description": "Smallest margin of victory in a single matchup this week.",
                           "tone": "positive"},
@@ -945,6 +948,23 @@ def compute_superlatives(league: LeagueData, coach: dict[int, dict]) -> list[Awa
                                 f"{w['name']} cost {tname[w['team_id']]} {abs(w['wpa']):.3f} win probability",
                                 player_id=pid, player_name=w["name"]))
 
+        # Surprise Player — biggest gap between a player's REAL
+        # win-probability impact and what their own pregame projection
+        # would have produced, so a star projected for a big week who
+        # simply delivers it (real WPA high, but fully expected) doesn't
+        # win this — only genuine over-delivery relative to their own
+        # pregame number does. Same `wpa_candidates` pool/filter as
+        # MVP/LVP above; `surprise` is None for anyone ESPN had no real
+        # pregame projection for (see `weekly_wpa`'s own comment).
+        surprise_candidates = [(pid, w) for pid, w in wpa_candidates if w["surprise"] is not None]
+        if surprise_candidates:
+            pid, w = max(surprise_candidates, key=lambda kv: kv[1]["surprise"])
+            if w["surprise"] > 0:
+                awards.append(Award(week, "surprise", w["team_id"], round(w["surprise"], 3),
+                                    f"{w['name']} added {w['surprise']:.3f} more win probability than their "
+                                    f"pregame projection would have for {tname[w['team_id']]}",
+                                    player_id=pid, player_name=w["name"]))
+
         # Waiver hero — best starter added via waivers/FA in the last 14 days.
         # Single-player, not a whole-league comparison, so this stays live
         # every week a real game exists, playoffs included (same reasoning
@@ -1590,10 +1610,13 @@ def weekly_wpa(league: LeagueData) -> dict[int, dict[int, dict]]:
     see their season total go DOWN once playoffs are folded in, same as
     any other real game.
 
-    Returns `{week: {player_id: {"wpa", "team_id", "name", "position",
-    "pro_team_id"}}}` — a week with no qualifying games at all (shouldn't
-    happen for any real completed week, but kept explicit rather than
-    assumed) is simply absent, never an empty-but-present entry."""
+    Returns `{week: {player_id: {"wpa", "surprise", "team_id", "name",
+    "position", "pro_team_id"}}}` — a week with no qualifying games at
+    all (shouldn't happen for any real completed week, but kept explicit
+    rather than assumed) is simply absent, never an empty-but-present
+    entry. `surprise` (added 2026-09-14) is None when ESPN had no real
+    pregame projection for that player at all; see its own comment below
+    for what it measures."""
     out: dict[int, dict[int, dict]] = {}
     for week in league.completed_weeks():
         matchups = league.weeks.get(week, [])
@@ -1630,8 +1653,36 @@ def weekly_wpa(league: LeagueData) -> dict[int, dict[int, dict]]:
                         continue
                     counterfactual_side = real_side - p.actual + repl
                     cf_wp = normal_cdf((counterfactual_side - opp_score) / WIN_PROB_SIGMA)
+
+                    # "Surprise" (added 2026-09-14, Tommy: "a player
+                    # projected to score 30 scoring 30 will get a lot of
+                    # WPA but they were expected to... which players end
+                    # up providing way more value than was expected
+                    # pre-game"): swap this player's REAL score for their
+                    # own PREGAME projection instead of the position's
+                    # replacement level — `p.projected` is already frozen
+                    # at whatever ESPN had before kickoff for any
+                    # completed week (confirmed live 2026-09-11, ESPN's
+                    # own projected field never moves once a game starts),
+                    # so no separate pregame-specific field is needed here.
+                    # The replacement-level counterfactual (`cf_wp`) cancels
+                    # out of the difference algebraically — surprise
+                    # reduces to just real_wp minus "what the win
+                    # probability would have been had this one player hit
+                    # their own number exactly, everything else the same as
+                    # it actually happened" — so it's computed directly,
+                    # not as wpa-minus-an-expected-wpa (equivalent, just
+                    # skips a step). None when ESPN had no real projection
+                    # for them at all, same "can't compare against nothing"
+                    # gap `projected_buster`/`bust` above already leave.
+                    surprise = None
+                    if p.projected is not None:
+                        expected_side = real_side - p.actual + p.projected
+                        expected_wp = normal_cdf((expected_side - opp_score) / WIN_PROB_SIGMA)
+                        surprise = real_wp - expected_wp
+
                     week_out[p.player_id] = {
-                        "wpa": real_wp - cf_wp, "team_id": side_tw.team_id,
+                        "wpa": real_wp - cf_wp, "surprise": surprise, "team_id": side_tw.team_id,
                         "name": p.name, "position": p.position, "pro_team_id": p.pro_team_id,
                     }
         if week_out:

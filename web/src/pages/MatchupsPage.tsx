@@ -27,6 +27,7 @@ const AWARD_ICON: Record<string, string> = {
   projection_buster: "🚀",
   waiver_hero: "🦸",
   mvp: "⭐",
+  surprise: "🎁",
   nail_biter: "😬",
   luckiest: "🍀",
   unluckiest: "💔",
@@ -49,7 +50,7 @@ function headlineValue(award: Award): string {
   // real value to "0.0" or "0.1" and lose the number entirely. 3
   // decimals matches the precision the MVP Race chart's own tooltip
   // already uses for the same reason.
-  if (award.key === "mvp" || award.key === "lvp") return signed(award.value, 3);
+  if (award.key === "mvp" || award.key === "lvp" || award.key === "surprise") return signed(award.value, 3);
   return pts(award.value);
 }
 
@@ -156,7 +157,9 @@ function PlayerRow({ p }: { p: LineupPlayer | undefined }) {
       </span>
       <span className="num mu-pts">
         {pts(p.actual)}
-        <span className="muted mu-proj">{p.projected !== null ? ` /${pts(p.projected)}` : ""}</span>
+        <span className="muted mu-proj" title={p.in_progress ? "Live projection — updates as their game plays out" : undefined}>
+          {p.live_projected !== null ? ` /${pts(p.live_projected)}` : ""}
+        </span>
       </span>
     </div>
   );

@@ -11,7 +11,7 @@ function formatValue(award: Award, meta: AwardMeta | undefined): string {
   // real value to "0.0" or "0.1" and lose the number entirely. 3
   // decimals matches the MVP Race chart's own tooltip (same underlying
   // stat, same reason).
-  if (award.key === "mvp" || award.key === "lvp") return signed(award.value, 3);
+  if (award.key === "mvp" || award.key === "lvp" || award.key === "surprise") return signed(award.value, 3);
   void meta;
   return pts(award.value);
 }

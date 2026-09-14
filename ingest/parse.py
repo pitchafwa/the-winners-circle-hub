@@ -999,14 +999,30 @@ def optimal_week_projection(
                     # (added 2026-09-14, Tommy: "for players in game, show
                     # the players live projection instead of their
                     # pre-game one") — identical to `projected` for anyone
-                    # not currently `in_progress` (not played yet, or
+                    # not currently `in_progress` (not played yet, OR
                     # already decided), so a caller can safely always
                     # prefer this over `projected` for DISPLAY, while
                     # `pregame_projected` (set in simulate.py's
                     # `_with_hot_cold`, unaffected by this) stays the
                     # frozen baseline on_fire/on_ice and every other
                     # "vs. projection" comparison is still judged against.
-                    "live_projected": round(_best_estimate(entry), 2),
+                    #
+                    # Deliberately NOT `_best_estimate(entry)` here — that
+                    # returns the real `actual` once a game's decided
+                    # (correct for the TEAM-level projected_final sum,
+                    # which should reflect real locked-in points, not a
+                    # stale guess), but showing that on a per-player
+                    # matchup card would repeat the same number twice
+                    # ("18/18") instead of letting actual-vs-projected
+                    # stay comparable. Caught live, 2026-09-14 — Tommy:
+                    # "when a player's game ends, the projection listed on
+                    # their matchup card reverts to pre-game so we can see
+                    # the comparison between actual and projected score.
+                    # live projection should only show during the
+                    # player's game." So: the live model's estimate ONLY
+                    # while genuinely `in_progress`; the plain frozen
+                    # pregame number both before kickoff and once decided.
+                    "live_projected": round(_best_estimate(entry), 2) if _is_in_progress(entry) else round(entry["projected"], 2),
                     "played": entry["played"],
                     "in_progress": _is_in_progress(entry),
                     "assumed_start": i in assumed_by_index,

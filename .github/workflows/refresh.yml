@@ -49,6 +49,19 @@ name: Refresh league data
 # inside it can't detect its own non-invocation) that polls
 # api.github.com/repos/.../actions/workflows/refresh.yml/runs and alerts
 # if the latest run is older than a few hours during the season.
+#
+# 2026-09-15 recurrence: same failure mode, caught live mid-Monday-Night-
+# Football by Tommy noticing two players' live scores looked stale
+# (Kenneth Walker III, Rashee Rice — their real stats had moved on well
+# past what the site showed). Confirmed the same signature: `state:
+# "active"`, cron correctly generated and covering this exact window
+# (`*/5 0-4 15 9 *`), runs firing normally every ~10-15 min right up
+# through 2026-09-15T00:24:45Z, then nothing at all for 80+ minutes
+# despite the every-5-min game-window cron that should have fired ~16
+# times in that gap. This same push-touches-the-file fix applied again.
+# Two recurrences now (2026-08-27, 2026-09-15) — worth actually building
+# the external watchdog mentioned above rather than continuing to catch
+# this by a person happening to notice stale scores.
 
 on:
   workflow_dispatch: {}

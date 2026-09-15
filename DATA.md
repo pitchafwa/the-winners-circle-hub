@@ -98,15 +98,30 @@ there too.
 `standing_rank` (`metrics.compute_playoff_standing()`, new 2026-08-29) is the
 table's real default order and its leftmost "Rank" column — 1 = champion, 2 =
 runner-up, then each playoff round's eliminated teams tied for the next block
-of ranks broken by regular-season PF, most-recently-eliminated round first;
-non-bracket teams keep their plain seed order underneath. Progressive: a team
-already eliminated has its rank locked in immediately, teams still alive in
-the bracket share the current best remaining tier until they actually win or
-lose. Deliberately NOT the same as `seed` (ESPN's regular-season playoff
-seed, unchanged, still present) or `final_rank` (ESPN's own
-`rankCalculatedFinal`, which reorders non-playoff teams by their
+of ranks broken by regular-season PF, most-recently-eliminated round first.
+Progressive: a team already eliminated has its rank locked in immediately,
+teams still alive in the bracket share the current best remaining tier until
+they actually win or lose. Deliberately NOT the same as `seed` (ESPN's
+regular-season playoff seed, unchanged, still present) or `final_rank`
+(ESPN's own `rankCalculatedFinal`, which reorders non-playoff teams by their
 consolation-bracket results — `standing_rank` never touches a non-bracket
 team's relative order).
+
+**Non-bracket teams (revised 2026-09-15)** — every team during the regular
+season (no playoff bracket exists yet), plus anyone who misses the real
+bracket once it does — are sorted by `(win_pct desc, points_for desc)` in
+`build.py`, NOT by ESPN's raw `seed` directly (Tommy: "for teams that are
+tied in record... sorted by total team points"). This league's real
+configured tiebreak (`playoff_seeding_rule: H2H_RECORD`, in `meta.json`) is
+still exactly what `seed` itself is computed from — unchanged, and still the
+real number this app uses everywhere an official league tiebreak actually
+matters (draft order, pick futures, real playoff qualification) — this
+change only affects the STANDINGS TABLE's own row order, where points-for
+reads as a clearer, more legible tiebreak than an early-season H2H record
+that's often still mostly unplayed. Falls back to plain `seed` order in true
+preseason (`points_for` is `null` for everyone before any week is decided,
+so every team ties on the points comparison and the sort falls through to
+`seed`) and as the final tiebreaker for an exact points-for tie too.
 
 ## `{season}/standings_by_week.json`
 

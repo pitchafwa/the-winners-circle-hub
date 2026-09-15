@@ -238,14 +238,30 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
             "consistency": consistency.get(t.team_id),
         })
     # Non-bracket teams (missed the real playoffs, or the playoffs haven't
-    # started) keep exactly their current seed-based order — only fill in
-    # their standing_rank AFTER every real bracket team already has one, so
-    # they always sort below the playoff group as a block, same as before
-    # playoff_standing existed at all when it's empty (preseason/regular
-    # season: every row falls into this branch, numbering 1..N by seed,
-    # identical to the old seed-only sort).
-    non_bracket = sorted((r for r in rows if r["standing_rank"] is None),
-                         key=lambda r: r["seed"] if r["seed"] else 99)
+    # started) — only fill in their standing_rank AFTER every real bracket
+    # team already has one, so they always sort below the playoff group as
+    # a block, same as before playoff_standing existed at all when it's
+    # empty (preseason/regular season: every row falls into this branch).
+    #
+    # Sorted by (win_pct, points_for) rather than ESPN's raw `seed` alone
+    # (revised 2026-09-15, Tommy: "for teams that are tied in record...
+    # sorted by total team points") — this league's real configured
+    # tiebreak (`playoff_seeding_rule: H2H_RECORD`) stays exactly what
+    # `seed` itself is computed from (unchanged, still the real number
+    # used everywhere else this app needs the actual league-official
+    # seed — draft order, pick futures, playoff qualification), but for
+    # the STANDINGS TABLE's own row order specifically, points-for reads
+    # as a clearer, more legible tiebreak than an early-season H2H record
+    # that's often still mostly unplayed. `points_for` is `None` in true
+    # preseason (before any week is decided) — falls back to 0 for
+    # everyone there, which is harmless since every team ties on it
+    # anyway and the sort falls through to `seed`, exactly reproducing
+    # the old seed-only behavior for that case. `seed` stays as the final
+    # tiebreaker for the rare case for an exact points-for tie too.
+    non_bracket = sorted(
+        (r for r in rows if r["standing_rank"] is None),
+        key=lambda r: (-r["win_pct"], -(r["points_for"] or 0), r["seed"] if r["seed"] else 99),
+    )
     next_rank = len(playoff_standing) + 1
     for r in non_bracket:
         r["standing_rank"] = next_rank

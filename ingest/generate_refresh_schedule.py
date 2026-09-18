@@ -103,10 +103,32 @@ REFRESH_INTERVAL_MINUTES = 5  # GitHub Actions' own documented floor for
 # 5 is the fastest this can genuinely, reliably deliver on GitHub's own
 # infrastructure — not a choice made on our end.
 
+# Minute offset away from round numbers (added 2026-09-18, after this
+# schedule silently stopped firing three separate times — 2026-08-27,
+# 2026-09-15, 2026-09-18 — despite `state: "active"` and correct cron
+# syntax every time). Researched real causes rather than guessing again:
+# GitHub staff have publicly confirmed (github.com/orgs/community/
+# discussions/185355, /185373) that scheduled workflows can be delayed
+# or silently DROPPED during high-load periods, and independent
+# real-world measurement (multiple developer write-ups, 2026) found the
+# worst congestion clusters at exactly the round numbers everyone else's
+# cron also uses — :00, :05, :10, :15, :30 — while an odd minute like
+# :03 or :17 sees almost no collision, since almost nobody else
+# schedules there. `*/5` fires at :00/:05/:10/:15... — precisely the
+# most congested slots on all of GitHub Actions. Offsetting by 3 minutes
+# (`3-59/5` — same real 5-minute cadence, just shifted) is a documented,
+# no-external-dependency, no-manual-work fix for exactly this failure
+# mode, not a guess. Not a hard guarantee (GitHub's own docs are explicit
+# that scheduled triggers are best-effort, nothing on their platform
+# promises exact timing) — but a real, substantial improvement over
+# scheduling at the single busiest minute-of-hour by pure accident.
+REFRESH_MINUTE_OFFSET = 3
+
 
 def _line(date, hour_start: int, hour_end: int, start_et: datetime) -> str:
     weekday = start_et.strftime("%a")
-    return f'    - cron: "*/{REFRESH_INTERVAL_MINUTES} {hour_start}-{hour_end} {date.day} {date.month} *"  # {weekday} {start_et.date()} ET games'
+    minute_field = f"{REFRESH_MINUTE_OFFSET}-59/{REFRESH_INTERVAL_MINUTES}"
+    return f'    - cron: "{minute_field} {hour_start}-{hour_end} {date.day} {date.month} *"  # {weekday} {start_et.date()} ET games'
 
 
 def write_in_place(lines: list[str], skipped_tbd: int) -> bool:

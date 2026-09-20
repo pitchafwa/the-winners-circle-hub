@@ -88,6 +88,18 @@ name: Refresh league data
 
 on:
   workflow_dispatch: {}
+  # Fired by the external cron-job.org heartbeat (added 2026-09-20, see
+  # incident log above) — deliberately a SEPARATE event from
+  # workflow_dispatch so a real human clicking "Run workflow" always runs
+  # for real, never silently gated by the game-time guard below. The
+  # heartbeat's own schedule is a dumb, static, frequent ping (no NFL
+  # schedule awareness needed on cron-job.org's end); the "is this
+  # actually worth a real ESPN fetch right now" precision lives entirely
+  # in the guard step, which reuses the same real per-game windows
+  # generate_refresh_schedule.py already tracks and keeps fresh weekly —
+  # not a second, third-party-synced copy of the schedule.
+  repository_dispatch:
+    types: [external-heartbeat]
   schedule:
     # --- always-on fallback -------------------------------------------
     - cron: "3 5-23 * * 1"       # Mon, hourly (post-MNF news even outside the generated window) — :03, not :00, see the 2026-09-18 congestion note above
@@ -237,14 +249,42 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Only meaningful for the external heartbeat trigger (see is_game_time.py
+      # for the full reasoning) — runs before the expensive uv/ingest steps so
+      # a "not game time" heartbeat costs a few seconds, not a real ESPN fetch.
+      # Skipped entirely (not just a no-op) for workflow_dispatch/schedule
+      # runs, which always proceed unconditionally: a schedule-triggered run
+      # is already inherently scoped to a real game window (that's what
+      # generate_refresh_schedule.py's cron entries encode), and a manual
+      # click from Tommy means he wants fresh data regardless of the clock.
+      - name: Check if this is a real game window
+        id: gametime
+        if: github.event_name == 'repository_dispatch'
+        working-directory: ingest
+        run: |
+          # is_game_time.py -> config.py needs python-dotenv (for .env
+          # cookie loading elsewhere in the pipeline) — installed directly
+          # here rather than via the full `uv sync` below, since the whole
+          # point of this step is to skip that expensive install/fetch
+          # when it's not actually game time.
+          pip install --quiet python-dotenv
+          if python is_game_time.py; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install uv
+        if: github.event_name != 'repository_dispatch' || steps.gametime.outputs.run == 'true'
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Install ingest dependencies
+        if: github.event_name != 'repository_dispatch' || steps.gametime.outputs.run == 'true'
         working-directory: ingest
         run: ~/.local/bin/uv sync
 
       - name: Run ingest
+        if: github.event_name != 'repository_dispatch' || steps.gametime.outputs.run == 'true'
         working-directory: ingest
         env:
           # Python fully block-buffers stdout when it isn't a real
@@ -270,6 +310,7 @@ jobs:
 
       - name: Commit changed data
         id: commit
+        if: github.event_name != 'repository_dispatch' || steps.gametime.outputs.run == 'true'
         run: |
           git config user.name "league-hub-bot"
           git config user.email "actions@users.noreply.github.com"

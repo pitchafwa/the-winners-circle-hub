@@ -6,7 +6,7 @@ games). Venue bonuses (+3 regular season, +5 playoffs here — read from
 settings) are added to the home side, since they decide real games in this
 league. The real remaining schedule is played out; the top 3 in EACH
 division make the playoffs (no wildcards — confirmed against real bracket
-participation in both 2024 and 2025), tiebroken H2H then points-for. Each
+participation in both 2024 and 2025), tiebroken per ESPN's documented order (tiebreak.py). Each
 division runs its own 3-team mini-bracket (#1 seed bye, #2v#3 play-in, then
 #1 vs that winner for the division title — also confirmed against the real
 2024/2025 playoff schedules), and the two division champions meet only at
@@ -41,7 +41,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from metrics import current_records, normal_cdf, power_score_1_100, redraft_lineup_value, WIN_PROB_SIGMA
+from metrics import current_records, current_tiebreak_extras, normal_cdf, power_score_1_100, redraft_lineup_value, WIN_PROB_SIGMA
+from tiebreak import division_pct, h2h_top, games_between, order_by_espn_rules
 from parse import (
     LeagueData,
     current_roster_players,
@@ -226,65 +227,68 @@ def team_models(league: LeagueData, prior: tuple[float, float],
     return models
 
 
-def _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng):
+def _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng, pa=None, div_pct=None):
     """Top N per division make the playoffs — NO wildcards. Confirmed
     against real bracket participation in both 2024 and 2025 (exactly 3-3
     by division each year — not the division-leader-plus-overall-wildcard
     mix a lot of other ESPN league formats use, which is what this used to
     assume before Tommy flagged it and real bracket data settled it).
 
+    Ties on wins follow ESPN's documented order (tiebreak.py): head-to-head
+    (only if every tied team played each other equally often) -> points for
+    -> intradivisional record -> points against -> coin flip (`rng`).
+
     Returns (by_division, full_order): by_division{div_id: teams in that
     division, best record first} for running each division's own
     mini-bracket, and full_order (all teams, division ignored, best record
     first) for display ranks and "which division champ hosts the final"."""
     def order(group: list[int]) -> list[int]:
-        # exact-tie groups get an internal h2h table
-        by_wins: dict[float, list[int]] = defaultdict(list)
-        for t in group:
-            by_wins[wins[t]].append(t)
-        out = []
-        for w in sorted(by_wins, reverse=True):
-            tied = by_wins[w]
-            if len(tied) > 1:
-                # snapshot: list.sort() empties the list during sorting, so the
-                # key lambda must not iterate `tied` itself
-                group = list(tied)
-                tied.sort(key=lambda t: (
-                    sum(h2h.get((t, o), 0) for o in group if o != t),
-                    pf[t],
-                    rng.random(),
-                ), reverse=True)
-            out.extend(tied)
-        return out
+        return order_by_espn_rules(group, wins, h2h, pf, pa, div_pct, rng)
 
     by_division = {d: order([t for t in team_ids if divisions[t] == d]) for d in sorted(set(divisions.values()))}
     full_order = order(team_ids)
     return by_division, full_order
 
 
-MAX_CLINCH_ENUM_GAMES = 16
+MAX_CLINCH_ENUM_GAMES = 14
+
+
+def _worst_ahead(cands, t, h2h, games, removed=0):
+    """How many of `cands` (tied on wins, includes t) finish ahead of t in the
+    WORST case under ESPN's one-seed-at-a-time tiebreak. Head-to-head (step 1)
+    is exact; anything it can't separate falls to points-for and beyond, which
+    can't be bounded for unplayed games, so the adversary picks who's on top."""
+    if len(cands) == 1:
+        return removed
+    top = h2h_top(cands, h2h, games)
+    if len(top) == 1:
+        x = top[0]
+        if x == t:
+            return removed
+        return _worst_ahead([c for c in cands if c != x], t, h2h, games, removed + 1)
+    return max(_worst_ahead([c for c in cands if c != x], t, h2h, games, removed + 1)
+               for x in top if x != t)
 
 
 def clinch_status(remaining, base_wins: dict[int, float], divisions: dict[int, int],
                   per_division: int, base_h2h: dict | None = None) -> dict[int, dict[str, bool]]:
     """Mathematical (not probabilistic) clinch check under this league's
-    real seeding rule (ESPN playoffSeedingRule H2H_RECORD, no wildcards:
-    top `per_division` of each division make it; ties on wins are broken
-    by head-to-head among the exactly-tied teams, then points-for — the
-    same order `_seed` and `metrics._tiebreak_order` use, checked against
-    ESPN's real seeds for every past season). Team T is safe iff, for
+    real seeding rules (ESPN H2H_RECORD, no wildcards: top `per_division`
+    of each division make it; ties on wins broken per tiebreak.py — the
+    same code the standings and simulation use). Team T is safe iff, for
     every possible set of remaining results, fewer than `per_division`
     division rivals finish ahead of it.
 
     Worst case for T: it loses every remaining game (except its next one,
     when asking "what if it wins this week" — a win only ever helps T's
-    record AND its head-to-head, so losing is always the worst branch),
-    every rival wins every cross-division game, and rival-vs-rival games
-    go every possible way (enumerated exactly, tracking each outcome's
-    wins and head-to-head). Wins ties are resolved by the real head-to-head
-    rule. Points-for is the one tiebreaker that can't be bounded (it's
-    unbounded scores), so a tie that survives head-to-head counts AGAINST
-    T — under-claims a clinch in that rare spot, never over-claims one.
+    record and head-to-head, so losing is always the worst branch), every
+    rival wins every cross-division game, and rival-vs-rival games go
+    every possible way (enumerated exactly, tracking wins and head-to-head).
+    Head-to-head is applied exactly, including ESPN's "only valid if every
+    tied team played each other equally often" rule and one-seed-at-a-time
+    resets. Points-for (and the steps after it) can't be bounded for
+    games not yet played, so a tie head-to-head can't separate is resolved
+    against T — under-claims a clinch in that rare spot, never over-claims.
 
     Returns {team: {"clinched", "clinches_if_win_next"}}. Divisions with
     too many undecided rival-vs-rival games to enumerate report False
@@ -305,22 +309,31 @@ def clinch_status(remaining, base_wins: dict[int, float], divisions: dict[int, i
             return True
         k = len(rivals)
         idx = {x: i for i, x in enumerate(rivals)}
+        members = set(rivals) | {t}
         nxt = next_game.get(t)
         forced_win = force_next_win and nxt is not None
         t_wins = base_wins.get(t, 0.0) + (1 if forced_win else 0)
         rival_wins = np.array([base_wins.get(x, 0.0) for x in rivals], dtype=float)
-        # head-to-head counts among the division, fixed part (played games
-        # + worst-case results of T's own games and cross-division games)
-        h_rr = np.zeros((k, k))                 # h_rr[i, j]: rival i's wins over rival j
+        h_rr = np.zeros((k, k))
         for i, xi in enumerate(rivals):
             for j, xj in enumerate(rivals):
                 if i != j:
                     h_rr[i, j] = base_h2h.get((xi, xj), 0)
-        h_rt = np.array([base_h2h.get((x, t), 0) for x in rivals], dtype=float)   # rival i over T
-        h_tr = np.array([base_h2h.get((t, x), 0) for x in rivals], dtype=float)   # T over rival i
+        h_rt = np.array([base_h2h.get((x, t), 0) for x in rivals], dtype=float)
+        h_tr = np.array([base_h2h.get((t, x), 0) for x in rivals], dtype=float)
+        # total games each pair plays by season's end (decided + remaining),
+        # independent of who wins — what ESPN's "equal number of times" test sees
+        total_games: dict[tuple[int, int], float] = {}
+        for a in members:
+            for b in members:
+                if a != b:
+                    total_games[(a, b)] = games_between(base_h2h, a, b)
         rr_games = []
         for e in remaining:
             a, b = e.home_id, e.away_id
+            if a in members and b in members:
+                total_games[(a, b)] += 1
+                total_games[(b, a)] += 1
             if t in (a, b):
                 other = b if a == t else a
                 if other in idx:
@@ -349,14 +362,27 @@ def clinch_status(remaining, base_wins: dict[int, float], divisions: dict[int, i
             wins[~a_wins, ib] += 1
             hh[a_wins, ia, ib] += 1
             hh[~a_wins, ib, ia] += 1
-        above = wins > t_wins
+        ahead = (wins > t_wins).sum(axis=1)
+        if (ahead >= per_division).any():
+            return False
         tied = wins == t_wins
-        # head-to-head totals within each outcome's tie group (T + tied rivals)
-        s_rival = (hh * tied[:, None, :]).sum(axis=2) + h_rt[None, :]
-        s_t = (tied * h_tr[None, :]).sum(axis=1)
-        beats_or_ties_t = tied & (s_rival >= s_t[:, None])
-        ahead = above.sum(axis=1) + beats_or_ties_t.sum(axis=1)
-        return bool((ahead < per_division).all())
+        games = lambda a, b: total_games[(a, b)]
+        for o in np.nonzero(tied.any(axis=1))[0]:
+            cands = [rivals[i] for i in np.nonzero(tied[o])[0]] + [t]
+            h2h_o = {}
+            for a in cands:
+                for b in cands:
+                    if a == b:
+                        continue
+                    if a == t:
+                        h2h_o[(a, b)] = h_tr[idx[b]]
+                    elif b == t:
+                        h2h_o[(a, b)] = h_rt[idx[a]]
+                    else:
+                        h2h_o[(a, b)] = hh[o, idx[a], idx[b]]
+            if ahead[o] + _worst_ahead(cands, t, h2h_o, games) >= per_division:
+                return False
+        return True
 
     for t in divisions:
         already = guaranteed(t, False)
@@ -394,6 +420,7 @@ def run(league: LeagueData, history: LeagueData | None = None,
     models = team_models(league, prior, roster_shift)
     power_score = {tid: power_score_1_100(v) for tid, v in roster_value.items()}
     base_wins, base_losses, base_pf, base_h2h = current_records(league)
+    base_pa, base_div_w, base_div_g = current_tiebreak_extras(league)
     team_ids = list(league.teams)
     divisions = {t: league.teams[t].division_id for t in team_ids}
     playoff_count = league.playoff_team_count
@@ -413,6 +440,7 @@ def run(league: LeagueData, history: LeagueData | None = None,
     titles = defaultdict(int)
     seeds = defaultdict(lambda: defaultdict(int))
     final_wins_sum = defaultdict(float)
+    same_div = [divisions[e.home_id] == divisions[e.away_id] for e in remaining]
     next_game: dict[int, int] = {}   # team -> index of their first remaining matchup
     for i, e in enumerate(remaining):
         next_game.setdefault(e.home_id, i)
@@ -429,6 +457,9 @@ def run(league: LeagueData, history: LeagueData | None = None,
         wins = dict(base_wins)
         pf = dict(base_pf)
         h2h = dict(base_h2h)
+        pa = defaultdict(float, base_pa)
+        div_w = defaultdict(float, base_div_w)
+        div_g = defaultdict(int, base_div_g)
         for t in team_ids:
             wins.setdefault(t, 0.0)
             pf.setdefault(t, 0.0)
@@ -437,15 +468,22 @@ def run(league: LeagueData, history: LeagueData | None = None,
             hs, as_ = draws[s, i, 0], draws[s, i, 1]
             pf[e.home_id] += hs
             pf[e.away_id] += as_
+            pa[e.home_id] += as_
+            pa[e.away_id] += hs
             winner, loser = (e.home_id, e.away_id) if hs >= as_ else (e.away_id, e.home_id)
             wins[winner] += 1
+            if same_div[i]:
+                div_g[e.home_id] += 1
+                div_g[e.away_id] += 1
+                div_w[winner] += 1
             h2h[(winner, loser)] = h2h.get((winner, loser), 0) + 1
             if next_game.get(e.home_id) == i:
                 won_next[e.home_id] = winner == e.home_id
             if next_game.get(e.away_id) == i:
                 won_next[e.away_id] = winner == e.away_id
 
-        by_division, full_order = _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng)
+        by_division, full_order = _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng,
+                                       pa, division_pct(div_w, div_g))
         per_division = playoff_count // len(by_division) if by_division else 0
         field = [t for lst in by_division.values() for t in lst[:per_division]]
 
@@ -729,7 +767,7 @@ def run(league: LeagueData, history: LeagueData | None = None,
         "remaining_matchups": len(remaining),
         "model": "normal(team lineup mean, stdev) shrunk to league priors below "
                  f"{SHRINK_GAMES} games; venue bonuses applied; top 3 per division make the "
-                 "playoffs, no wildcards; H2H tiebreak within exact-tie groups, then PF"
+                 "playoffs, no wildcards; ties broken per ESPN's documented order (H2H if equal games, PF, intradivisional, PA, coin flip)"
                  + ("; prior mean nudged by this-season roster strength, fading out as real "
                     "results accumulate" if roster_strength_active else ""),
         "roster_strength_active": roster_strength_active,

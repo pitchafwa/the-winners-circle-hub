@@ -17,6 +17,7 @@ from scipy.optimize import linear_sum_assignment
 
 import config
 from parse import IR_SLOT, LeagueData, PlayerWeek, TeamWeek, SLOT_NAMES
+from tiebreak import division_pct, order_by_espn_rules
 
 # Win probability from a score gap: normal-CDF(diff / WIN_PROB_SIGMA).
 # Lives here (not simulate.py, which uses it for the "this week's win
@@ -292,32 +293,47 @@ def current_records(league: LeagueData):
     return wins, losses, pf, h2h
 
 
-def _tiebreak_order(group: list[int], wins, losses, pf, h2h) -> list[int]:
-    """Real tiebreak: wins -> head-to-head among the exact-tied group -> PF
-    -> deterministic team_id fallback. Shared by division_race() (per
-    division) and standings_by_week() (whole-league, for its as-of-week
-    Rank column — pre-playoffs, this is exactly what `seed` approximates)."""
-    by_wins: dict[float, list[int]] = defaultdict(list)
-    for t in group:
-        by_wins[wins[t]].append(t)
-    out = []
-    for w in sorted(by_wins, reverse=True):
-        tied_group = by_wins[w]
-        ranked = sorted(tied_group, key=lambda t: (
-            sum(h2h.get((t, o), 0) for o in tied_group if o != t),
-            pf[t],
-            -t,
-        ), reverse=True)
-        out.extend(ranked)
-    return out
+def current_tiebreak_extras(league: LeagueData):
+    """Points against and intradivisional wins/games from decided regular-season
+    games — the inputs to tiebreak steps 3-4 that current_records() doesn't carry.
+    Returns (pa, div_w, div_g); tiebreak.division_pct() turns the last two into a win pct."""
+    pa: dict[int, float] = defaultdict(float)
+    div_w: dict[int, float] = defaultdict(float)
+    div_g: dict[int, int] = defaultdict(int)
+    for e in league.full_schedule:
+        if (e.winner == "UNDECIDED" or e.away_id is None
+                or e.matchup_period > league.reg_season_weeks):
+            continue
+        pa[e.home_id] += e.away_score
+        pa[e.away_id] += e.home_score
+        if league.teams[e.home_id].division_id == league.teams[e.away_id].division_id:
+            div_g[e.home_id] += 1
+            div_g[e.away_id] += 1
+            if e.winner == "HOME":
+                div_w[e.home_id] += 1
+            elif e.winner == "AWAY":
+                div_w[e.away_id] += 1
+            else:
+                div_w[e.home_id] += 0.5
+                div_w[e.away_id] += 0.5
+    return pa, div_w, div_g
 
 
-def _rank_with_cutoff(group: list[int], wins, losses, pf, h2h, cutoff: int) -> dict[int, dict]:
+def _tiebreak_order(group: list[int], wins, losses, pf, h2h, pa=None, div_pct=None) -> list[int]:
+    """ESPN's documented tiebreak (see tiebreak.py): wins -> head-to-head
+    (only if every tied team played each other equally often) -> PF ->
+    intradivisional record -> PA -> coin flip (here: lowest team id, for
+    a stable display). Shared by division_race() (per division) and
+    standings_by_week() (whole-league, for its as-of-week Rank column)."""
+    return order_by_espn_rules(group, wins, h2h, pf, pa, div_pct)
+
+
+def _rank_with_cutoff(group: list[int], wins, losses, pf, h2h, cutoff: int, pa=None, div_pct=None) -> dict[int, dict]:
     """Rank one group (a division, in every real caller so far) by
     _tiebreak_order, with games_back/cushion relative to the cutoff-th
     spot (e.g. cutoff=3 for "top 3 make the playoffs"). Returns
     {team_id: {rank, games_back, cushion}}."""
-    ranked = _tiebreak_order(group, wins, losses, pf, h2h)
+    ranked = _tiebreak_order(group, wins, losses, pf, h2h, pa, div_pct)
     real_cutoff = min(cutoff, len(ranked))
     first_out_wins = wins[ranked[real_cutoff]] if len(ranked) > real_cutoff else None
     first_out_losses = losses[ranked[real_cutoff]] if len(ranked) > real_cutoff else None
@@ -343,7 +359,7 @@ def division_race(league: LeagueData) -> dict[int, dict]:
     actual playoff format — top 3 per division make the playoffs, no
     wildcards (see `simulate.py`'s module docstring for how that was
     confirmed against real bracket data). Same tiebreak the Monte Carlo sim
-    uses per draw (wins -> head-to-head among the exact-tied group -> PF),
+    uses per draw (ESPN's documented order, see tiebreak.py),
     but with a deterministic team_id fallback instead of a random coin flip
     — this is one real number for display, not one draw among 10,000.
 
@@ -352,6 +368,8 @@ def division_race(league: LeagueData) -> dict[int, dict]:
     cutline otherwise), cushion (games ahead of the first team out — only
     set for a playoff-spot team, else None)}}."""
     wins, losses, pf, h2h = current_records(league)
+    pa, div_w, div_g = current_tiebreak_extras(league)
+    div_pct = division_pct(div_w, div_g)
 
     by_division: dict[int, list[int]] = defaultdict(list)
     for tid, team in league.teams.items():
@@ -359,7 +377,7 @@ def division_race(league: LeagueData) -> dict[int, dict]:
 
     result: dict[int, dict] = {}
     for group in by_division.values():
-        for tid, d in _rank_with_cutoff(group, wins, losses, pf, h2h, cutoff=3).items():
+        for tid, d in _rank_with_cutoff(group, wins, losses, pf, h2h, cutoff=3, pa=pa, div_pct=div_pct).items():
             result[tid] = {"division_rank": d["rank"], "games_back": d["games_back"], "cushion": d["cushion"]}
     return result
 
@@ -387,7 +405,7 @@ def standings_by_week(league: LeagueData) -> dict[int, dict[int, dict]]:
     No playoff-adjusted standing_rank here — every snapshot is a
     regular-season week, so the bracket doesn't exist yet at any of
     them. `standing_rank` is the same real tiebreak division_race() uses
-    (wins -> head-to-head -> PF), applied league-wide instead of per
+    (ESPN's documented order, see tiebreak.py), applied league-wide instead of per
     division — exactly what `seed` approximates before the playoffs
     start anyway."""
     weekly_scores = _weekly_scores(league)
@@ -414,6 +432,8 @@ def standings_by_week(league: LeagueData) -> dict[int, dict[int, dict]]:
         ties_ct: dict[int, int] = defaultdict(int)
         pf: dict[int, float] = defaultdict(float)
         pa: dict[int, float] = defaultdict(float)
+        div_w: dict[int, float] = defaultdict(float)
+        div_g: dict[int, int] = defaultdict(int)
         h2h: dict[tuple[int, int], float] = defaultdict(float)
         results_by_team: dict[int, list[str]] = defaultdict(list)
         for e in league.full_schedule:
@@ -424,6 +444,16 @@ def standings_by_week(league: LeagueData) -> dict[int, dict[int, dict]]:
             pf[e.away_id] += e.away_score
             pa[e.home_id] += e.away_score
             pa[e.away_id] += e.home_score
+            if league.teams[e.home_id].division_id == league.teams[e.away_id].division_id:
+                div_g[e.home_id] += 1
+                div_g[e.away_id] += 1
+                if e.winner == "HOME":
+                    div_w[e.home_id] += 1
+                elif e.winner == "AWAY":
+                    div_w[e.away_id] += 1
+                else:
+                    div_w[e.home_id] += 0.5
+                    div_w[e.away_id] += 0.5
             if e.winner == "HOME":
                 wins[e.home_id] += 1
                 losses[e.away_id] += 1
@@ -455,11 +485,12 @@ def standings_by_week(league: LeagueData) -> dict[int, dict[int, dict]]:
         by_division: dict[int, list[int]] = defaultdict(list)
         for tid, team in league.teams.items():
             by_division[team.division_id].append(tid)
+        div_pct = division_pct(div_w, div_g)
         division_ranked: dict[int, dict] = {}
         for group in by_division.values():
-            for tid, d in _rank_with_cutoff(group, wins, losses, pf, h2h, cutoff=3).items():
+            for tid, d in _rank_with_cutoff(group, wins, losses, pf, h2h, cutoff=3, pa=pa, div_pct=div_pct).items():
                 division_ranked[tid] = d
-        league_order = _tiebreak_order(all_team_ids, wins, losses, pf, h2h)
+        league_order = _tiebreak_order(all_team_ids, wins, losses, pf, h2h, pa, div_pct)
 
         rows: dict[int, dict] = {}
         for tid in all_team_ids:

@@ -82,22 +82,37 @@ points_against, division_id, division_record, division_rank, games_back, cushion
 all_play_wins/losses/ties, all_play_record, all_play_pct, expected_wins, luck,
 lineup_points, optimal_points, coach_rating, bench_points_lost`.
 
+**Standings tiebreak** (`ingest/tiebreak.py`, one shared implementation used by
+`division_race`, `standings_by_week`, the Monte Carlo seeding and `clinch_status`).
+This league's ESPN setting is `playoffSeedingRule: H2H_RECORD`; ESPN only exposes that
+first rule via the API, so everything after it is ESPN's documented default (source:
+ESPN Fan Support, "H2H Points League Playoff Seeding: How Tiebreakers Work"; a league
+manager can reorder the steps on the Edit Playoffs page, which we can't see). Teams are
+grouped by wins, then within a tied group: (1) head-to-head among the tied teams — ONLY
+valid if every tied team played every other tied team the same number of times,
+otherwise skipped; (2) points for; (3) intradivisional record (win pct vs own-division
+teams); (4) points against (more wins the step, "tougher schedule"); (5) coin flip
+(simulation: random; displayed standings: lowest team id). With 3+ tied teams ESPN seeds
+ONE team at a time: find the top, remove it, restart from step 1 for the rest. Validated
+against ESPN's real seeds: every division-season 2012-2025 matches except 2015 (no
+points-for data stored), plus the live 2026 tie between teams 6 and 9 (equal record and
+points, never met) is separated by step 4, exactly as ESPN seeded it. No game in league
+history has ever tied (an exact score tie is credited to the home team).
+
 `clinched` / `clinches_if_win_next` (bool, added 2026-09-26, `simulate.clinch_status()`):
 exact worst-case math, NOT a probability threshold. Top 3 per division make the
-playoffs (no wildcards); ESPN's `playoffSeedingRule` for this league is `H2H_RECORD`,
-and the tiebreak (wins -> head-to-head among the exactly-tied teams -> points-for) was
-checked against ESPN's real seeds for every division-season 2012-2026: 28 of 30 match
-(23 of those had a real tie on wins). The 2 misses are 2015 (no points-for data
-stored) and a live 2026 exact tie in both wins and PF that no rule separates.
-A team is safe iff no possible remaining results leave 3+ division rivals ahead of it.
-Worst case: it loses every remaining game (or wins only its next one, for
-`clinches_if_win_next`), rivals win all cross-division games, rival-vs-rival games are
-enumerated exhaustively tracking wins AND head-to-head. Only points-for can't be
-bounded, so a tie that survives head-to-head counts against the team (under-claims,
-never over-claims). Drives the matchup cards' "Clinches" badge (replaced a >=97% odds
-threshold that wasn't a real clinch). Divisions with >16 undecided rival-vs-rival
-games report false. Tests: `ingest/tests/test_simulate.py::TestClinch` (includes a
-brute-force cross-check).
+playoffs (no wildcards). A team is safe iff no possible remaining results leave 3+
+division rivals ahead of it under the tiebreak above. Worst case: it loses every
+remaining game (or wins only its next one, for `clinches_if_win_next`), rivals win all
+cross-division games, rival-vs-rival games are enumerated exhaustively tracking wins AND
+head-to-head, and head-to-head is applied exactly (equal-games rule, one-at-a-time
+resets). Points-for and the steps after it can't be bounded for unplayed games, so a
+tie head-to-head can't separate counts against the team (under-claims, never
+over-claims). Drives the matchup cards' "Clinches" badge (replaced a >=97% odds
+threshold that wasn't a real clinch). Divisions with >14 undecided rival-vs-rival games
+report false. Tests: `ingest/tests/test_tiebreak.py` and
+`ingest/tests/test_simulate.py::TestClinch` (brute force over every outcome x every
+points-for ordering against the real tiebreak function).
 
 `power_score` (added 2026-09-02, `metrics.power_score_1_100()`): same
 1-100 number as `sim.json`/`spectrum.json` (see those sections) — a
@@ -138,7 +153,7 @@ season with real schedule data (2012 on); `division_record` is always
 come back `null` for a season/week with no box-score cache, same
 "known weeks only" fallback the season-total numbers already use.
 `standing_rank`/`seed`/`final_rank` are all the same value here (the
-real wins → head-to-head → PF tiebreak, applied league-wide) — no
+real ESPN tiebreak, `tiebreak.py`, applied league-wide) — no
 playoff-adjusted reordering, since every snapshot is a regular-season
 week and the bracket doesn't exist yet at any of them. One quirk worth
 knowing: unlike `standings.json`'s season-end `coach_rating` (which
@@ -151,9 +166,9 @@ completed season.
 are the REAL, current standing within each team's division under this
 league's actual playoff format — top 3 per division make it, no wildcards
 (see `simulate.py`'s module docstring for how that was confirmed against
-real bracket data). Same tiebreak the Monte Carlo sim uses per draw (wins →
-head-to-head among the exact-tied group → points-for), but with a
-deterministic team_id fallback instead of a random coin flip, since this is
+real bracket data). Same tiebreak the Monte Carlo sim uses per draw (ESPN's
+documented order, see "Standings tiebreak" below), but with a
+deterministic lowest-team-id fallback instead of a random coin flip, since this is
 one real number for display, not one draw among 10,000. `division_rank` is
 1-based within the division. `games_back` is the standard sports GB formula
 against the division's 3rd-place cutline team — `0.0` for a team currently

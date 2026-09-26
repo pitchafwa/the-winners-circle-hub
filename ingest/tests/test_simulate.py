@@ -12,18 +12,15 @@ from test_all_play import build_league, matchup
 
 class TestSeeding:
     def test_division_winners_get_top_seeds(self):
-        # T4 has the best record overall, but T1 wins division 0 and T3 wins
-        # division 1 — they take seeds 1 and 2 regardless.
+        # No wildcards: each division's order is separate, and full_order is
+        # the whole league by record.
         team_ids = [1, 2, 3, 4]
         divisions = {1: 0, 2: 1, 3: 1, 4: 1}
         wins = {1: 5, 2: 4, 3: 8, 4: 9}
         pf = {1: 1000, 2: 1100, 3: 1200, 4: 1300}
-        # T4 tops division 1... wait, then T4 is the division winner. Make T3
-        # the div-1 winner and put T4's 9 wins in division 0 behind T1? Can't —
-        # keep it honest: T4 9 wins IS div-1 winner; T3 8 wins is wildcard.
-        field, order = _seed(team_ids, wins, pf, {}, divisions, 2, random.Random(1))
-        assert field == [4, 1]           # both division winners, best first
-        assert order == [4, 1, 3, 2]     # then wildcards by record
+        by_division, order = _seed(team_ids, wins, pf, {}, divisions, 2, random.Random(1))
+        assert by_division == {0: [1], 1: [4, 3, 2]}
+        assert order == [4, 3, 1, 2]
 
     def test_h2h_breaks_exact_tie(self):
         team_ids = [1, 2, 3]
@@ -107,50 +104,46 @@ class TestClinch:
         assert not clinch_status(rem, wins2, div, 3, {})[1]["clinched"]  # no h2h -> ties count against
 
     def test_matches_brute_force_on_random_scenarios(self):
+        """Every outcome of every remaining game x every possible points-for
+        ordering (the unbounded adversary), ranked with the REAL shared
+        tiebreak (tiebreak.order_by_espn_rules) — must agree exactly with
+        clinch_status, including ESPN's equal-games rule and one-at-a-time
+        resets."""
         import itertools
         from simulate import clinch_status
-        rng = random.Random(7)
+        from tiebreak import order_by_espn_rules
+        rng = random.Random(11)
         teams = [1, 2, 3, 4, 5]
         div = {t: 0 for t in teams}
-        for _ in range(150):
+        pairs = list(itertools.combinations(teams, 2))
+        for _ in range(45):
             base = {t: float(rng.randint(0, 4)) for t in teams}
             h2h = {}
-            for a, b in itertools.permutations(teams, 2):
-                h2h[(a, b)] = rng.choice([0, 0, 1, 2])
-            games = [self._g(*rng.sample(teams, 2)) for _ in range(rng.randint(0, 7))]
+            uniform = rng.choice([0, 1, 2]) if rng.random() < 0.6 else None
+            for a, b in pairs:
+                g = uniform if uniform is not None else rng.choice([0, 1, 2])
+                wa = rng.randint(0, g)
+                h2h[(a, b)], h2h[(b, a)] = wa, g - wa
+            games = [self._g(*rng.sample(teams, 2)) for _ in range(rng.randint(0, 5))]
             got = clinch_status(games, base, div, 3, h2h)
+            nxt = {t: next((e for e in games if t in (e.home_id, e.away_id)), None) for t in teams}
+            safe_all = {t: True for t in teams}
+            safe_if_win = {t: True for t in teams}
+            for res in itertools.product([0, 1], repeat=len(games)):
+                w, h = dict(base), dict(h2h)
+                winners = {}
+                for e, r in zip(games, res):
+                    win, lose = (e.home_id, e.away_id) if r else (e.away_id, e.home_id)
+                    w[win] += 1
+                    h[(win, lose)] = h.get((win, lose), 0) + 1
+                    winners[id(e)] = win
+                for pf_perm in itertools.permutations(range(5)):
+                    order = order_by_espn_rules(teams, w, h, dict(zip(teams, pf_perm)))
+                    for t in teams:
+                        if order.index(t) >= 3:
+                            safe_all[t] = False
+                            if nxt[t] is None or winners[id(nxt[t])] == t:
+                                safe_if_win[t] = False
             for t in teams:
-                # brute force over every outcome, ties resolved WORST case for T
-                # after head-to-head (points-for is the unbounded adversary)
-                def safe(force):
-                    nxt = next((e for e in games if t in (e.home_id, e.away_id)), None)
-                    for res in itertools.product([0, 1], repeat=len(games)):
-                        w, h = dict(base), dict(h2h)
-                        ok = True
-                        for e, r in zip(games, res):
-                            win, lose = (e.home_id, e.away_id) if r else (e.away_id, e.home_id)
-                            if force and e is nxt and lose == t:
-                                ok = False   # this outcome contradicts "T wins next"
-                            w[win] += 1
-                            h[(win, lose)] = h.get((win, lose), 0) + 1
-                        if not ok:
-                            continue
-                        ahead = 0
-                        for x in teams:
-                            if x == t:
-                                continue
-                            if w[x] > w[t]:
-                                ahead += 1
-                            elif w[x] == w[t]:
-                                grp = [y for y in teams if w[y] == w[t]]
-                                sx = sum(h.get((x, y), 0) for y in grp if y != x)
-                                st = sum(h.get((t, y), 0) for y in grp if y != t)
-                                if sx >= st:
-                                    ahead += 1
-                        if ahead >= 3:
-                            return False
-                    return True
-                # "clinched": T may lose everything -> brute force over outcomes is
-                # a superset, so the exact answer is safe-in-ALL-outcomes.
-                assert got[t]["clinched"] == safe(False), (base, t)
-                assert got[t]["clinches_if_win_next"] == (safe(False) or safe(True)), (base, t)
+                assert got[t]["clinched"] == safe_all[t], (base, h2h, t)
+                assert got[t]["clinches_if_win_next"] == (safe_all[t] or safe_if_win[t]), (base, h2h, t)

@@ -262,6 +262,76 @@ def _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng):
     return by_division, full_order
 
 
+MAX_CLINCH_ENUM_GAMES = 16
+
+
+def clinch_status(remaining, base_wins: dict[int, float], divisions: dict[int, int],
+                  per_division: int) -> dict[int, dict[str, bool]]:
+    """Mathematical (not probabilistic) clinch check. Playoff spots are top
+    `per_division` of each division by record with no wildcards, so team T
+    is safe iff no possible set of remaining results leaves `per_division`
+    or more division rivals with at least T's wins. Worst case for T: it
+    loses every remaining game (except its next one, when asking "what if
+    it wins this week"), every rival wins every cross-division game, and
+    rival-vs-rival games go whichever way hurts T most (enumerated
+    exactly). Ties on wins count AGAINST T, so a tiebreak that's actually
+    already locked in is under-claimed — never over-claimed.
+    Returns {team: {"clinched", "clinches_if_win_next"}}. Divisions with
+    too many undecided rival-vs-rival games to enumerate report False
+    (only ever true of early-season weeks, when nothing can clinch)."""
+    out = {t: {"clinched": False, "clinches_if_win_next": False} for t in divisions}
+    if per_division <= 0:
+        return out
+    next_game: dict[int, object] = {}
+    for e in remaining:
+        next_game.setdefault(e.home_id, e)
+        next_game.setdefault(e.away_id, e)
+
+    def guaranteed(t: int, force_next_win: bool) -> bool:
+        div = divisions[t]
+        rivals = [x for x in divisions if divisions[x] == div and x != t]
+        if len(rivals) < per_division:
+            return True
+        nxt = next_game.get(t)
+        forced_win = force_next_win and nxt is not None
+        t_wins = base_wins.get(t, 0.0) + (1 if forced_win else 0)
+        rival_base = {x: base_wins.get(x, 0.0) for x in rivals}
+        rr_games = []
+        for e in remaining:
+            a, b = e.home_id, e.away_id
+            if t in (a, b):
+                other = b if a == t else a
+                if other in rival_base and not (forced_win and e is nxt):
+                    rival_base[other] += 1  # rival beats T
+                continue
+            in_a, in_b = a in rival_base, b in rival_base
+            if in_a and in_b:
+                rr_games.append((a, b))
+            elif in_a:
+                rival_base[a] += 1  # cross-division game: rival wins
+            elif in_b:
+                rival_base[b] += 1
+        if len(rr_games) > MAX_CLINCH_ENUM_GAMES:
+            return False
+        idx = {x: i for i, x in enumerate(rivals)}
+        base = np.array([rival_base[x] for x in rivals])
+        n = len(rr_games)
+        combos = np.arange(2 ** n)
+        wins = np.tile(base, (2 ** n, 1)).astype(float)
+        for g, (a, b) in enumerate(rr_games):
+            a_wins = ((combos >> g) & 1).astype(bool)
+            wins[a_wins, idx[a]] += 1
+            wins[~a_wins, idx[b]] += 1
+        ahead = (wins >= t_wins).sum(axis=1)
+        return bool((ahead < per_division).all())
+
+    for t in divisions:
+        already = guaranteed(t, False)
+        out[t]["clinched"] = already
+        out[t]["clinches_if_win_next"] = already or guaranteed(t, True)
+    return out
+
+
 def _division_bracket(seeded3: list[int], playoff_game) -> int:
     """One division's 3-team bracket: the #1 seed gets a bye, #2 plays #3
     (#2 hosts), then #1 hosts the winner for the division title. Confirmed
@@ -384,6 +454,9 @@ def run(league: LeagueData, history: LeagueData | None = None,
     def se(p):
         return round(float(np.sqrt(p * (1 - p) / N_SIMS)), 4)
 
+    per_div_spots = playoff_count // len(set(divisions.values())) if divisions else 0
+    clinch = clinch_status(remaining, base_wins, divisions, per_div_spots)
+
     teams_out = []
     for t in team_ids:
         p_make = pct(made[t])
@@ -401,6 +474,8 @@ def run(league: LeagueData, history: LeagueData | None = None,
             "seed_dist": {str(r): pct(n) for r, n in sorted(seeds[t].items())},
             "playoff_pct_if_win_next": round(cw[0] / cw[1], 4) if cw[1] else None,
             "playoff_pct_if_lose_next": round(cl[0] / cl[1], 4) if cl[1] else None,
+            "clinched": clinch[t]["clinched"],
+            "clinches_if_win_next": clinch[t]["clinches_if_win_next"],
             "playoff_pct_by_final_wins": {
                 str(w): round(m / n, 4)
                 for w, (m, n) in sorted(by_final_wins[t].items()) if n >= 50

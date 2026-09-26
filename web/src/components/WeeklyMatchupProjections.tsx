@@ -17,7 +17,6 @@ export interface TeamInfo {
 }
 
 const ELIMINATION_THRESHOLD = 0.05;
-const CLINCH_THRESHOLD = 0.97;
 
 // Playoff impact is a combined percentage-point swing (0-2 in theory,
 // usually much smaller) in BOTH teams' playoff odds between winning and
@@ -33,6 +32,10 @@ const CLINCH_THRESHOLD = 0.97;
 // (Tommy, 2026-09-02: "do week 1 games really have much playoff stakes?
 // it currently applies to every week 1 matchup") without inventing a
 // more complex statistical model for a plain-English badge.
+// Was "back half of the season" (week 7 of 14); lowered to week 3 on
+// 2026-09-26 (Tommy: start showing swing badges) — two weeks of real
+// results are enough for the odds to mean something.
+const PLAYOFF_IMPACT_MIN_WEEK = 3;
 const PLAYOFF_IMPACT_HUGE_SWING = 0.3;
 const PLAYOFF_IMPACT_STAKES = 0.12;
 
@@ -72,10 +75,10 @@ interface MatchupFlag {
  * bracket game is already sudden-death by construction, and these fields
  * mean something different there. Playoff-impact and upset alert are both
  * playoff_pct-independent so they're shown for playoff games too.
- * `regSeasonWeeks` gates playoff-impact to the back half of the season —
- * see PLAYOFF_IMPACT_STAKES' comment for why. */
-function matchupFlags(m: SimMatchup, simTeams: Map<number, SimTeam>, teamName: (id: number) => string,
-                      regSeasonWeeks: number): MatchupFlag[] {
+ * Playoff-impact is gated to PLAYOFF_IMPACT_MIN_WEEK and later — see its
+ * comment for why. "Clinches" is an exact worst-case check computed in
+ * simulate.clinch_status, not a probability threshold. */
+function matchupFlags(m: SimMatchup, simTeams: Map<number, SimTeam>, teamName: (id: number) => string): MatchupFlag[] {
   const flags: MatchupFlag[] = [];
   if (!m.is_playoff) {
     for (const id of [m.away_id, m.home_id]) {
@@ -88,17 +91,16 @@ function matchupFlags(m: SimMatchup, simTeams: Map<number, SimTeam>, teamName: (
           detail: `A loss this week drops ${teamName(id)}'s playoff odds below ${pct(ELIMINATION_THRESHOLD, 0)} (currently ${pct(s.playoff_pct, 0)}).`,
         });
       }
-      if (s.playoff_pct_if_win_next !== null && s.playoff_pct_if_win_next >= CLINCH_THRESHOLD
-          && s.playoff_pct < CLINCH_THRESHOLD) {
+      if (s.clinches_if_win_next && !s.clinched) {
         flags.push({
           key: `clinch-${id}`, teamId: id, label: `${teamName(id)}: Clinches`, tone: "positive",
-          detail: `A win this week pushes ${teamName(id)}'s playoff odds above ${pct(CLINCH_THRESHOLD, 0)} (currently ${pct(s.playoff_pct, 0)}).`,
+          detail: `A win this week mathematically locks up a playoff spot for ${teamName(id)} — no combination of remaining results can knock them out.`,
         });
       }
     }
   }
 
-  if (m.matchup_period >= Math.ceil(regSeasonWeeks / 2)) {
+  if (m.matchup_period >= PLAYOFF_IMPACT_MIN_WEEK) {
     if (m.playoff_impact_score >= PLAYOFF_IMPACT_HUGE_SWING) {
       flags.push({
         key: "impact", teamId: null, label: "🔥 Huge Swing", tone: "gold",
@@ -247,13 +249,11 @@ function MatchupPreviewCard({
   teamInfo,
   h2hPairs,
   simTeams,
-  regSeasonWeeks,
 }: {
   m: SimMatchup;
   teamInfo: Map<number, TeamInfo>;
   h2hPairs: H2HPair[];
   simTeams: Map<number, SimTeam>;
-  regSeasonWeeks: number;
 }) {
   const { teamName, myTeamId } = useApp();
   const cardRef = useRef<HTMLElement>(null);
@@ -270,7 +270,7 @@ function MatchupPreviewCard({
   const mine = m.home_id === myTeamId || m.away_id === myTeamId;
   const h2h = h2hLookup(h2hPairs, m.away_id, m.home_id);
   const rows = Math.max(m.away_lineup.length, m.home_lineup.length);
-  const flags = matchupFlags(m, simTeams, teamName, regSeasonWeeks);
+  const flags = matchupFlags(m, simTeams, teamName);
   // Both sides share the identical real slot order index-for-index,
   // so one permutation (computed off either side) reorders both.
   const order = displayOrderIndices(m.away_lineup.map((p) => p.slot));
@@ -395,13 +395,11 @@ export default function WeeklyMatchupProjections({
   teamInfo,
   h2hPairs,
   simTeams,
-  regSeasonWeeks,
 }: {
   matchups: SimMatchup[];
   teamInfo: Map<number, TeamInfo>;
   h2hPairs: H2HPair[];
   simTeams: Map<number, SimTeam>;
-  regSeasonWeeks: number;
 }) {
   return (
     <div className="mu-list">
@@ -412,7 +410,6 @@ export default function WeeklyMatchupProjections({
           teamInfo={teamInfo}
           h2hPairs={h2hPairs}
           simTeams={simTeams}
-          regSeasonWeeks={regSeasonWeeks}
         />
       ))}
     </div>

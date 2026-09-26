@@ -401,7 +401,6 @@ export default function MatchupsPage() {
             teamInfo={teamInfo}
             h2hPairs={h2h.data?.pairs ?? []}
             simTeams={simTeams}
-            regSeasonWeeks={meta.reg_season_weeks}
           />
         </section>
       )}

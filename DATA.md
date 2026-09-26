@@ -82,6 +82,17 @@ points_against, division_id, division_record, division_rank, games_back, cushion
 all_play_wins/losses/ties, all_play_record, all_play_pct, expected_wins, luck,
 lineup_points, optimal_points, coach_rating, bench_points_lost`.
 
+`clinched` / `clinches_if_win_next` (bool, added 2026-09-26, `simulate.clinch_status()`):
+exact worst-case math, NOT a probability threshold. Top 3 per division make the
+playoffs (no wildcards), so a team is safe iff no possible remaining results leave
+3+ division rivals with at least its wins. Worst case: the team loses every remaining
+game (or wins only its next one, for `clinches_if_win_next`), rivals win all
+cross-division games, rival-vs-rival games enumerated exhaustively, and ties on wins
+count against the team (so an already-locked tiebreak is under-claimed, never
+over-claimed). Drives the matchup cards' "Clinches" badge (replaced a >=97% odds
+threshold that wasn't a real clinch). Divisions with >16 undecided rival-vs-rival
+games report false.
+
 `power_score` (added 2026-09-02, `metrics.power_score_1_100()`): same
 1-100 number as `sim.json`/`spectrum.json` (see those sections) — a
 "right now" market snapshot of the CURRENT roster, so it's only ever

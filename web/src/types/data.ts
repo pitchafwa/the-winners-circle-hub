@@ -383,6 +383,8 @@ export interface SimTeam {
   seed_dist: Record<string, number>;
   playoff_pct_if_win_next: number | null;
   playoff_pct_if_lose_next: number | null;
+  clinched?: boolean;
+  clinches_if_win_next?: boolean;
   playoff_pct_by_final_wins: Record<string, number>;
 }
 

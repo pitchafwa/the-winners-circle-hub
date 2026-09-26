@@ -84,14 +84,20 @@ lineup_points, optimal_points, coach_rating, bench_points_lost`.
 
 `clinched` / `clinches_if_win_next` (bool, added 2026-09-26, `simulate.clinch_status()`):
 exact worst-case math, NOT a probability threshold. Top 3 per division make the
-playoffs (no wildcards), so a team is safe iff no possible remaining results leave
-3+ division rivals with at least its wins. Worst case: the team loses every remaining
-game (or wins only its next one, for `clinches_if_win_next`), rivals win all
-cross-division games, rival-vs-rival games enumerated exhaustively, and ties on wins
-count against the team (so an already-locked tiebreak is under-claimed, never
-over-claimed). Drives the matchup cards' "Clinches" badge (replaced a >=97% odds
+playoffs (no wildcards); ESPN's `playoffSeedingRule` for this league is `H2H_RECORD`,
+and the tiebreak (wins -> head-to-head among the exactly-tied teams -> points-for) was
+checked against ESPN's real seeds for every division-season 2012-2026: 28 of 30 match
+(23 of those had a real tie on wins). The 2 misses are 2015 (no points-for data
+stored) and a live 2026 exact tie in both wins and PF that no rule separates.
+A team is safe iff no possible remaining results leave 3+ division rivals ahead of it.
+Worst case: it loses every remaining game (or wins only its next one, for
+`clinches_if_win_next`), rivals win all cross-division games, rival-vs-rival games are
+enumerated exhaustively tracking wins AND head-to-head. Only points-for can't be
+bounded, so a tie that survives head-to-head counts against the team (under-claims,
+never over-claims). Drives the matchup cards' "Clinches" badge (replaced a >=97% odds
 threshold that wasn't a real clinch). Divisions with >16 undecided rival-vs-rival
-games report false.
+games report false. Tests: `ingest/tests/test_simulate.py::TestClinch` (includes a
+brute-force cross-check).
 
 `power_score` (added 2026-09-02, `metrics.power_score_1_100()`): same
 1-100 number as `sim.json`/`spectrum.json` (see those sections) — a

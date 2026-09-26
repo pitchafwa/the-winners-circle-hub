@@ -266,19 +266,30 @@ MAX_CLINCH_ENUM_GAMES = 16
 
 
 def clinch_status(remaining, base_wins: dict[int, float], divisions: dict[int, int],
-                  per_division: int) -> dict[int, dict[str, bool]]:
-    """Mathematical (not probabilistic) clinch check. Playoff spots are top
-    `per_division` of each division by record with no wildcards, so team T
-    is safe iff no possible set of remaining results leaves `per_division`
-    or more division rivals with at least T's wins. Worst case for T: it
-    loses every remaining game (except its next one, when asking "what if
-    it wins this week"), every rival wins every cross-division game, and
-    rival-vs-rival games go whichever way hurts T most (enumerated
-    exactly). Ties on wins count AGAINST T, so a tiebreak that's actually
-    already locked in is under-claimed — never over-claimed.
+                  per_division: int, base_h2h: dict | None = None) -> dict[int, dict[str, bool]]:
+    """Mathematical (not probabilistic) clinch check under this league's
+    real seeding rule (ESPN playoffSeedingRule H2H_RECORD, no wildcards:
+    top `per_division` of each division make it; ties on wins are broken
+    by head-to-head among the exactly-tied teams, then points-for — the
+    same order `_seed` and `metrics._tiebreak_order` use, checked against
+    ESPN's real seeds for every past season). Team T is safe iff, for
+    every possible set of remaining results, fewer than `per_division`
+    division rivals finish ahead of it.
+
+    Worst case for T: it loses every remaining game (except its next one,
+    when asking "what if it wins this week" — a win only ever helps T's
+    record AND its head-to-head, so losing is always the worst branch),
+    every rival wins every cross-division game, and rival-vs-rival games
+    go every possible way (enumerated exactly, tracking each outcome's
+    wins and head-to-head). Wins ties are resolved by the real head-to-head
+    rule. Points-for is the one tiebreaker that can't be bounded (it's
+    unbounded scores), so a tie that survives head-to-head counts AGAINST
+    T — under-claims a clinch in that rare spot, never over-claims one.
+
     Returns {team: {"clinched", "clinches_if_win_next"}}. Divisions with
     too many undecided rival-vs-rival games to enumerate report False
     (only ever true of early-season weeks, when nothing can clinch)."""
+    base_h2h = base_h2h or {}
     out = {t: {"clinched": False, "clinches_if_win_next": False} for t in divisions}
     if per_division <= 0:
         return out
@@ -292,37 +303,59 @@ def clinch_status(remaining, base_wins: dict[int, float], divisions: dict[int, i
         rivals = [x for x in divisions if divisions[x] == div and x != t]
         if len(rivals) < per_division:
             return True
+        k = len(rivals)
+        idx = {x: i for i, x in enumerate(rivals)}
         nxt = next_game.get(t)
         forced_win = force_next_win and nxt is not None
         t_wins = base_wins.get(t, 0.0) + (1 if forced_win else 0)
-        rival_base = {x: base_wins.get(x, 0.0) for x in rivals}
+        rival_wins = np.array([base_wins.get(x, 0.0) for x in rivals], dtype=float)
+        # head-to-head counts among the division, fixed part (played games
+        # + worst-case results of T's own games and cross-division games)
+        h_rr = np.zeros((k, k))                 # h_rr[i, j]: rival i's wins over rival j
+        for i, xi in enumerate(rivals):
+            for j, xj in enumerate(rivals):
+                if i != j:
+                    h_rr[i, j] = base_h2h.get((xi, xj), 0)
+        h_rt = np.array([base_h2h.get((x, t), 0) for x in rivals], dtype=float)   # rival i over T
+        h_tr = np.array([base_h2h.get((t, x), 0) for x in rivals], dtype=float)   # T over rival i
         rr_games = []
         for e in remaining:
             a, b = e.home_id, e.away_id
             if t in (a, b):
                 other = b if a == t else a
-                if other in rival_base and not (forced_win and e is nxt):
-                    rival_base[other] += 1  # rival beats T
+                if other in idx:
+                    if forced_win and e is nxt:
+                        h_tr[idx[other]] += 1
+                    else:
+                        rival_wins[idx[other]] += 1
+                        h_rt[idx[other]] += 1
                 continue
-            in_a, in_b = a in rival_base, b in rival_base
+            in_a, in_b = a in idx, b in idx
             if in_a and in_b:
-                rr_games.append((a, b))
+                rr_games.append((idx[a], idx[b]))
             elif in_a:
-                rival_base[a] += 1  # cross-division game: rival wins
+                rival_wins[idx[a]] += 1
             elif in_b:
-                rival_base[b] += 1
-        if len(rr_games) > MAX_CLINCH_ENUM_GAMES:
-            return False
-        idx = {x: i for i, x in enumerate(rivals)}
-        base = np.array([rival_base[x] for x in rivals])
+                rival_wins[idx[b]] += 1
         n = len(rr_games)
+        if n > MAX_CLINCH_ENUM_GAMES:
+            return False
         combos = np.arange(2 ** n)
-        wins = np.tile(base, (2 ** n, 1)).astype(float)
-        for g, (a, b) in enumerate(rr_games):
+        wins = np.tile(rival_wins, (2 ** n, 1))
+        hh = np.tile(h_rr, (2 ** n, 1, 1))
+        for g, (ia, ib) in enumerate(rr_games):
             a_wins = ((combos >> g) & 1).astype(bool)
-            wins[a_wins, idx[a]] += 1
-            wins[~a_wins, idx[b]] += 1
-        ahead = (wins >= t_wins).sum(axis=1)
+            wins[a_wins, ia] += 1
+            wins[~a_wins, ib] += 1
+            hh[a_wins, ia, ib] += 1
+            hh[~a_wins, ib, ia] += 1
+        above = wins > t_wins
+        tied = wins == t_wins
+        # head-to-head totals within each outcome's tie group (T + tied rivals)
+        s_rival = (hh * tied[:, None, :]).sum(axis=2) + h_rt[None, :]
+        s_t = (tied * h_tr[None, :]).sum(axis=1)
+        beats_or_ties_t = tied & (s_rival >= s_t[:, None])
+        ahead = above.sum(axis=1) + beats_or_ties_t.sum(axis=1)
         return bool((ahead < per_division).all())
 
     for t in divisions:
@@ -455,7 +488,7 @@ def run(league: LeagueData, history: LeagueData | None = None,
         return round(float(np.sqrt(p * (1 - p) / N_SIMS)), 4)
 
     per_div_spots = playoff_count // len(set(divisions.values())) if divisions else 0
-    clinch = clinch_status(remaining, base_wins, divisions, per_div_spots)
+    clinch = clinch_status(remaining, base_wins, divisions, per_div_spots, base_h2h)
 
     teams_out = []
     for t in team_ids:

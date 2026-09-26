@@ -68,3 +68,89 @@ class TestScheduleSwap:
 def test_matchup_helper_still_works():
     m = matchup(1, 1, 2, 10, 8)
     assert m.winner == "HOME"
+
+
+class TestClinch:
+    """simulate.clinch_status: exact worst-case clinch under wins -> head-to-head
+    -> points-for, checked against brute force over every outcome."""
+
+    @staticmethod
+    def _g(a, b):
+        from types import SimpleNamespace
+        return SimpleNamespace(home_id=a, away_id=b, matchup_period=1)
+
+    def test_clear_lead_clinches_and_tight_pack_does_not(self):
+        from simulate import clinch_status
+        div = {t: (0 if t <= 5 else 1) for t in range(1, 11)}
+        rem = [self._g(1, 6), self._g(2, 7), self._g(3, 8), self._g(4, 9), self._g(5, 10)]
+        base = lambda d: {**d, **{t: 5 for t in range(6, 11)}}
+        assert clinch_status(rem, base({1: 8, 2: 3, 3: 3, 4: 2, 5: 2}), div, 3)[1]["clinched"]
+        tight = clinch_status(rem, base({1: 5, 2: 5, 3: 5, 4: 5, 5: 5}), div, 3)[1]
+        assert not tight["clinched"] and not tight["clinches_if_win_next"]
+
+    def test_head_to_head_tiebreak_can_lock_a_clinch(self):
+        from simulate import clinch_status
+        # Div of 5; T=1 has beaten every rival already. Each rival can at best
+        # finish tied with T on wins, and T holds head-to-head over all of
+        # them, so T is safe even though a plain "ties lose" check would say no.
+        div = {t: (0 if t <= 5 else 1) for t in range(1, 11)}
+        rem = [self._g(2, 6), self._g(3, 7), self._g(4, 8), self._g(5, 9)]
+        wins = {1: 4, 2: 4, 3: 4, 4: 4, 5: 3, **{t: 5 for t in range(6, 11)}}
+        h2h = {(1, x): 1 for x in (2, 3, 4, 5)}
+        with_h2h = clinch_status(rem, wins, div, 3, h2h)[1]
+        without = clinch_status(rem, wins, div, 3, {})[1]
+        # 2,3,4 can reach 5 wins vs T's 4; T is only safe if fewer than 3 finish ahead
+        assert not without["clinched"]
+        assert not with_h2h["clinched"]   # 2,3,4 all above T on wins -> genuinely not safe
+        wins2 = {1: 5, 2: 4, 3: 4, 4: 4, 5: 3, **{t: 5 for t in range(6, 11)}}
+        assert clinch_status(rem, wins2, div, 3, h2h)[1]["clinched"]     # ties only, T holds h2h
+        assert not clinch_status(rem, wins2, div, 3, {})[1]["clinched"]  # no h2h -> ties count against
+
+    def test_matches_brute_force_on_random_scenarios(self):
+        import itertools
+        from simulate import clinch_status
+        rng = random.Random(7)
+        teams = [1, 2, 3, 4, 5]
+        div = {t: 0 for t in teams}
+        for _ in range(150):
+            base = {t: float(rng.randint(0, 4)) for t in teams}
+            h2h = {}
+            for a, b in itertools.permutations(teams, 2):
+                h2h[(a, b)] = rng.choice([0, 0, 1, 2])
+            games = [self._g(*rng.sample(teams, 2)) for _ in range(rng.randint(0, 7))]
+            got = clinch_status(games, base, div, 3, h2h)
+            for t in teams:
+                # brute force over every outcome, ties resolved WORST case for T
+                # after head-to-head (points-for is the unbounded adversary)
+                def safe(force):
+                    nxt = next((e for e in games if t in (e.home_id, e.away_id)), None)
+                    for res in itertools.product([0, 1], repeat=len(games)):
+                        w, h = dict(base), dict(h2h)
+                        ok = True
+                        for e, r in zip(games, res):
+                            win, lose = (e.home_id, e.away_id) if r else (e.away_id, e.home_id)
+                            if force and e is nxt and lose == t:
+                                ok = False   # this outcome contradicts "T wins next"
+                            w[win] += 1
+                            h[(win, lose)] = h.get((win, lose), 0) + 1
+                        if not ok:
+                            continue
+                        ahead = 0
+                        for x in teams:
+                            if x == t:
+                                continue
+                            if w[x] > w[t]:
+                                ahead += 1
+                            elif w[x] == w[t]:
+                                grp = [y for y in teams if w[y] == w[t]]
+                                sx = sum(h.get((x, y), 0) for y in grp if y != x)
+                                st = sum(h.get((t, y), 0) for y in grp if y != t)
+                                if sx >= st:
+                                    ahead += 1
+                        if ahead >= 3:
+                            return False
+                    return True
+                # "clinched": T may lose everything -> brute force over outcomes is
+                # a superset, so the exact answer is safe-in-ALL-outcomes.
+                assert got[t]["clinched"] == safe(False), (base, t)
+                assert got[t]["clinches_if_win_next"] == (safe(False) or safe(True)), (base, t)

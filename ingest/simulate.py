@@ -50,7 +50,6 @@ from parse import (
     optimal_week_projection,
     pregame_projection_locked,
     pro_game_dates,
-    pro_game_likely_over,
     recent_player_performance,
     values_by_pid,
 )
@@ -606,19 +605,28 @@ def run(league: LeagueData, history: LeagueData | None = None,
                     pregame = existing_pin
                 else:
                     pregame = p["projected"]
+                # `p["live_projected"]`/`p["in_progress"]` (set upstream in
+                # optimal_week_projection's `_best_estimate`/`_is_in_progress`)
+                # are the real touch-based rest-of-game model, not a crude
+                # max(actual, projected) blend — and they already know
+                # whether this exact game is over (ESPN's own `type.completed`
+                # flag first, `pro_game_likely_over`'s time guess only as a
+                # fallback). Bug caught live, 2026-09-27 (Tommy: "Kenneth
+                # Walker is live projected for 32... why doesn't he have the
+                # flame icon"): this used to recompute its own live_estimate
+                # from `p["projected"]`, which is the FROZEN pregame number
+                # for an in-progress player (unaffected by this file's own
+                # `live_projected` addition on 2026-09-14) — so it was
+                # comparing the pregame pin against itself the entire game,
+                # collapsing on_fire/on_ice to ~0 for every in-progress
+                # player regardless of how far ahead or behind pace they
+                # actually were.
                 if not p["played"]:
                     live_estimate = p["projected"]
-                elif pro_game_likely_over(kickoff):
-                    # Once the game's actually over, trust the real
-                    # score alone — ESPN's own `projected` number
-                    # doesn't move during the game at all (confirmed
-                    # live, 2026-09-11), so blending it in forever would
-                    # let a real bust hide behind their old pregame
-                    # number. See `parse.pro_game_likely_over`'s
-                    # docstring.
-                    live_estimate = p["actual"]
+                elif p["in_progress"]:
+                    live_estimate = p["live_projected"]
                 else:
-                    live_estimate = max(p["actual"], p["projected"])
+                    live_estimate = p["actual"]
                 on_fire, on_ice = hot_cold_status(
                     p["position"], p["played"], live_estimate, pregame,
                     recent_by_pid.get(p["player_id"], []),

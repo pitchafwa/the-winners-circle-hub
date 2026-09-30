@@ -19,8 +19,15 @@ from two different value lenses:
   value (same table that backs draft grades and trade grades, still a
   FLAT full-roster sum — every rostered asset has real trade value
   regardless of whether it could start today) and future draft-pick
-  capital (same round-average estimate trade grades use for pick assets),
-  weighted 3:1 toward the roster — a team's own dynasty assets are the
+  capital (each pick's own already-priced `value` from `pick_futures.json`
+  — build.py computes this once, at whatever precision that pick's
+  resolution state allows: an exact known slot, that team's real
+  projected range of finishes for an unresolved pick governed by the live
+  season, or a round average as the last resort — reused here rather than
+  a second, independently-drifting estimate; before 2026-09-30 this was
+  its own flat round-average, which could silently disagree with the Pick
+  Futures board's own number for the same picks), weighted 3:1 toward the
+  roster — a team's own dynasty assets are the
   more important half of "banked for the future" than picks are, both
   already KTC-dynasty-scaled so they're directly comparable. Dynasty
   value alone isn't a rebuilding signal by itself (a stacked-but-young
@@ -41,7 +48,7 @@ valuation source's own scale shifting under a future source change).**
 from __future__ import annotations
 
 from metrics import redraft_lineup_value
-from parse import _normalize_name, pick_values_for_season, values_by_pid
+from parse import _normalize_name, values_by_pid
 
 # dynasty roster value counts 3x as much as pick capital toward "rebuilding value"
 ROSTER_WEIGHT = 3
@@ -64,8 +71,7 @@ def _label(contending_value: float, rebuilding_value: float) -> str:
 def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board: list[dict],
                              dynasty_values: dict[str, int], redraft_values: dict[str, int],
                              roster_players: dict[int, list[tuple[int, frozenset[int]]]],
-                             starting_slots: list[int], season: int,
-                             pick_curves: dict[str, dict[str, list[float]]] | None = None) -> list[dict]:
+                             starting_slots: list[int], season: int) -> list[dict]:
     dynasty_roster_value: dict[int, float] = {tid: 0.0 for tid in team_ids}
     for s in stints:
         if s["end_season"] is not None:
@@ -80,15 +86,18 @@ def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board
         for tid in team_ids
     }
 
-    values_cache: dict[int, dict] = {}
+    # Reuses each pick's OWN already-computed `value` (build.py sets this
+    # before calling here, priced at whatever precision that pick's
+    # resolution state allows — see pick_futures.json's DATA.md section)
+    # rather than a second, independent flat-round-average estimate — the
+    # same "one shared computation, not two that can silently drift apart"
+    # rule this file's own `power_score` used to violate before that
+    # redundant copy was removed (2026-09-29). Before this, a team's
+    # rebuilding_value here could disagree with its own pick capital shown
+    # on the Pick Futures board for the exact same picks.
     pick_capital: dict[int, float] = {tid: 0.0 for tid in team_ids}
     for p in pick_board:
-        year = p["season"]
-        if year not in values_cache:
-            values_cache[year] = pick_values_for_season(year, pick_curves)
-        row = values_cache[year].get(str(p["round"]))
-        est = (sum(row) / len(row)) if row else 0.0
-        pick_capital[p["current_owner_id"]] = pick_capital.get(p["current_owner_id"], 0.0) + est
+        pick_capital[p["current_owner_id"]] = pick_capital.get(p["current_owner_id"], 0.0) + p["value"]
 
     rebuilding_value: dict[int, float] = {}
     ratio: dict[int, float] = {}

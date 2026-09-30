@@ -1587,9 +1587,10 @@ compares two different value lenses instead of roster age:
   (`valuation.values_by_name()`, the same table draft/trade grades use,
   still a FLAT full-roster sum sourced from `ownership.json`'s open
   stints — every rostered asset has real trade value regardless of
-  whether it could start today) and held future pick capital
-  (`pick_futures.json`, valued the same round-average way as
-  `trades.json`'s pick assets), blended `(3*dynasty + picks) / 4` —
+  whether it could start today) and held future pick capital (each
+  pick's own `value` from `pick_futures.json` — see that file's section
+  for the three pricing tiers — reused directly rather than a second,
+  independently-drifting estimate), blended `(3*dynasty + picks) / 4` —
   weighted 3:1 toward the roster (`spectrum.ROSTER_WEIGHT`) since a
   team's own dynasty assets matter more to its future than picks do —
   assets banked for the future rather than playing right now.

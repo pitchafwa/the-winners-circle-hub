@@ -1393,7 +1393,7 @@ def main():
         "teams": spectrum.contend_rebuild_spectrum(
             latest_teams, ownership_data["stints"], pick_board, dynasty_values, redraft_values,
             parse.current_roster_players(latest_league.season), latest_league.starting_slots,
-            latest_league.season, pick_curves),
+            latest_league.season),
     })
 
     print("Building all-time head-to-head...")

@@ -68,10 +68,15 @@ def _label(contending_value: float, rebuilding_value: float) -> str:
     return "Balanced"  # in between — not clearly either
 
 
-def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board: list[dict],
-                             dynasty_values: dict[str, int], redraft_values: dict[str, int],
-                             roster_players: dict[int, list[tuple[int, frozenset[int]]]],
-                             starting_slots: list[int], season: int) -> list[dict]:
+def dynasty_roster_values(team_ids: list[int], stints: list[dict],
+                          dynasty_values: dict[str, int]) -> dict[int, float]:
+    """Each team's current roster's long-term dynasty value — flat sum
+    across every OPEN stint (a player currently on that roster), from the
+    same ownership timeline that backs draft/trade grades. Pulled out as
+    its own function (2026-09-30) so `future_strength.py`'s n+2 pick-value
+    heuristic can use the EXACT same number `contend_rebuild_spectrum`
+    below shows on the Contend/Rebuild page, rather than a second
+    computation that could silently drift from it."""
     dynasty_roster_value: dict[int, float] = {tid: 0.0 for tid in team_ids}
     for s in stints:
         if s["end_season"] is not None:
@@ -79,12 +84,28 @@ def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board
         name = _normalize_name(s["name"])
         tid = s["team_id"]
         dynasty_roster_value[tid] = dynasty_roster_value.get(tid, 0.0) + dynasty_values.get(name, 0)
+    return dynasty_roster_value
 
-    redraft_by_pid = values_by_pid(season, redraft_values)
-    contending_value: dict[int, float] = {
+
+def contending_values(team_ids: list[int], roster_players: dict[int, list[tuple[int, frozenset[int]]]],
+                      redraft_by_pid: dict[int, float], starting_slots: list[int]) -> dict[int, float]:
+    """Each team's current roster's best-possible starting lineup, priced
+    on REDRAFT (this-season) value — "how good is this team RIGHT NOW."
+    Pulled out as its own function for the same reason as
+    `dynasty_roster_values` above."""
+    return {
         tid: redraft_lineup_value(roster_players.get(tid, []), redraft_by_pid, starting_slots)
         for tid in team_ids
     }
+
+
+def contend_rebuild_spectrum(team_ids: list[int], stints: list[dict], pick_board: list[dict],
+                             dynasty_values: dict[str, int], redraft_values: dict[str, int],
+                             roster_players: dict[int, list[tuple[int, frozenset[int]]]],
+                             starting_slots: list[int], season: int) -> list[dict]:
+    dynasty_roster_value = dynasty_roster_values(team_ids, stints, dynasty_values)
+    redraft_by_pid = values_by_pid(season, redraft_values)
+    contending_value = contending_values(team_ids, roster_players, redraft_by_pid, starting_slots)
 
     # Reuses each pick's OWN already-computed `value` (build.py sets this
     # before calling here, priced at whatever precision that pick's

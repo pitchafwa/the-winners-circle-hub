@@ -721,7 +721,7 @@ export interface PickFuturesEntry {
   player_name: string | null;
   via: string;
   value: number;
-  value_basis: "exact" | "projected_distribution" | "round_average";
+  value_basis: "exact" | "projected_distribution" | "n2_heuristic" | "round_average";
 }
 
 export interface PickFutures {

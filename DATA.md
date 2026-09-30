@@ -1486,9 +1486,29 @@ added 2026-09-30):
   board (LM-Tools-only column) and, for free, the Trade Analyzer and
   Trade Partners tools below (both already just read this file's
   `value`).
-- `"round_average"` — everything else (further out than the live
-  season, or a live sim genuinely unavailable): the old flat round-
-  average of that draft season's KTC curve, unchanged from before.
+- `"n2_heuristic"` (added 2026-09-30, `ingest/future_strength.py`) — an
+  `unresolved` pick governed by the season AFTER the live one (n+2, e.g.
+  a 2028 pick while 2026 is live) — too far out for a real simulation
+  (that governing season, n+1, hasn't been played yet), so priced off an
+  explicitly-labeled HEURISTIC instead of a real distribution: a
+  composite "projected strength going into next season" score, blending
+  (Tommy's own stated weighting) current roster strength (55% —
+  `spectrum.contending_values`, the SAME number the Contend/Rebuild page
+  shows), dynasty roster strength (30% — `spectrum.dynasty_roster_values`,
+  same page), and that team's own n+1 draft capital (15% — already-priced
+  n+1 picks summed by current owner; naturally concentrated at the very
+  top of round 1 on its own, since KTC's curve is already steeply concave
+  there). Ranks all 10 teams by that blended score, then builds a
+  synthetic (not simulated) draft-slot distribution around each team's
+  rank — deliberately much WIDER than a real one-season-out Monte Carlo
+  draw (`future_strength.SLOT_SPREAD`), since there's genuinely much less
+  certainty this far out. Never claims to be the real thing — see that
+  module's own docstring for the full reasoning and the weights, which
+  are a judgment call, not a fitted model (no real 2-years-out outcome
+  data exists to fit against).
+- `"round_average"` — everything else (n+3 and further out, or a real
+  sim/heuristic genuinely unavailable): the old flat round-average of
+  that draft season's KTC curve, unchanged from before.
 
 Deliberately left unrounded (a team's total pick capital sums many of
 these; rounding each one first would drift the total off by a few points

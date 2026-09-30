@@ -25,6 +25,7 @@ import parse
 import pick_tracking
 import player_pool
 import roster_card
+import future_strength
 import spectrum
 import trade_grades
 
@@ -1312,28 +1313,52 @@ def main():
     except FileNotFoundError:
         pass
 
+    # Heuristic proxy inputs for the n+2 pricing pass below (future_strength.py)
+    # — current roster strength and dynasty roster strength, via the SAME
+    # two functions (spectrum.contending_values/dynasty_roster_values)
+    # `contend_rebuild_spectrum` calls further down for the Contend/
+    # Rebuild page, so an n+2 pick's discount is always consistent with
+    # what that page already says about the team it belongs to, not a
+    # second, independently-drifting read of "how strong is this team."
+    roster_players_all = parse.current_roster_players(latest_league.season)
+    contending_value = spectrum.contending_values(
+        latest_teams, roster_players_all,
+        parse.values_by_pid(latest_league.season, redraft_values), latest_league.starting_slots)
+    dynasty_roster_value = spectrum.dynasty_roster_values(latest_teams, ownership_data["stints"], dynasty_values)
+
     # Each pick's real market value, computed once here rather than left
     # for every consumer to re-derive — the deployed site's LM Tools
     # (Trade Analyzer, Trade Partners) have no backend to call
     # `trade_analyzer_tool.py`'s equivalent `_pick_value()` at request
     # time, so it has to already be sitting in the static JSON they read.
-    # Three tiers, most precise available wins (`value_basis` records
+    # Four tiers, most precise available wins (`value_basis` records
     # which): a RESOLVED or PROJECTED pick already has a real, exact known
     # slot (that season's final standings are in, even if the actual
     # rookie draft hasn't happened yet) — priced at exactly that slot, not
     # a round average. An UNRESOLVED pick governed by the live in-progress
-    # season is priced by its owner's real range of plausible finishes
-    # (`draft_slot_dist`, from the SAME Monte Carlo sim the playoff-odds
-    # bars already run — added 2026-09-30, Tommy: "assess the value of any
-    # next year pick based on the range of outcomes plausible for that
-    # team"). Anything else (further out than the live season, or no sim
-    # available) falls back to the flat round-average, same as before.
-    # Left unrounded: a team's pick capital sums many of these, and
-    # rounding each pick first (rather than the sum) would drift the total
-    # off by a few points versus the Python reference implementation,
-    # which only ever rounds once, at the end.
+    # season (n+1, e.g. 2027 while 2026 is live) is priced by its owner's
+    # real range of plausible finishes (`draft_slot_dist`, from the SAME
+    # Monte Carlo sim the playoff-odds bars already run — added
+    # 2026-09-30, Tommy: "assess the value of any next year pick based on
+    # the range of outcomes plausible for that team"). An UNRESOLVED pick
+    # one year further out than that (n+2, e.g. 2028) can't be simulated
+    # for real — the season that governs it hasn't started — so it's
+    # priced by `future_strength.py`'s explicitly-labeled heuristic
+    # instead (added the same day, same conversation: "we can approximate
+    # the strength of a team for the following season based on some kind
+    # of blend of their current roster strength, dynasty roster strength,
+    # and pick capital for year n+1"), which needs n+1's own picks priced
+    # FIRST (hence the two passes below). Anything else (further out than
+    # n+2, or no sim/heuristic available) falls back to the flat round-
+    # average, same as before. Left unrounded: a team's pick capital sums
+    # many of these, and rounding each pick first (rather than the sum)
+    # would drift the total off by a few points versus the Python
+    # reference implementation, which only ever rounds once, at the end.
     team_count = len(latest_teams)
-    for p in pick_board:
+    n1_season = config.SEASON + 1  # e.g. 2027 — governed by the live season; real sim available
+    n2_season = config.SEASON + 2  # e.g. 2028 — governed by n1_season, which hasn't happened yet
+
+    def _price_exact_or_projected(p: dict) -> bool:
         pick_values = parse.pick_values_for_season(p["season"], pick_curves)
         row = pick_values.get(str(p["round"]))
         if p["status"] in ("resolved", "projected") and p["overall_pick"] is not None:
@@ -1341,14 +1366,34 @@ def main():
             exact = metrics._pick_expected_value(pick_values, p["round"], slot_in_round)
             p["value"] = exact if exact is not None else (sum(row) / len(row) if row else 0.0)
             p["value_basis"] = "exact" if exact is not None else "round_average"
-        elif p["status"] == "unresolved" and p["season"] - 1 == config.SEASON:
+        elif p["status"] == "unresolved" and p["season"] == n1_season:
             dist = live_slot_dist_by_team.get(p["original_team_id"])
             projected = metrics.pick_value_from_slot_dist(pick_values, p["round"], dist)
             p["value"] = projected if projected is not None else (sum(row) / len(row) if row else 0.0)
             p["value_basis"] = "projected_distribution" if projected is not None else "round_average"
+        elif p["status"] == "unresolved" and p["season"] == n2_season:
+            return False  # priced in the second pass below
         else:
             p["value"] = sum(row) / len(row) if row else 0.0
             p["value_basis"] = "round_average"
+        return True
+
+    n2_picks = [p for p in pick_board if not _price_exact_or_projected(p)]
+
+    n1_pick_capital: dict[int, float] = {tid: 0.0 for tid in latest_teams}
+    for p in pick_board:
+        if p["season"] == n1_season:
+            n1_pick_capital[p["current_owner_id"]] = n1_pick_capital.get(p["current_owner_id"], 0.0) + p["value"]
+    strength_rank = future_strength.projected_strength_rank(
+        latest_teams, contending_value, dynasty_roster_value, n1_pick_capital)
+    for p in n2_picks:
+        pick_values = parse.pick_values_for_season(p["season"], pick_curves)
+        row = pick_values.get(str(p["round"]))
+        dist = future_strength.projected_slot_dist(p["original_team_id"], strength_rank)
+        projected = metrics.pick_value_from_slot_dist(pick_values, p["round"], dist)
+        p["value"] = projected if projected is not None else (sum(row) / len(row) if row else 0.0)
+        p["value_basis"] = "n2_heuristic" if projected is not None else "round_average"
+
     _write(config.DATA_DIR / "pick_futures.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "board": pick_board,

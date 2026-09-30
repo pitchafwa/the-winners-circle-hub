@@ -23,6 +23,7 @@ const STATUS_LABEL: Record<PickResolutionStatus, string> = {
 const VALUE_BASIS_LABEL: Record<PickFuturesEntry["value_basis"], string> = {
   exact: "Exact — that season's real final standings are already in",
   projected_distribution: "Projected from that team's real range of plausible finishes this season",
+  n2_heuristic: "Rough estimate — blends current roster strength, dynasty strength, and next year's pick capital (much less certain, two years out)",
   round_average: "Round average — nothing more specific to price it against yet",
 };
 

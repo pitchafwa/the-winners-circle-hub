@@ -147,3 +147,97 @@ class TestClinch:
             for t in teams:
                 assert got[t]["clinched"] == safe_all[t], (base, h2h, t)
                 assert got[t]["clinches_if_win_next"] == (safe_all[t] or safe_if_win[t]), (base, h2h, t)
+
+
+class TestDraftOrder:
+    """simulate._draft_order_for_draw / _division_bracket / _nonplayoff_draft_order —
+    the projected-pick-order model (added 2026-09-30, feeds pick_futures.json's
+    expected-value pricing of an unresolved future pick)."""
+
+    def test_division_bracket_reports_every_exit_round(self):
+        from simulate import _division_bracket
+        # Deterministic playoff_game: higher team_id always wins.
+        pg = lambda a, b, home: max(a, b)
+        champ, r1_loser, final_loser = _division_bracket([3, 2, 1], pg)  # seeds 1,2,3 = teams 3,2,1
+        assert champ == 3          # 1-seed (team 3) always wins
+        assert r1_loser == 1       # 3-seed (team 1) loses the 2-vs-3 game
+        assert final_loser == 2    # 2-seed (team 2) loses the division final
+
+    def test_nonplayoff_order_matches_real_draft_order_rule(self):
+        # Mirrors draft_order.py's own cmp_key exactly: wins ascending,
+        # then head-to-head (the team that lost the series is worse).
+        from simulate import _nonplayoff_draft_order
+        wins = {1: 3.0, 2: 3.0, 3: 5.0}
+        h2h = {(1, 2): 0, (2, 1): 1}  # 2 beat 1 -> 1 is worse, drafts first
+        assert _nonplayoff_draft_order([1, 2, 3], wins, h2h) == [1, 2, 3]
+
+    def test_full_draft_order_matches_draft_order_py_on_a_real_shape(self):
+        # Build a completed-season LeagueData matching draft_order.py's own
+        # real rule (non-playoff worst-first, then playoff teams worst-
+        # finish-first) and confirm simulate._draft_order_for_draw agrees
+        # when fed the same bracket outcome directly (not simulated).
+        from simulate import _draft_order_for_draw
+        team_ids = list(range(1, 11))
+        divisions = {t: (0 if t <= 5 else 1) for t in team_ids}
+        field = [1, 2, 3, 6, 7, 8]  # top 3 each division
+        full_order = [1, 6, 2, 7, 3, 8, 4, 9, 5, 10]  # best to worst, overall record
+        wins = {t: (11 - full_order.index(t)) for t in team_ids}  # consistent with full_order
+        h2h = {}
+        # Bracket: div A (1,2,3) -> champ 1, r1_loser 3, divfinal_loser 2
+        #          div B (6,7,8) -> champ 6, r1_loser 8, divfinal_loser 7
+        # Final: 1 beats 6 -> champ=1, runner_up=6
+        order = _draft_order_for_draw(
+            team_ids, field, full_order, wins, h2h,
+            r1_losers=[3, 8], divfinal_losers=[2, 7], runner_up=6, champ=1,
+        )
+        non_playoff = [10, 5, 9, 4]  # worst-to-best by wins (full_order-consistent)
+        assert order[:4] == non_playoff
+        # r1_losers tier: worse regular-season finish drafts first -> 8 (rank 6) before 3 (rank 5)
+        assert order[4:6] == [8, 3]
+        # divfinal_losers tier: 7 (rank 4) before 2 (rank 3)
+        assert order[6:8] == [7, 2]
+        assert order[8:] == [6, 1]
+
+    def test_run_produces_draft_slot_dist_matching_seed_dist_shape(self):
+        # End-to-end smoke test on a real 10-team, 2-division, 6-playoff-spot
+        # league (this league's real shape): draft_slot_dist should be a
+        # full permutation distribution, probabilities summing to ~1 per
+        # team, same as seed_dist already does — and worth checking as its
+        # own field, since `run()` only populates it when track_draft_order
+        # is True.
+        import simulate
+        from parse import LeagueData, ScheduleEntry, TeamInfo
+
+        team_ids = list(range(1, 11))
+        teams = {t: TeamInfo(t, f"Team {t}", f"T{t}", "", "", 0 if t <= 5 else 1) for t in team_ids}
+        full_schedule = []
+        # Weeks 1-2: decided (round-robin-ish pairing, home always wins by 10).
+        for week in (1, 2):
+            for i in range(0, 10, 2):
+                a, b = team_ids[i], team_ids[i + 1]
+                full_schedule.append(ScheduleEntry(
+                    matchup_period=week, home_id=a, away_id=b, winner="HOME",
+                    home_score=110.0, away_score=100.0, is_playoff=False, playoff_tier="NONE"))
+                teams[a].wins += 1
+                teams[b].losses += 1
+                teams[a].points_for += 110.0
+                teams[b].points_for += 100.0
+        # Week 3: remaining (UNDECIDED) — what the sim actually draws over.
+        for i in range(0, 10, 2):
+            a, b = team_ids[i], team_ids[i + 1]
+            full_schedule.append(ScheduleEntry(
+                matchup_period=3, home_id=a, away_id=b, winner="UNDECIDED",
+                home_score=0.0, away_score=0.0, is_playoff=False, playoff_tier="NONE"))
+        league = LeagueData(
+            season=2026, name="Test", team_count=10, reg_season_weeks=3,
+            playoff_team_count=6, playoff_seeding_rule="H2H_RECORD",
+            home_team_bonus=0, playoff_home_team_bonus=0,
+            starting_slots=[0], teams=teams, weeks={}, full_schedule=full_schedule,
+            scoring_period_id=3, final_scoring_period=17,
+        )
+        result = simulate.run(league)
+        assert result is not None
+        for row in result["teams"]:
+            assert row["draft_slot_dist"] is not None
+            total = sum(row["draft_slot_dist"].values())
+            assert abs(total - 1.0) < 0.01, (row["team_id"], total)

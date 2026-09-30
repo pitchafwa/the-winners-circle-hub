@@ -1143,6 +1143,31 @@ def _pick_expected_value(pick_values: dict, round_: int, round_pick: int) -> flo
     return row[round_pick - 1]
 
 
+def pick_value_from_slot_dist(pick_values: dict, round_: int, slot_dist: dict[str, float] | None) -> float | None:
+    """Same standardized value curve as `_pick_expected_value`, but priced
+    across a DISTRIBUTION of plausible draft slots instead of one known
+    slot — for an unresolved future pick, where the owning team's eventual
+    draft position isn't known yet, only a real range of outcomes
+    (`simulate.run()`'s `draft_slot_dist`). The same slot-1-through-
+    team_count position applies to every round of that draft, since this
+    league runs a straight, non-snake order (confirmed in
+    `pick_tracking.resolve()`'s own overall_pick formula) — one
+    distribution prices any round. None if there's no distribution to
+    price against (the sim's generalized-bracket-shape fallback leaves
+    `draft_slot_dist` as None) or the value curve has nothing on file for
+    this round."""
+    if not slot_dist:
+        return None
+    total = 0.0
+    weight = 0.0
+    for slot_str, p in slot_dist.items():
+        v = _pick_expected_value(pick_values, round_, int(slot_str))
+        if v is not None:
+            total += p * v
+            weight += p
+    return round(total / weight, 1) if weight else None
+
+
 def compute_draft(league: LeagueData, picks: list[dict],
                   names: dict[int, str] | None = None,
                   dynasty_values: dict[str, int] | None = None,

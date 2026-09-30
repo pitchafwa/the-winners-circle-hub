@@ -390,15 +390,67 @@ def clinch_status(remaining, base_wins: dict[int, float], divisions: dict[int, i
     return out
 
 
-def _division_bracket(seeded3: list[int], playoff_game) -> int:
+def _division_bracket(seeded3: list[int], playoff_game) -> tuple[int, int, int]:
     """One division's 3-team bracket: the #1 seed gets a bye, #2 plays #3
     (#2 hosts), then #1 hosts the winner for the division title. Confirmed
     against the real 2024/2025 playoff schedules — this is genuinely how
     each division runs its own mini-bracket; the two division champions
-    only meet each other at the very end, for the league championship."""
+    only meet each other at the very end, for the league championship.
+    Returns (division_champ, round1_loser, division_final_loser) — the
+    losers are needed by the draft-order projection below, which cares
+    about exactly how far a team got, not just who won."""
     one, two, three = seeded3
     r1_winner = playoff_game(two, three, home=two)
-    return playoff_game(one, r1_winner, home=one)
+    r1_loser = three if r1_winner == two else two
+    champ = playoff_game(one, r1_winner, home=one)
+    final_loser = one if champ == r1_winner else r1_winner
+    return champ, r1_loser, final_loser
+
+
+def _nonplayoff_draft_order(ids: list[int], wins: dict, h2h: dict) -> list[int]:
+    """Worst-to-best (drafts first to last) among non-playoff teams, per
+    the league's real rule (draft_order.py: wins, then head-to-head — NOT
+    the fuller PF/intradivisional/PA tiebreak `tiebreak.py` uses for
+    standings, since this is deliberately matching the actual applied
+    draft-order rule, not the seeding rule). A deterministic team_id
+    fallback breaks any tie draft_order.py itself would leave to set-
+    iteration order — fine for a real one-time computation, not fine for
+    10,000 draws that need a well-defined answer every time."""
+    import functools
+
+    def cmp(a, b):
+        wa, wb = wins.get(a, 0.0), wins.get(b, 0.0)
+        if wa != wb:
+            return -1 if wa < wb else 1
+        aw, bw = h2h.get((a, b), 0), h2h.get((b, a), 0)
+        if aw != bw:
+            return -1 if aw < bw else 1
+        return -1 if a < b else (1 if a > b else 0)
+
+    return sorted(ids, key=functools.cmp_to_key(cmp))
+
+
+def _draft_order_for_draw(team_ids: list[int], field: list[int], full_order: list[int],
+                          wins: dict, h2h: dict, r1_losers: list[int], divfinal_losers: list[int],
+                          runner_up: int, champ: int) -> list[int]:
+    """Full draft order for ONE simulated season (pick 1 first = worst),
+    replicating draft_order.compute_draft_order's real two-tier rule:
+    non-playoff teams first (worst record), then playoff teams in reverse
+    order of how far they got. Within a tied bracket-exit round (the 2
+    round-1 losers, or the 2 division-final losers), the team with the
+    worse REGULAR-SEASON finish drafts first — not in draft_order.py
+    itself (which only ever runs once, post-season, off real final_rank
+    that already has no ties left to break), but a reasonable, needed
+    call for a draw that has to produce a well-defined full order."""
+    def tier_order(tier: list[int]) -> list[int]:
+        return sorted(tier, key=lambda t: -full_order.index(t))
+
+    non_playoff = [t for t in team_ids if t not in field]
+    return (
+        _nonplayoff_draft_order(non_playoff, wins, h2h)
+        + tier_order(r1_losers) + tier_order(divfinal_losers)
+        + [runner_up, champ]
+    )
 
 
 def run(league: LeagueData, history: LeagueData | None = None,
@@ -438,7 +490,19 @@ def run(league: LeagueData, history: LeagueData | None = None,
     made = defaultdict(int)
     titles = defaultdict(int)
     seeds = defaultdict(lambda: defaultdict(int))
+    draft_slot = defaultdict(lambda: defaultdict(int))
     final_wins_sum = defaultdict(float)
+    # Whether the real bracket shape (2 divisions x 3, the only shape this
+    # league has ever run) applies — checked once here off the STRUCTURAL
+    # inputs (divisions/playoff_count), not re-derived from a per-draw
+    # `by_division` that only differs draw to draw in WHO is in it, never
+    # in this shape. Draft-order projection (used to price a future pick
+    # by the team's range of plausible finishes — see build.py's
+    # pick_futures.json section) is only meaningful for this real shape;
+    # the generalized fallback below just doesn't track it, same
+    # "deliberately simple, nobody's hit it" acceptance as the fallback
+    # itself.
+    track_draft_order = len(set(divisions.values())) == 2 and playoff_count // 2 == 3
     same_div = [divisions[e.home_id] == divisions[e.away_id] for e in remaining]
     next_game: dict[int, int] = {}   # team -> index of their first remaining matchup
     for i, e in enumerate(remaining):
@@ -487,12 +551,21 @@ def run(league: LeagueData, history: LeagueData | None = None,
         field = [t for lst in by_division.values() for t in lst[:per_division]]
 
         if len(by_division) == 2 and per_division == 3:
-            div_champs = [_division_bracket(lst[:3], playoff_game) for lst in by_division.values()]
+            bracket = [_division_bracket(lst[:3], playoff_game) for lst in by_division.values()]
+            div_champs = [b[0] for b in bracket]
             champ = playoff_game(
                 div_champs[0], div_champs[1],
                 home=div_champs[0] if full_order.index(div_champs[0]) < full_order.index(div_champs[1])
                 else div_champs[1],
             )
+            if track_draft_order:
+                runner_up = div_champs[1] if champ == div_champs[0] else div_champs[0]
+                r1_losers = [b[1] for b in bracket]
+                divfinal_losers = [b[2] for b in bracket]
+                draft_order_draw = _draft_order_for_draw(
+                    team_ids, field, full_order, wins, h2h, r1_losers, divfinal_losers, runner_up, champ)
+                for slot, t in enumerate(draft_order_draw, start=1):
+                    draft_slot[t][slot] += 1
         else:
             # Every real season this league has run is 2 divisions x 3 —
             # this is a deliberately simple fallback (no bracket, straight
@@ -542,6 +615,8 @@ def run(league: LeagueData, history: LeagueData | None = None,
             "title_se": se(p_title),
             "avg_final_wins": round(final_wins_sum[t] / N_SIMS, 2),
             "seed_dist": {str(r): pct(n) for r, n in sorted(seeds[t].items())},
+            "draft_slot_dist": ({str(r): pct(n) for r, n in sorted(draft_slot[t].items())}
+                                if track_draft_order else None),
             "playoff_pct_if_win_next": round(cw[0] / cw[1], 4) if cw[1] else None,
             "playoff_pct_if_lose_next": round(cl[0] / cl[1], 4) if cl[1] else None,
             "clinched": clinch[t]["clinched"],

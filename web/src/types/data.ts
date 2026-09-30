@@ -381,6 +381,7 @@ export interface SimTeam {
   title_se: number;
   avg_final_wins: number;
   seed_dist: Record<string, number>;
+  draft_slot_dist: Record<string, number> | null;
   playoff_pct_if_win_next: number | null;
   playoff_pct_if_lose_next: number | null;
   clinched?: boolean;
@@ -720,6 +721,7 @@ export interface PickFuturesEntry {
   player_name: string | null;
   via: string;
   value: number;
+  value_basis: "exact" | "projected_distribution" | "round_average";
 }
 
 export interface PickFutures {

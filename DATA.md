@@ -524,10 +524,14 @@ method statement), `roster_strength_active` (bool — whether redraft valuation
 data was available to compute the roster-strength nudge below; `false` reads
 as an honest "not applied," never silently skipped without saying so),
 `teams[]`: `{team_id, power_score, playoff_pct, playoff_se, title_pct,
-title_se, avg_final_wins, seed_dist{"seed": pct}, playoff_pct_if_win_next,
-playoff_pct_if_lose_next, playoff_pct_by_final_wins{"wins": pct}}` (final-wins
-buckets with <50 sims are omitted). Frontend renders absence as an explicit
-"not simulated" state and always shows ± the standard error.
+title_se, avg_final_wins, seed_dist{"seed": pct}, draft_slot_dist{"slot": pct}
+| null, playoff_pct_if_win_next, playoff_pct_if_lose_next,
+playoff_pct_by_final_wins{"wins": pct}}` (final-wins buckets with <50 sims
+are omitted). Frontend renders absence as an explicit "not simulated"
+state and always shows ± the standard error. `draft_slot_dist` — see
+`pick_futures.json`'s own section for what it means and drives; it's
+computed here (same per-draw simulation, not a separate model) since
+that's where every other per-draw team outcome already lives.
 
 `power_score` (added 2026-09-02, `metrics.power_score_1_100()`): the SAME
 number as `spectrum.json`'s `power_score` (see that section — 1-100,
@@ -1456,17 +1460,54 @@ with the current (imminent, not-yet-drafted) season — not just picks that
 have been traded, unlike `activity.json`'s per-season `pick_ownership`.
 `board[]`: `{season, round, original_team_id, current_owner_id, status
 ("unresolved"|"projected"|"resolved"), overall_pick, player_id,
-player_name, via, value}` — same resolution states as `activity.json`'s
-`pick_ownership` (`ingest/pick_tracking.py:resolve`); untraded picks
-default `current_owner_id` to `original_team_id`. `value` is that pick's
-real market value (round-average of that draft season's KTC curve,
-`parse.pick_values_for_season()`), computed once at build time —
-deliberately left unrounded (a team's total pick capital sums many of
+player_name, via, value, value_basis}` — same resolution states as
+`activity.json`'s `pick_ownership` (`ingest/pick_tracking.py:resolve`);
+untraded picks default `current_owner_id` to `original_team_id`. `value`
+is that pick's real market value against KTC's curve
+(`parse.pick_values_for_season()`), priced at the MOST PRECISE level the
+pick's own resolution state allows (`value_basis` records which,
+added 2026-09-30):
+
+- `"exact"` — `resolved`/`projected` picks already have a real, known
+  slot (that season's real final standings are in, even before the
+  actual rookie draft happens) — priced at exactly that slot, not a
+  round average.
+- `"projected_distribution"` — an `unresolved` pick whose governing
+  season (`resolve()`'s "a YEAR draft's order is normally set by the
+  PRIOR season's final standings" — i.e. a `{season}` pick's order comes
+  from `{season-1}`'s standings) is the CURRENT, still-in-progress
+  season: priced by that team's real range of plausible finishes
+  (`simulate.run()`'s `draft_slot_dist` — the exact same Monte Carlo the
+  playoff-odds bars already run, re-read from that season's own
+  `sim.json`; the same slot-1-through-team_count distribution prices any
+  round, since this league runs a straight, non-snake draft order).
+  Tommy, 2026-09-30: "assess the value of any next year pick based on
+  the range of outcomes plausible for that team." Feeds the Pick Futures
+  board (LM-Tools-only column) and, for free, the Trade Analyzer and
+  Trade Partners tools below (both already just read this file's
+  `value`).
+- `"round_average"` — everything else (further out than the live
+  season, or a live sim genuinely unavailable): the old flat round-
+  average of that draft season's KTC curve, unchanged from before.
+
+Deliberately left unrounded (a team's total pick capital sums many of
 these; rounding each one first would drift the total off by a few points
 versus rounding once, at the end) — so every LM Tool that needs "how much
 future draft capital does this team hold" (Trade Analyzer, Trade
 Partners) sums the same numbers off this file instead of re-deriving
 them, with no backend needed.
+
+`draft_slot_dist` (added 2026-09-30, `simulate.run()`, in `{season}/sim.json`'s
+own `teams[]`, alongside `seed_dist`): `{"1": pct, "2": pct, ..., str(team_count): pct}`
+— the SAME Monte Carlo draws' distribution of each team's real ROOKIE-DRAFT
+draft slot next spring, not final regular-season rank (`seed_dist`'s
+own meaning) — these can genuinely differ a lot, since draft order is
+NOT just reverse standings: non-playoff teams draft first worst-record-
+first, then playoff teams draft in reverse order of how far they got
+(`ingest/draft_order.py`'s real, league-stated rule — replicated per
+simulated draw here, including the full bracket's exit round, not just
+who wins it). `null` for the generalized non-2x3-division bracket
+fallback (no real season has ever needed it).
 
 ## `player_values.json` (top level, current season only)
 

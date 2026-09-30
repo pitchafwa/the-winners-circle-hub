@@ -1287,18 +1287,68 @@ def main():
     pick_board = pick_tracking.all_picks_board(
         config.SEASON, latest_teams, DRAFT_ROUNDS, all_pick_ownership,
         horizon_years=PICK_FUTURES_HORIZON_YEARS)
-    # Each pick's real market value (round-average of that draft season's KTC
-    # curve), computed once here rather than left for every consumer to
-    # re-derive — the deployed site's LM Tools (Trade Analyzer, Trade
-    # Partners) have no backend to call `trade_analyzer_tool.py`'s
-    # equivalent `_pick_value()` at request time, so it has to already be
-    # sitting in the static JSON they read. Left unrounded: a team's pick
-    # capital sums many of these, and rounding each pick first (rather than
-    # the sum) would drift the total off by a few points versus the Python
-    # reference implementation, which only ever rounds once, at the end.
+
+    # Live season's draft_slot_dist per original-owner team, if the live
+    # season is still in progress — read back from sim.json's OWN just-
+    # written output this same run (build_season() above already wrote it
+    # for `config.SEASON`), the same "committed/just-written output is the
+    # interchange, not a second return-value path" pattern this file
+    # already uses for live_week_pregame_by_pid. Only actually usable for
+    # picks whose governing draft-order season IS the live one (see
+    # pick_tracking.resolve()'s own "a YEAR draft's order is normally set
+    # by the PRIOR season's final standings" rule) — a 2028 pick during
+    # the 2026 season has nothing to project from yet (2027 hasn't been
+    # played), and correctly falls back to the flat round-average below.
+    live_slot_dist_by_team: dict[int, dict] = {}
+    try:
+        live_league = parse.load_league(config.SEASON)
+        if not live_league.season_over:
+            live_sim_path = config.DATA_DIR / str(config.SEASON) / "sim.json"
+            if live_sim_path.exists():
+                with open(live_sim_path, encoding="utf-8") as f:
+                    for row in json.load(f).get("teams", []):
+                        if row.get("draft_slot_dist"):
+                            live_slot_dist_by_team[row["team_id"]] = row["draft_slot_dist"]
+    except FileNotFoundError:
+        pass
+
+    # Each pick's real market value, computed once here rather than left
+    # for every consumer to re-derive — the deployed site's LM Tools
+    # (Trade Analyzer, Trade Partners) have no backend to call
+    # `trade_analyzer_tool.py`'s equivalent `_pick_value()` at request
+    # time, so it has to already be sitting in the static JSON they read.
+    # Three tiers, most precise available wins (`value_basis` records
+    # which): a RESOLVED or PROJECTED pick already has a real, exact known
+    # slot (that season's final standings are in, even if the actual
+    # rookie draft hasn't happened yet) — priced at exactly that slot, not
+    # a round average. An UNRESOLVED pick governed by the live in-progress
+    # season is priced by its owner's real range of plausible finishes
+    # (`draft_slot_dist`, from the SAME Monte Carlo sim the playoff-odds
+    # bars already run — added 2026-09-30, Tommy: "assess the value of any
+    # next year pick based on the range of outcomes plausible for that
+    # team"). Anything else (further out than the live season, or no sim
+    # available) falls back to the flat round-average, same as before.
+    # Left unrounded: a team's pick capital sums many of these, and
+    # rounding each pick first (rather than the sum) would drift the total
+    # off by a few points versus the Python reference implementation,
+    # which only ever rounds once, at the end.
+    team_count = len(latest_teams)
     for p in pick_board:
-        row = parse.pick_values_for_season(p["season"], pick_curves).get(str(p["round"]))
-        p["value"] = sum(row) / len(row) if row else 0.0
+        pick_values = parse.pick_values_for_season(p["season"], pick_curves)
+        row = pick_values.get(str(p["round"]))
+        if p["status"] in ("resolved", "projected") and p["overall_pick"] is not None:
+            slot_in_round = p["overall_pick"] - (p["round"] - 1) * team_count
+            exact = metrics._pick_expected_value(pick_values, p["round"], slot_in_round)
+            p["value"] = exact if exact is not None else (sum(row) / len(row) if row else 0.0)
+            p["value_basis"] = "exact" if exact is not None else "round_average"
+        elif p["status"] == "unresolved" and p["season"] - 1 == config.SEASON:
+            dist = live_slot_dist_by_team.get(p["original_team_id"])
+            projected = metrics.pick_value_from_slot_dist(pick_values, p["round"], dist)
+            p["value"] = projected if projected is not None else (sum(row) / len(row) if row else 0.0)
+            p["value_basis"] = "projected_distribution" if projected is not None else "round_average"
+        else:
+            p["value"] = sum(row) / len(row) if row else 0.0
+            p["value_basis"] = "round_average"
     _write(config.DATA_DIR / "pick_futures.json", {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "board": pick_board,

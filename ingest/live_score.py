@@ -110,8 +110,15 @@ def _team_players_scores(team_statistics: list[dict], position_id_by_pid: dict, 
     return out
 
 
-def _kicker_scores(team_players_stats: list[dict], scoring_plays: list[dict], rules: dict) -> dict[int, dict]:
+def _kicker_scores(team_players_stats: list[dict], scoring_plays: list[dict], rules: dict, abbrev: str) -> dict[int, dict]:
     out: dict[int, dict] = {}
+    # Scoped to THIS kicker's own team's plays first (`sp["team"]["abbreviation"]`,
+    # confirmed present on every scoringPlays entry) — `scoring_plays` is the
+    # whole GAME's list, both teams, so matching only on last-name text was a
+    # real bug: two kickers sharing a last name (or one's a substring of the
+    # other's) in the same game could have a made FG attributed to, or its
+    # distance/tier misassigned between, the wrong kicker. Caught 2026-09-29 audit.
+    own_team_plays = [sp for sp in scoring_plays if sp.get("team", {}).get("abbreviation") == abbrev]
     for group in team_players_stats:
         if group.get("name") != "kicking":
             continue
@@ -121,7 +128,7 @@ def _kicker_scores(team_players_stats: list[dict], scoring_plays: list[dict], ru
             kicking_stats = dict(zip(group.get("keys", []), row.get("stats", [])))
             distances = [
                 dst_kicking.made_field_goal_distance(sp)
-                for sp in scoring_plays
+                for sp in own_team_plays
                 if sp.get("type", {}).get("text") == "Field Goal Good" and name.split()[-1] in sp.get("text", "")
             ]
             distances = [d for d in distances if d is not None]
@@ -177,7 +184,7 @@ def compute_live_scores_for_week(season: int, week: int, rules: dict) -> dict[in
         for abbrev, team_stats in players_by_team.items():
             for pid, entry in _team_players_scores(team_stats, {}, rules).items():
                 out[pid] = {**entry, "elapsed_fraction": elapsed_fraction}
-            for pid, entry in _kicker_scores(team_stats, scoring_plays, rules).items():
+            for pid, entry in _kicker_scores(team_stats, scoring_plays, rules, abbrev).items():
                 out[pid] = {**entry, "elapsed_fraction": elapsed_fraction}
 
             opponent_abbrevs = [a for a in players_by_team if a != abbrev]

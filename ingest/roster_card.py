@@ -19,7 +19,8 @@ import parse
 
 def build_roster_cards(season: int, league: parse.LeagueData,
                        fp_points: dict[int, float] | None = None,
-                       pregame_by_pid: dict[int, float] | None = None) -> dict[int, dict]:
+                       pregame_by_pid: dict[int, float] | None = None,
+                       live_score_override: dict[int, dict] | None = None) -> dict[int, dict]:
     """`fp_points` (player_id -> FantasyPros' PPR projection for the
     current week, from fp_projections.points_by_pid()) is optional —
     None/empty just means every card's `fp_projection` comes back None,
@@ -33,7 +34,17 @@ def build_roster_cards(season: int, league: parse.LeagueData,
     build.py reads it back from THIS module's own previous `roster.json`
     output (the durable, committed memory — see `parse.hot_cold_status`'s
     docstring for the full reasoning) and passes it in, rather than this
-    module reaching for its own past output itself."""
+    module reaching for its own past output itself.
+
+    `live_score_override` (added 2026-09-29, same shape/source as the one
+    `simulate.run()` already takes — see `parse.optimal_week_projection`'s
+    docstring): real touch/elapsed-fraction data fed into
+    `parse.best_live_estimate` for the real, backtested rest-of-game model,
+    in place of the older `max(actual, projected)` blend this module used
+    to compute on its own. Before this, a currently-playing player could
+    show a different live score/on_fire/on_ice here than on the League
+    page's matchup cards, which already got the better model on
+    2026-09-14 — this module just hadn't been updated to match."""
     raw = parse._load(season, "league")
     if not raw:
         return {}
@@ -44,6 +55,7 @@ def build_roster_cards(season: int, league: parse.LeagueData,
     current_week = parse.current_fantasy_week(league)
     fp_points = fp_points or {}
     pregame_by_pid = pregame_by_pid or {}
+    live_score_override = live_score_override or {}
     game_dates = parse.pro_game_dates(season, current_week) if current_week else {}
 
     out: dict[int, dict] = {}
@@ -77,6 +89,20 @@ def build_roster_cards(season: int, league: parse.LeagueData,
                 opp = pro.get(game["opponent_id"], {})
                 next_game = {"opponent": opp.get("abbrev", "?"), "is_home": game["is_home"], "date": game["date"]}
             on_bye = game is None and pro_info.get("bye_week") == current_week
+            kickoff = game_dates.get(pro_team_id)
+
+            # Same override this module's sibling (parse.optimal_week_projection,
+            # feeding sim.json's matchup cards) already applies: our own
+            # fast public-feed approximation, refreshable far more often
+            # than the private fantasy API `week_actual` above otherwise
+            # depends on. Only while the game's genuinely still live —
+            # once it's over, the private feed's official number wins.
+            live_touches, live_elapsed_fraction = None, None
+            override_entry = live_score_override.get(pid)
+            if override_entry is not None and not parse.pro_game_likely_over(kickoff):
+                week_actual = round(override_entry["points"], 2)
+                live_touches = override_entry.get("touches")
+                live_elapsed_fraction = override_entry.get("elapsed_fraction")
 
             player_recent = recent.get(pid, [])
             diffs = [r["points"] - r["projected"] for r in player_recent if r["projected"] is not None]
@@ -92,23 +118,30 @@ def build_roster_cards(season: int, league: parse.LeagueData,
             # high their projection already sits). See
             # `parse.pregame_projection_locked`'s docstring.
             existing_pin = pregame_by_pid.get(pid)
-            kickoff = game_dates.get(pro_team_id)
             if existing_pin is not None and parse.pregame_projection_locked(kickoff):
                 pregame_projection = existing_pin
             else:
                 pregame_projection = week_projection
-            if not played_this_week:
-                live_estimate = week_projection
-            elif week_projection is None or parse.pro_game_likely_over(kickoff):
-                # Once the game's actually over, trust the real score
-                # alone — ESPN's own `week_projection` doesn't move
-                # during the game at all (confirmed live, 2026-09-11),
-                # so blending it in forever would let a real bust hide
-                # behind their old pregame number. See
-                # `parse.pro_game_likely_over`'s docstring.
-                live_estimate = week_actual
+            # Shares the exact same live-estimate model
+            # `parse.optimal_week_projection` uses for the League page's
+            # matchup cards (`parse.best_live_estimate`, added 2026-09-29)
+            # — this module used to keep its own older max(actual,
+            # projected) copy, which silently fell behind once the
+            # touch-based rest-of-game model replaced that blend
+            # everywhere else on 2026-09-14, so the same player could show
+            # a different live score/fire-ice status here than on the
+            # League page at the same moment.
+            if week_projection is None:
+                # No ESPN projection stat at all (rare — e.g. a practice-squad
+                # call-up) — nothing to blend with, so the real actual (once
+                # played) or nothing (not yet played) stands alone, same as
+                # before this function shared best_live_estimate.
+                live_estimate = week_actual if played_this_week else None
             else:
-                live_estimate = max(week_actual, week_projection)
+                live_estimate = parse.best_live_estimate(
+                    week_actual, week_projection, pro_team_id, game_dates,
+                    live_touches, live_elapsed_fraction,
+                )
             on_fire, on_ice = parse.hot_cold_status(
                 position, played_this_week, live_estimate, pregame_projection, player_recent,
             )

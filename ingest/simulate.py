@@ -226,7 +226,7 @@ def team_models(league: LeagueData, prior: tuple[float, float],
     return models
 
 
-def _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng, pa=None, div_pct=None):
+def _seed(team_ids, wins, pf, h2h, divisions, rng, pa=None, div_pct=None):
     """Top N per division make the playoffs — NO wildcards. Confirmed
     against real bracket participation in both 2024 and 2025 (exactly 3-3
     by division each year — not the division-leader-plus-overall-wildcard
@@ -481,7 +481,7 @@ def run(league: LeagueData, history: LeagueData | None = None,
             if next_game.get(e.away_id) == i:
                 won_next[e.away_id] = winner == e.away_id
 
-        by_division, full_order = _seed(team_ids, wins, pf, h2h, divisions, playoff_count, rng,
+        by_division, full_order = _seed(team_ids, wins, pf, h2h, divisions, rng,
                                        pa, division_pct(div_w, div_g))
         per_division = playoff_count // len(by_division) if by_division else 0
         field = [t for lst in by_division.values() for t in lst[:per_division]]

@@ -188,7 +188,6 @@ on:
 
 permissions:
   contents: write  # also what the "Trigger deploy" step's repository_dispatch call needs
-  actions: write
 
 jobs:
   refresh:
@@ -218,12 +217,17 @@ jobs:
       #
       # Real fix: don't depend on a real-token push at all. Check out with
       # the plain default GITHUB_TOKEN (always present, needs no manual
-      # setup) and explicitly dispatch deploy-pages.yml via the Actions API
-      # in the "Trigger deploy" step below instead — GITHUB_TOKEN CAN
-      # trigger a workflow_dispatch run (unlike a push, which the anti-
-      # recursion rule blocks) as long as `actions: write` is granted,
-      # which costs nothing to grant and needs no secret anyone has to
-      # remember to create.
+      # setup) and explicitly notify deploy-pages.yml via a
+      # `repository_dispatch` in the "Trigger deploy" step below instead —
+      # GITHUB_TOKEN CAN fire that (unlike a push, which the anti-recursion
+      # rule blocks) with only `contents: write`, no secret anyone has to
+      # remember to create. (Originally dispatched via the Actions API's
+      # own workflow_dispatch endpoint, which needs `actions: write` — that
+      # got swapped for `repository_dispatch` so the exact pushed sha could
+      # be carried in the payload, see the "Trigger deploy" step's own
+      # comment; `actions: write` stopped being needed then but stuck
+      # around unused until this comment/permission were cleaned up
+      # 2026-09-29.)
       - uses: actions/checkout@v4
 
       # ingest/.cache/ is gitignored (it's raw ESPN/KTC API responses, not
@@ -257,34 +261,60 @@ jobs:
       # is already inherently scoped to a real game window (that's what
       # generate_refresh_schedule.py's cron entries encode), and a manual
       # click from Tommy means he wants fresh data regardless of the clock.
-      - name: Check if this is a real game window
+      - name: Check if this run is worth doing
         id: gametime
-        if: github.event_name == 'repository_dispatch'
+        if: >-
+          github.event_name == 'repository_dispatch' ||
+          contains(fromJSON('["3 5-23 * * 1","3 * * * 2","3 */6 * * *"]'), github.event.schedule)
         working-directory: ingest
+        env:
+          SEASON: ${{ vars.SEASON || '2026' }}
         run: |
-          # is_game_time.py -> config.py needs python-dotenv (for .env
-          # cookie loading elsewhere in the pipeline) — installed directly
-          # here rather than via the full `uv sync` below, since the whole
-          # point of this step is to skip that expensive install/fetch
-          # when it's not actually game time.
-          pip install --quiet python-dotenv
-          if python is_game_time.py; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            # The external heartbeat: precise, real-schedule-aware check.
+            # is_game_time.py -> config.py needs python-dotenv (for .env
+            # cookie loading elsewhere in the pipeline) — installed directly
+            # here rather than via the full `uv sync` below, since the whole
+            # point of this step is to skip that expensive install/fetch
+            # when it's not actually game time.
+            pip install --quiet python-dotenv
+            if python is_game_time.py; then
+              echo "run=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "run=false" >> "$GITHUB_OUTPUT"
+            fi
           else
-            echo "run=false" >> "$GITHUB_OUTPUT"
+            # One of the 3 hand-written, year-round fallback cron entries
+            # (Mon/Tue hourly, every-6h safety net) matched via
+            # `github.event.schedule` (the exact cron string that fired).
+            # These exist to catch whatever the generated, real-per-game-
+            # date schedule might miss — including a stale/broken
+            # generator itself (see the incident log above) — so they
+            # deliberately do NOT reuse is_game_time.py's cached-schedule-
+            # derived windows: that would make the fallback blind to
+            # exactly the failure it exists to catch. Instead, a crude,
+            # cache-independent month check — real NFL/fantasy activity is
+            # Sept through early Jan. Added 2026-09-29 so these 3 entries
+            # stop running a full ingest cycle every 6 hours, every day,
+            # straight through the 7-month off-season.
+            month=$(date -u +%-m)
+            case "$month" in
+              9|10|11|12|1) echo "run=true" >> "$GITHUB_OUTPUT" ;;
+              *) echo "run=false" >> "$GITHUB_OUTPUT" ;;
+            esac
           fi
 
       - name: Install uv
-        if: github.event_name != 'repository_dispatch' || steps.gametime.outputs.run == 'true'
+        if: steps.gametime.outputs.run != 'false'
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Install ingest dependencies
-        if: github.event_name != 'repository_dispatch' || steps.gametime.outputs.run == 'true'
+        if: steps.gametime.outputs.run != 'false'
         working-directory: ingest
         run: ~/.local/bin/uv sync
 
       - name: Run ingest
-        if: github.event_name != 'repository_dispatch' || steps.gametime.outputs.run == 'true'
+        if: steps.gametime.outputs.run != 'false'
         working-directory: ingest
         env:
           # Python fully block-buffers stdout when it isn't a real
@@ -294,6 +324,19 @@ jobs:
           # underneath, which reads as a hang when it may not be one.
           PYTHONUNBUFFERED: "1"
           LEAGUE_ID: "29471"
+          # New-season rollover: set the `SEASON` repository VARIABLE
+          # (Settings -> Secrets and variables -> Actions -> Variables tab
+          # — NOT a secret, and not a code change) to the new year. Falls
+          # back to '2026' (this variable's never been created) so CI
+          # doesn't break before that's set up; config.py's own
+          # `os.getenv("SEASON", "2026")` default exists for the same
+          # local-dev-with-no-.env reason. Added 2026-09-29 — before this,
+          # the docs describing "bump SEASON" as the whole rollover story
+          # were aspirational: nothing in CI ever actually set it, so
+          # every real run silently used config.py's hardcoded literal
+          # regardless, and a real rollover would have needed an actual
+          # code change despite what the comments implied.
+          SEASON: ${{ vars.SEASON || '2026' }}
           # Set these as repository secrets before enabling the schedule above.
           # Public-league fetches work without them; they're only needed to
           # keep 2017-2023 history refreshable (ESPN gates that far back) —
@@ -310,7 +353,7 @@ jobs:
 
       - name: Commit changed data
         id: commit
-        if: github.event_name != 'repository_dispatch' || steps.gametime.outputs.run == 'true'
+        if: steps.gametime.outputs.run != 'false'
         run: |
           git config user.name "league-hub-bot"
           git config user.email "actions@users.noreply.github.com"

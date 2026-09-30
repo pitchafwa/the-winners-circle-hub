@@ -3,8 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%8F%88</text></svg>" />
+
+    <!-- Applied before anything paints, straight off localStorage, so a
+         saved dark-mode choice doesn't show a flash of the light theme
+         first (React/AppContext runs far too late to avoid that flash —
+         see ThemeToggle.tsx for the same key/values written back). No-op,
+         same "system" behavior as today, if nothing's been saved yet. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("league-hub:v1:theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
 
     <!-- "Add to Home Screen" on iOS reads apple-touch-icon specifically —
          it ignores the favicon above and manifest.json's icons entirely,

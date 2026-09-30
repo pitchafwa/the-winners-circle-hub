@@ -54,13 +54,20 @@ Index of built seasons. `default_season` is what the app opens on.
 League identity + settings, read at runtime, never hardcoded:
 `name`, `team_count`, `reg_season_weeks`, `playoff_team_count`, `playoff_seeding_rule`,
 `home_team_bonus`, `playoff_home_team_bonus`, `starting_slots` (names, with multiplicity),
-`divisions[] {id, name}`, `teams[] {id, name, abbrev, logo, owner, division_id}`,
+`divisions[] {id, name}`, `teams[] {id, name, abbrev, logo, owner, division_id, nickname}`,
 `completed_weeks[]`, `season_started`, `season_over`, `current_matchup_period`,
 `previous_seasons[]`, `championship_week` (always 17 — a league rule, not an ESPN
 field; see `FINAL_COUNTED_WEEK` in `ingest/config.py`. The `WINNERS_BRACKET`
 matchup in this week decides the title, full stop, regardless of how many
 other lower-stakes matchups (3rd place, consolation) are also being played
 that same week).
+
+`nickname` (`ingest/build.py`, from `parse.owner_aliases()`, reading
+`ingest/owner_aliases.json`): the real name/nickname league members
+actually use for a team, when one's on file — `null` if not. This is the
+PRIMARY display label throughout the frontend (`t.nickname ?? t.name`,
+used in the nav, standings, and most every team reference) — `name` is
+the fallback, not the norm.
 
 `season_started` (revised 2026-09-14): `true` the moment
 `league.scoring_period_id > 0` — real NFL games airing this week — NOT
@@ -80,7 +87,11 @@ started") and only turns nonzero once the real season has actually begun.
 `team_id, power_score, seed, final_rank, standing_rank, wins/losses/ties, record, win_pct, points_for,
 points_against, division_id, division_record, division_rank, games_back, cushion, streak,
 all_play_wins/losses/ties, all_play_record, all_play_pct, expected_wins, luck,
-lineup_points, optimal_points, coach_rating, bench_points_lost`.
+lineup_points, optimal_points, coach_rating, bench_points_lost, consistency`.
+
+`consistency` (stdev of weekly scores, lower = steadier; `null` under 2
+games) — same field, same computation (`metrics.compute_consistency()`),
+on every row of both this file and `standings_by_week.json`.
 
 **Standings tiebreak** (`ingest/tiebreak.py`, one shared implementation used by
 `division_race`, `standings_by_week`, the Monte Carlo seeding and `clinch_status`).
@@ -1259,9 +1270,6 @@ state, not degenerate all-zero grades. `class_total_value`: the season's
 total current value across all picks (null when unavailable). `problems[]`:
 unmatched-name warnings from the manual draft file.
 
-Standings rows also carry `consistency` (stdev of weekly scores, lower =
-steadier; null under 2 games).
-
 ## `ownership.json` (top level, cross-season)
 
 Roster-ownership timeline: continuous per-player-per-team tenure "stints,"
@@ -1564,15 +1572,11 @@ later); everything in between (53,000–60,000 contending value) reads
 percentile, they're pegged to the current KTC valuation scale and may
 need retuning if the league's overall asset values drift meaningfully.
 
-`power_score` (`metrics.power_score_1_100()`, 1-100): `contending_value`
-rescaled onto a plain 1-100 number — same fixed-anchor philosophy as
-`label` above (`POWER_SCORE_FLOOR_VALUE` 35,000 → 1,
-`POWER_SCORE_CEILING_VALUE` 75,000 → 100, clipped), not a league-relative
-min-max, so an average roster reads near 50 rather than the field always
-spanning the full 1-100 range regardless of how close the league
-actually is. The SAME number appears on each team in `{season}/sim.json`
-(added 2026-09-02, see that section) — one shared computation, not two
-independently-drifting readings of "how strong is this roster."
+`contending_value` doubles as this same team's "power score" wherever the
+site needs a plain 1-100 number (`metrics.power_score_1_100()`, see
+`{season}/sim.json`/`standings.json`'s own sections — same fixed-anchor
+rescaling, same shared computation) — not repeated here as a field, since
+nothing on this page reads a second copy of it (removed 2026-09-29).
 
 ## `h2h.json` (top level, cross-season)
 

@@ -800,7 +800,7 @@ def build_season(season: int, dynasty_values: dict[str, int] | None = None,
                     for card in team.get(group_name, []):
                         if card.get("player_id") is not None and card.get("pregame_projection") is not None:
                             pregame_by_pid[card["player_id"]] = card["pregame_projection"]
-        cards = roster_card.build_roster_cards(season, league, fp_points, pregame_by_pid)
+        cards = roster_card.build_roster_cards(season, league, fp_points, pregame_by_pid, live_score_override)
         if cards:
             _write(out_dir / "roster.json", {
                 "generated_at": generated_at,

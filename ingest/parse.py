@@ -724,6 +724,54 @@ def ages_by_pid(market_ages: dict[str, float]) -> dict[int, float]:
 JOKE_LINEUP_GAP = 10.0
 
 
+def best_live_estimate(
+    actual: float | None, projected: float, pro_team_id: int, game_dates: dict[int, int],
+    live_touches: float | None = None, live_elapsed_fraction: float | None = None,
+) -> float:
+    """This player's best current estimate for the week: not played yet ->
+    `projected`; played and the game's genuinely still live -> the real,
+    backtested rest-of-game model (`live_projection.project_rest_of_game`)
+    when real touch data is available, else the older `max(actual,
+    projected)` blend; played and the game's over -> `actual` alone, full
+    stop (blending in `projected` forever would let a real bust hide behind
+    its old pregame number — see `optimal_week_projection`'s docstring for
+    the full history of both bugs this accounts for).
+
+    Pulled out of `optimal_week_projection` on 2026-09-29 so every caller
+    that needs "how good is this player right now" — the sim/matchup cards
+    AND the My Team roster cards — shares the exact same model instead of
+    each keeping its own copy that can silently drift out of sync (caught
+    live: `roster_card.py` had quietly kept the old, pre-2026-09-14 blend
+    while this function had already moved on to the touch-based model, so
+    the same player could show a different live score on the two pages at
+    the same moment)."""
+    if actual is None:
+        return projected
+    if live_elapsed_fraction == 1.0:
+        return actual
+    if pro_game_likely_over(game_dates.get(pro_team_id)):
+        return actual
+    if live_touches is not None and live_elapsed_fraction is not None:
+        import live_projection  # local import: keeps this optional dependency out of every caller that never touches a live week
+        return live_projection.project_rest_of_game(actual, live_touches, live_elapsed_fraction, projected)
+    return max(actual, projected)
+
+
+def player_in_progress(
+    actual: float | None, pro_team_id: int, game_dates: dict[int, int],
+    live_elapsed_fraction: float | None = None,
+) -> bool:
+    """True while a player's real game has started but isn't decided yet.
+    Reuses the exact same "is this game definitely over" checks
+    `best_live_estimate` above already relies on, rather than a third,
+    potentially-drifting definition of "over.\""""
+    if actual is None:
+        return False
+    if live_elapsed_fraction == 1.0:
+        return False
+    return not pro_game_likely_over(game_dates.get(pro_team_id))
+
+
 def optimal_week_projection(
     season: int, week: int, starting_slots: list[int],
     live_score_override: dict[int, dict] | None = None,
@@ -820,69 +868,28 @@ def optimal_week_projection(
     if not box:
         return {}
     from metrics import best_lineup  # local import: metrics imports from parse, so this has to be deferred to call time to dodge a circular import at module load
-    import live_projection  # local import: same reasoning as `best_lineup` above, and keeps this optional dependency out of every other caller of parse.py that never touches a live week
 
     game_dates = pro_game_dates(season, week)
     live_score_override = live_score_override or {}
 
     def _best_estimate(entry: dict) -> float:
-        """This player's best current estimate for the week (see this
-        function's docstring for the three regimes: not played yet,
-        still genuinely live, or the game's over). Used everywhere below
-        that needs "how good is this player right now," not just the
-        final `projected_final` sum: filling a genuinely blank starting
-        slot and the joke-lineup bench comparison both need the same
-        number.
-
-        While a game's genuinely in progress AND real touch data is
-        available (`live_touches`/`live_elapsed_fraction`, set below from
-        `live_score_override` — `None` for D/ST/kickers, who don't have
-        a "touches" concept), this calls the real, backtested rest-of-game
-        model instead of the old `max(actual, projected)` blend. Falls
-        back to that old blend when live touch data isn't available (a
-        past week rebuilt with no override, D/ST/kickers, or a player
-        `live_score.py` never fetched data for) — never a crash, just the
-        previous, still-correct-if-less-precise behavior.
-
-        A real bug caught live (2026-09-14, Tommy: still ~20 points high
-        after the first fix, correctly suspicious): `pro_game_likely_over`
-        is only a time-based GUESS (kickoff + 4 hours) — for a game that
-        finishes faster than that (common for an early Sunday slate
-        checked ~3h40m post-kickoff), it hadn't caught up yet, so
-        already-finished players were still running through
-        `project_rest_of_game`'s blend, which still pulls partway back
-        toward the pregame number even at 100% elapsed — there's no
-        remaining uncertainty once a game's genuinely over, so it
-        shouldn't blend at all. `live_elapsed_fraction == 1.0` (set in
-        `live_score.py` from ESPN's own `type.completed` flag, not a
-        guess) is checked first now — a real, confirmed "this exact game
-        is over" signal beats the time-based heuristic whenever it's
-        available, and skips straight to the player's own real final
-        score, no blending left to do."""
-        if entry["actual"] is None:
-            return entry["projected"]
-        if entry.get("live_elapsed_fraction") == 1.0:
-            return entry["actual"]
-        if pro_game_likely_over(game_dates.get(entry["pro_team_id"])):
-            return entry["actual"]
-        touches, frac = entry.get("live_touches"), entry.get("live_elapsed_fraction")
-        if touches is not None and frac is not None:
-            return live_projection.project_rest_of_game(entry["actual"], touches, frac, entry["projected"])
-        return max(entry["actual"], entry["projected"])
+        """Thin wrapper around the module-level `best_live_estimate` (see
+        its docstring for the model) — used everywhere below that needs
+        "how good is this player right now," not just the final
+        `projected_final` sum: filling a genuinely blank starting slot and
+        the joke-lineup bench comparison both need the same number."""
+        return best_live_estimate(
+            entry["actual"], entry["projected"], entry["pro_team_id"], game_dates,
+            entry.get("live_touches"), entry.get("live_elapsed_fraction"),
+        )
 
     def _is_in_progress(entry: dict) -> bool:
-        """True while a player's real game has started but isn't decided
-        yet — added 2026-09-14 (Tommy: "some way to identify which players
-        are currently in game") so the frontend can visually flag them
-        (bold, e.g.) separately from a player who hasn't played yet or
-        whose game is already final. Reuses the exact same "is this game
-        definitely over" checks `_best_estimate` above already relies on,
-        rather than a third, potentially-drifting definition of "over.\""""
-        if entry["actual"] is None:
-            return False
-        if entry.get("live_elapsed_fraction") == 1.0:
-            return False
-        return not pro_game_likely_over(game_dates.get(entry["pro_team_id"]))
+        """Thin wrapper around the module-level `player_in_progress` —
+        added 2026-09-14 (Tommy: "some way to identify which players are
+        currently in game") so the frontend can visually flag them (bold,
+        e.g.) separately from a player who hasn't played yet or whose game
+        is already final."""
+        return player_in_progress(entry["actual"], entry["pro_team_id"], game_dates, entry.get("live_elapsed_fraction"))
 
     pro = pro_team_schedule(season)
     out: dict[int, dict] = {}

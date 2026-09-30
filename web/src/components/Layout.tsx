@@ -5,6 +5,7 @@ import { dateTime } from "../lib/format";
 import { PlayerCardProvider } from "../state/PlayerCardContext";
 import NavDropdown from "./NavDropdown";
 import RefreshButton from "./RefreshButton";
+import ThemeToggle from "./ThemeToggle";
 import type { DropdownEntry } from "./NavDropdown";
 import type { Meta, Spectrum, TradeGrades } from "../types/data";
 
@@ -106,6 +107,7 @@ export default function Layout() {
             <span className="masthead-date">{mastheadDate(meta)}</span>
           </div>
           <div className="masthead-controls">
+            <ThemeToggle />
             <RefreshButton />
             {meta && (
               <label>

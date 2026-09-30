@@ -18,7 +18,7 @@ class TestSeeding:
         divisions = {1: 0, 2: 1, 3: 1, 4: 1}
         wins = {1: 5, 2: 4, 3: 8, 4: 9}
         pf = {1: 1000, 2: 1100, 3: 1200, 4: 1300}
-        by_division, order = _seed(team_ids, wins, pf, {}, divisions, 2, random.Random(1))
+        by_division, order = _seed(team_ids, wins, pf, {}, divisions, random.Random(1))
         assert by_division == {0: [1], 1: [4, 3, 2]}
         assert order == [4, 3, 1, 2]
 
@@ -28,7 +28,7 @@ class TestSeeding:
         wins = {1: 7, 2: 7, 3: 2}
         pf = {1: 1000, 2: 2000, 3: 900}   # PF favors T2...
         h2h = {(1, 2): 2, (2, 1): 0}      # ...but T1 swept the season series
-        _field, order = _seed(team_ids, wins, pf, h2h, divisions, 1, random.Random(1))
+        _field, order = _seed(team_ids, wins, pf, h2h, divisions, random.Random(1))
         assert order == [1, 2, 3]
 
     def test_pf_breaks_tie_when_h2h_even(self):
@@ -37,7 +37,7 @@ class TestSeeding:
         wins = {1: 7, 2: 7}
         pf = {1: 900, 2: 1200}
         h2h = {(1, 2): 1, (2, 1): 1}
-        _field, order = _seed(team_ids, wins, pf, h2h, divisions, 1, random.Random(1))
+        _field, order = _seed(team_ids, wins, pf, h2h, divisions, random.Random(1))
         assert order == [2, 1]
 
 

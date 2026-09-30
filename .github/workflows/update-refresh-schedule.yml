@@ -48,12 +48,19 @@ jobs:
         working-directory: ingest
         env:
           LEAGUE_ID: "29471"
+          # New-season rollover: set the `SEASON` repository VARIABLE
+          # (Settings -> Secrets and variables -> Actions -> Variables tab)
+          # to the new year — see refresh.yml's "Run ingest" step for the
+          # full story on why this is a real env var now, not aspirational.
+          SEASON: ${{ vars.SEASON || '2026' }}
           ESPN_S2: ${{ secrets.ESPN_S2 }}
           SWID: ${{ secrets.SWID }}
         run: ~/.local/bin/uv run python -c "import fetch; fetch.fetch_schedule_only()"
 
       - name: Regenerate refresh.yml's cron block
         working-directory: ingest
+        env:
+          SEASON: ${{ vars.SEASON || '2026' }}
         run: ~/.local/bin/uv run python generate_refresh_schedule.py --write
 
       - name: Commit if changed

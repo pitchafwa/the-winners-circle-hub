@@ -18,11 +18,57 @@
   --positive:  #1E8F5C;  /* value semantics ONLY — good deltas, wins */
   --negative:  #C23B32;  /* value semantics ONLY — bad deltas, errors */
 
+  /* Fixed navy brand surface — masthead, nav dropdown, table.stat th,
+     hero-stats. Deliberately NOT part of the light/dark swap below: these
+     are inverted bands by brand design in EITHER theme (this is the same
+     literal value light mode's --ink already was), not "dark mode
+     leaking in" — same navy, same paper-colored text on it, always. */
+  --ink-fixed: #12213D;
+  --paper-fixed: #FAF3E1;  /* the fixed navy surfaces above always pair with this, never the theme's --paper */
+
+  color-scheme: light;
+
   --font-display: "Trebuchet MS", "Segoe UI", -apple-system, sans-serif;
   --font-body: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
   --content-width: 76rem;
+}
+
+/* Dark mode (added 2026-09-29): system preference by default — the
+   :not([data-theme="light"]) guard lets an explicit light choice win over
+   a dark OS setting — and ThemeToggle's explicit override below wins over
+   both. Kept in the same warm-navy "Pack Rip" family as light mode rather
+   than a generic near-black, just inverted: dark cardstock ground, cream
+   ink, brighter accents for contrast against it. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:     #171B2C;
+    --paper-2:   #20263D;
+    --ink:       #F0EAD9;
+    --ink-muted: #A9AFC9;
+    --rule:      #343B57;
+    --accent:    #2FD1B8;
+    --accent-2:  #E0B458;
+    --gold:      #E0B458;
+    --positive:  #3FBE86;
+    --negative:  #E2685A;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:     #171B2C;
+  --paper-2:   #20263D;
+  --ink:       #F0EAD9;
+  --ink-muted: #A9AFC9;
+  --rule:      #343B57;
+  --accent:    #2FD1B8;
+  --accent-2:  #E0B458;
+  --gold:      #E0B458;
+  --positive:  #3FBE86;
+  --negative:  #E2685A;
+  color-scheme: dark;
 }
 
 *,
@@ -165,11 +211,11 @@ hr,
   padding-top: 2.25rem;
   padding-bottom: 0.6rem;
   margin-bottom: 1.5rem;
-  background: var(--ink);
-  box-shadow: 0 0 0 100vmax var(--ink);
+  background: var(--ink-fixed);
+  box-shadow: 0 0 0 100vmax var(--ink-fixed);
   clip-path: inset(0 -100vmax);
   border-bottom: 3px solid var(--accent-2);
-  color: var(--paper);
+  color: var(--paper-fixed);
 }
 
 .masthead-top {
@@ -191,7 +237,7 @@ hr,
   font-size: clamp(1.9rem, 4.5vw, 2.9rem);
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--paper);
+  color: var(--paper-fixed);
 }
 
 .masthead-date {
@@ -230,7 +276,7 @@ hr,
 }
 
 .navlink:hover {
-  color: var(--paper);
+  color: var(--paper-fixed);
   text-decoration: none;
 }
 
@@ -255,7 +301,7 @@ hr,
   top: calc(100% + 0.6rem);
   left: 0;
   z-index: 20;
-  background: var(--ink);
+  background: var(--ink-fixed);
   border: 1px solid rgba(250, 243, 225, 0.18);
   border-top: 2px solid var(--accent-2);
   min-width: 12rem;
@@ -275,7 +321,7 @@ hr,
 }
 
 .nav-dropdown-item:hover {
-  color: var(--paper);
+  color: var(--paper-fixed);
   background: rgba(250, 243, 225, 0.06);
   text-decoration: none;
 }
@@ -372,7 +418,7 @@ hr,
   border-radius: 999px;
   border: 1px solid rgba(250, 243, 225, 0.3);
   background: rgba(250, 243, 225, 0.08);
-  color: var(--paper);
+  color: var(--paper-fixed);
   cursor: pointer;
 }
 
@@ -459,7 +505,7 @@ table.stat th {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #96A0BE;
-  background: var(--ink);
+  background: var(--ink-fixed);
   padding: 0.55rem 0.65rem;
   border-bottom: 3px solid var(--accent-2);
   white-space: nowrap;
@@ -471,7 +517,7 @@ table.stat th.sortable {
 }
 
 table.stat th.sortable:hover {
-  color: var(--paper);
+  color: var(--paper-fixed);
 }
 
 table.stat th[aria-sort="ascending"],
@@ -1037,11 +1083,11 @@ input.control::placeholder {
 /* The team-page hero numbers, specifically — not every .stat-row reuse
    (some pages reuse the class purely for its grid layout). */
 .hero-stats {
-  background: var(--ink);
+  background: var(--ink-fixed);
   border: none;
   border-radius: 10px;
   padding: 1.4rem 1.5rem;
-  color: var(--paper);
+  color: var(--paper-fixed);
 }
 
 .hero-stats .label { color: #96A0BE; }

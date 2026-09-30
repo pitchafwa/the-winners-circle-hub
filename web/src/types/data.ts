@@ -331,7 +331,7 @@ export interface Trade {
   team_ids: number[];
   players: TradePlayer[];
   picks: TradePick[];
-  source: "espn" | "manual";
+  source: "manual";
   started_points_gained: Record<string, number>;
 }
 

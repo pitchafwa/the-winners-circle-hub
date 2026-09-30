@@ -247,7 +247,6 @@ export default function ScreenshotButton({
       for (const { original, placeholder } of imagePlacements) {
         if (!original.complete || original.naturalWidth === 0) continue; // still not loaded after waitForImage's timeout — leave the placeholder's own fallback color showing
         const rect = placeholder.getBoundingClientRect();
-        console.log("DEBUG rect", rect, "complete", original.complete, "nw", original.naturalWidth);
         const x = rect.left - frameRect.left;
         const y = rect.top - frameRect.top;
         const w = rect.width;

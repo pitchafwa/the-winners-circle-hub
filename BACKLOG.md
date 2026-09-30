@@ -2416,48 +2416,44 @@ timeline yet. Worth building that once as a shared primitive rather than
 solving it three separate times; several of the ideas below need the exact
 same thing.
 
-## Recommended: extensions of things already built
+## Implemented (was "Recommended," reconciled 2026-09-29)
 
-- **Trade grades** — the draft report card already grades every rookie pick
-  against a real dynasty market value (`pick_values.json`) and every
-  player's current value (`valuation.py`). The exact same machinery could
-  grade every trade in `manual_trades.json`, retroactively and on an
-  ongoing basis: who won which trade, biggest league blowout, a team's
-  career trade record. This is the most natural next build — no new data
-  source needed, just a new lens on data that's already flowing.
+Both "Recommended" sections below were written 2026-08-24 and never
+pruned as their own ideas shipped — by the 2026-09-29 site audit, 5 of
+the 7 were already built (3 of THOSE were also separately sitting in
+`## Declined` above, flatly contradicting this list). Reconciled here;
+see each feature's real code/DATA.md section for what actually shipped
+rather than what was originally proposed.
+
+- **Trade grades** — built (`ingest/trade_grades.py` → `trades.json` →
+  `TradesPage.tsx`; DATA.md's `trades.json` section).
+- **Pick futures board** — built (`ingest/pick_tracking.py` →
+  `pick_futures.json` → `PickFuturesPage.tsx`).
+- **Contend/rebuild spectrum** — built (`ingest/spectrum.py` →
+  `spectrum.json` → `ContendRebuildTable.tsx`).
+- **A real "Franchise" page per team** — built (`FranchisePage.tsx`).
+- **Draft class survival rate** — declined, see `## Declined` above.
+- **"On this day" callouts** — declined, see `## Declined` above.
+- **League Constitution page** — declined, see `## Declined` above.
+
+## Recommended (still open)
+
 - **Dynasty Power Rankings** — the current Power Rankings are single-season
   (all-play, points-for, trend, roster). A dynasty variant blending in
   current roster dynasty value + held draft-pick capital would answer a
   different, very dynasty-specific question: who's actually building the
   best long-term team, not just who's winning this year.
-- **Pick futures board** — `pick_ownership` (resolved/projected/unresolved
-  traded future picks) already exists in the data but isn't its own page —
-  it's easy to lose track of who owns what pick 2 years out. A dedicated
-  board (or a expanded History section) showing every traded future pick
-  league-wide at a glance would be a handy trade-planning reference.
-
-## Recommended: new, dynasty-flavored
-
-- **Draft class survival rate** — of everyone taken in a given year's
-  rookie draft, how many are still on a roster N years later (vs. cut,
-  traded away and cut elsewhere, etc.) — a fun companion to the draft
-  report card, and free once the ownership timeline above exists.
-- **Contend/rebuild spectrum** — a one-glance read on where each team sits
-  between "all-in now" and "stockpiling for later," from average roster
-  age + held future pick capital. Good Trophy-Case-style content.
-- **"On this day" callouts** — e.g. "3 years ago today, [Team] drafted
-  [Player]." Playful, low-effort, and the draft-date data to power it
-  already exists.
-- **A real "Franchise" page per team** — My Team is season-scoped and
-  History is league-wide; there's no single place for one team's *entire*
-  story — every trade it's ever made, every draft pick, full roster
-  tenure. Dynasty leagues are fundamentally about franchises persisting
-  across years more than any one season, so this might be the highest-
-  leverage structural addition on this list.
-- **League Constitution page** — not data-driven, just a static reference
-  page for the actual rules (keeper count, playoff format, trade deadline,
-  tiebreakers) — cheap to build, kills the recurring "wait what's the rule
-  again" group-chat question.
+- **Division Pro Bowl (added 2026-09-29)** — an idea for NFL week 18
+  (already inside the refresh schedule's window even though it's after
+  this league's own championship — see `generate_refresh_schedule.py`'s
+  docstring). The two divisions face off as an all-star exhibition: each
+  team in a division contributes real players to that division's combined
+  all-star roster (some real selection mechanism TBD — best remaining
+  redraft value? a vote? highest scorer at each position across the
+  division?), and the site tracks the resulting Southside-vs-Westside
+  matchup like a real one. Not scoped yet — needs a selection rule, a
+  scoring format decision (real week 18 stats? something else?), and a
+  UI treatment distinct enough from a real matchup to not be confusing.
 
 ## Structural note
 

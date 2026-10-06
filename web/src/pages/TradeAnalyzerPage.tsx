@@ -18,23 +18,23 @@ function positionSort(a: string, b: string): number {
   return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
 }
 
-function rosterCards(roster: TeamRoster | undefined): RosterPlayerCard[] {
+export function rosterCards(roster: TeamRoster | undefined): RosterPlayerCard[] {
   if (!roster) return [];
   return [...roster.starters, ...roster.bench, ...roster.ir].filter(
     (p): p is RosterPlayerCard & { player_id: number } => p.player_id !== null,
   );
 }
 
-interface AssetSelection {
+export interface AssetSelection {
   players: Set<number>;
   picks: Set<string>; // pick key — see PickChoice.key
 }
 
-function emptySelection(): AssetSelection {
+export function emptySelection(): AssetSelection {
   return { players: new Set(), picks: new Set() };
 }
 
-interface PickChoice {
+export interface PickChoice {
   key: string;
   season: number;
   round: number;
@@ -48,7 +48,7 @@ interface PickChoice {
   value: number;
 }
 
-function AssetPicker({
+export function AssetPicker({
   title, roster, picks, selection, onToggleplayer, onTogglePick,
 }: {
   title: string;

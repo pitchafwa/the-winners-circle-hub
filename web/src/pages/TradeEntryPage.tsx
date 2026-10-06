@@ -28,6 +28,12 @@ export default function TradeEntryPage() {
   const [bOut, setBOut] = useState<AssetSelection>(emptySelection());
   const [date, setDate] = useState(todayISO());
   const [week, setWeek] = useState<number>(0);
+  // ESPN processes a real trade the moment it's accepted, and roster.json
+  // follows on the next refresh — so by the time a trade is recorded here
+  // the players are usually ALREADY on the receiving team. In that case the
+  // giver's own roster no longer lists them; they're picked from the
+  // receiver's roster instead. Picks are unaffected (ESPN never tracks them).
+  const [alreadyInEspn, setAlreadyInEspn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [trades, setTrades] = useState<ManualTrade[] | null>(null);
@@ -67,7 +73,8 @@ export default function TradeEntryPage() {
     if (teamA === null || teamB === null) return [];
     const out: SubmitAsset[] = [];
     const add = (from: number, to: number, sel: AssetSelection) => {
-      for (const c of rosterCards(roster.data?.teams[String(from)])) {
+      const playerSource = alreadyInEspn ? to : from;
+      for (const c of rosterCards(roster.data?.teams[String(playerSource)])) {
         if (sel.players.has(c.player_id!)) out.push({ kind: "player", from, to, playerName: c.name ?? "" });
       }
       for (const pk of picksFor(from)) {
@@ -197,22 +204,31 @@ export default function TradeEntryPage() {
           <>
             <div className="two-col" style={{ marginBottom: "1rem" }}>
               <AssetPicker
-                title={`${label(teamA)} gives up`}
-                roster={roster.data?.teams[String(teamA)]}
+                title={alreadyInEspn ? `${label(teamA)} gave up (now on ${label(teamB)})` : `${label(teamA)} gives up`}
+                roster={roster.data?.teams[String(alreadyInEspn ? teamB : teamA)]}
                 picks={picksFor(teamA)}
                 selection={aOut}
                 onToggleplayer={(id) => toggle(setAOut, aOut, "players", id)}
                 onTogglePick={(key) => toggle(setAOut, aOut, "picks", key)}
               />
               <AssetPicker
-                title={`${label(teamB)} gives up`}
-                roster={roster.data?.teams[String(teamB)]}
+                title={alreadyInEspn ? `${label(teamB)} gave up (now on ${label(teamA)})` : `${label(teamB)} gives up`}
+                roster={roster.data?.teams[String(alreadyInEspn ? teamA : teamB)]}
                 picks={picksFor(teamB)}
                 selection={bOut}
                 onToggleplayer={(id) => toggle(setBOut, bOut, "players", id)}
                 onTogglePick={(key) => toggle(setBOut, bOut, "picks", key)}
               />
             </div>
+
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", cursor: "pointer" }}>
+              <input type="checkbox" checked={alreadyInEspn}
+                onChange={(e) => { setAlreadyInEspn(e.target.checked); setAOut(emptySelection()); setBOut(emptySelection()); }} />
+              <span>This trade was already processed in ESPN</span>
+              <span className="muted" style={{ fontSize: "0.78rem" }}>
+                — the players have already moved, so pick them from the team that received them
+              </span>
+            </label>
 
             <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", marginBottom: "1rem" }}>
               <label>

@@ -153,9 +153,15 @@ function upsertLedger(
   else ledger.push(entry);
 }
 
-export async function listTrades(): Promise<ManualTrade[]> {
+/** The live file straight from GitHub — trades plus the pick-holder ledger.
+ * The site's built JSON only catches up after the next rebuild, so anything
+ * that has to reflect a trade saved minutes ago (the pick picker) reads this. */
+export async function loadTradesFile(): Promise<{ trades: ManualTrade[]; ledger: PickLedgerEntry[] }> {
   const { data } = await load();
-  return [...data.trades].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  return {
+    trades: [...data.trades].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "")),
+    ledger: data.pick_ownership,
+  };
 }
 
 export async function submitTrade(

@@ -3,9 +3,9 @@ import { useApp } from "../state/AppContext";
 import { useJson, clearJsonCache } from "../lib/data";
 import PasswordGate from "../components/PasswordGate";
 import {
-  GITHUB_REPO, deleteTrade, getToken, listTrades, rebuildSite, setToken, submitTrade,
+  GITHUB_REPO, deleteTrade, getToken, loadTradesFile, rebuildSite, setToken, submitTrade,
 } from "../lib/githubTrades";
-import type { ManualTrade, SubmitAsset } from "../lib/githubTrades";
+import type { ManualTrade, PickLedgerEntry, SubmitAsset } from "../lib/githubTrades";
 import { AssetPicker, emptySelection, rosterCards } from "./TradeAnalyzerPage";
 import type { AssetSelection, PickChoice } from "./TradeAnalyzerPage";
 import type { PickFutures, Roster } from "../types/data";
@@ -37,6 +37,7 @@ export default function TradeEntryPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [trades, setTrades] = useState<ManualTrade[] | null>(null);
+  const [ledger, setLedger] = useState<PickLedgerEntry[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,15 +45,27 @@ export default function TradeEntryPage() {
   }, [meta, week]);
 
   const refreshList = () => {
-    if (!getToken()) { setTrades(null); return; }
+    if (!getToken()) { setTrades(null); setLedger(null); return; }
     setListError(null);
-    listTrades().then(setTrades).catch((e: Error) => setListError(e.message));
+    loadTradesFile()
+      .then((f) => { setTrades(f.trades); setLedger(f.ledger); })
+      .catch((e: Error) => setListError(e.message));
   };
   useEffect(refreshList, [token]);
 
+  // Who holds a pick RIGHT NOW: the live ledger on GitHub wins over the built
+  // board, which lags until the next rebuild. The ledger is the only source
+  // the board's owner comes from, so no entry means it's back with (or never
+  // left) its original team.
+  const holderOf = (p: PickFutures["board"][number]): number => {
+    if (ledger === null) return p.current_owner_id;
+    const e = ledger.find((x) => x.season === p.season && x.round === p.round && x.original_team_id === p.original_team_id);
+    return e ? e.owned_by_team_id : p.original_team_id;
+  };
+
   const picksFor = (teamId: number | null): PickChoice[] =>
     (pickFutures.data?.board ?? [])
-      .filter((p) => p.current_owner_id === teamId && p.status !== "resolved")
+      .filter((p) => holderOf(p) === teamId && p.status !== "resolved")
       .map((p) => ({
         key: `${p.season}-${p.round}-${p.original_team_id}`,
         season: p.season, round: p.round, originalTeamId: p.original_team_id, value: p.value,
@@ -254,6 +267,11 @@ export default function TradeEntryPage() {
               {busy ? "Saving…" : "Save trade to GitHub"}
             </button>
             {!token && <span className="muted" style={{ marginLeft: "0.75rem" }}>Add a token above first.</span>}
+            {token && ledger !== null && (
+              <span className="muted" style={{ marginLeft: "0.75rem", fontSize: "0.8rem" }}>
+                pick lists reflect trades already saved to GitHub
+              </span>
+            )}
           </>
         )}
 

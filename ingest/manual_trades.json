@@ -1045,6 +1045,28 @@
           "to": 4
         }
       ]
+    },
+    {
+      "id": "342d0e02",
+      "season": 2026,
+      "date": "2026-10-06",
+      "week": 5,
+      "teams": [
+        6,
+        8
+      ],
+      "assets": [
+        {
+          "player": "DJ Moore",
+          "from": 8,
+          "to": 6
+        },
+        {
+          "pick": "2027 1st",
+          "from": 6,
+          "to": 8
+        }
+      ]
     }
   ],
   "pick_ownership": [
@@ -1312,9 +1334,9 @@
       "season": 2027,
       "round": 1,
       "original_team_id": 8,
-      "owned_by_team_id": 6,
-      "via": "traded 2026-08-17",
-      "trade_id": "2bb907f2"
+      "owned_by_team_id": 8,
+      "via": "traded 2026-10-06",
+      "trade_id": "342d0e02"
     },
     {
       "season": 2026,

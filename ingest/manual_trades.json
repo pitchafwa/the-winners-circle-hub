@@ -1114,6 +1114,28 @@
           "to": 10
         }
       ]
+    },
+    {
+      "id": "c72ffa60",
+      "season": 2026,
+      "date": "2026-10-07",
+      "week": 5,
+      "teams": [
+        1,
+        9
+      ],
+      "assets": [
+        {
+          "player": "Alvin Kamara",
+          "from": 9,
+          "to": 1
+        },
+        {
+          "player": "Marvin Harrison Jr.",
+          "from": 1,
+          "to": 9
+        }
+      ]
     }
   ],
   "pick_ownership": [

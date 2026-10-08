@@ -1136,6 +1136,28 @@
           "to": 9
         }
       ]
+    },
+    {
+      "id": "ebd91fe0",
+      "season": 2026,
+      "date": "2026-10-07",
+      "week": 5,
+      "teams": [
+        1,
+        6
+      ],
+      "assets": [
+        {
+          "player": "Deebo Samuel Sr.",
+          "from": 6,
+          "to": 1
+        },
+        {
+          "pick": "2027 3rd",
+          "from": 1,
+          "to": 6
+        }
+      ]
     }
   ],
   "pick_ownership": [
@@ -1447,6 +1469,14 @@
       "owned_by_team_id": 5,
       "via": "traded 2026-10-06",
       "trade_id": "659687e1"
+    },
+    {
+      "season": 2027,
+      "round": 3,
+      "original_team_id": 1,
+      "owned_by_team_id": 6,
+      "via": "traded 2026-10-07",
+      "trade_id": "ebd91fe0"
     }
   ]
 }

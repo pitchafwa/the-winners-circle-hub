@@ -1185,6 +1185,33 @@
           "to": 6
         }
       ]
+    },
+    {
+      "id": "4dd27676",
+      "season": 2026,
+      "date": "2026-10-15",
+      "week": 6,
+      "teams": [
+        8,
+        10
+      ],
+      "assets": [
+        {
+          "player": "Brock Purdy",
+          "from": 10,
+          "to": 8
+        },
+        {
+          "player": "Trevor Lawrence",
+          "from": 8,
+          "to": 10
+        },
+        {
+          "pick": "2028 2nd",
+          "from": 8,
+          "to": 10
+        }
+      ]
     }
   ],
   "pick_ownership": [
@@ -1512,6 +1539,14 @@
       "owned_by_team_id": 5,
       "via": "traded 2026-10-07",
       "trade_id": "4bf3fc8c"
+    },
+    {
+      "season": 2028,
+      "round": 2,
+      "original_team_id": 8,
+      "owned_by_team_id": 10,
+      "via": "traded 2026-10-15",
+      "trade_id": "4dd27676"
     }
   ]
 }

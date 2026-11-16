@@ -1212,6 +1212,48 @@
           "to": 10
         }
       ]
+    },
+    {
+      "id": "2dba057d",
+      "season": 2026,
+      "date": "2026-11-16",
+      "week": 10,
+      "teams": [
+        5,
+        8
+      ],
+      "assets": [
+        {
+          "player": "Rashee Rice",
+          "from": 8,
+          "to": 5
+        },
+        {
+          "player": "Saquon Barkley",
+          "from": 8,
+          "to": 5
+        },
+        {
+          "pick": "2027 1st",
+          "from": 8,
+          "to": 5
+        },
+        {
+          "player": "Jonah Coleman",
+          "from": 5,
+          "to": 8
+        },
+        {
+          "player": "George Pickens",
+          "from": 5,
+          "to": 8
+        },
+        {
+          "pick": "2027 2nd",
+          "from": 5,
+          "to": 8
+        }
+      ]
     }
   ],
   "pick_ownership": [
@@ -1480,9 +1522,9 @@
       "season": 2027,
       "round": 1,
       "original_team_id": 8,
-      "owned_by_team_id": 8,
-      "via": "traded 2026-10-06",
-      "trade_id": "342d0e02"
+      "owned_by_team_id": 5,
+      "via": "traded 2026-11-16",
+      "trade_id": "2dba057d"
     },
     {
       "season": 2026,
@@ -1520,9 +1562,9 @@
       "season": 2027,
       "round": 2,
       "original_team_id": 10,
-      "owned_by_team_id": 5,
-      "via": "traded 2026-10-06",
-      "trade_id": "659687e1"
+      "owned_by_team_id": 8,
+      "via": "traded 2026-11-16",
+      "trade_id": "2dba057d"
     },
     {
       "season": 2027,
